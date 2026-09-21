@@ -116,6 +116,111 @@ describe('FileRoomRepository(파일 저장소)', () => {
     await assert.doesNotReject(() => repository.delete('ZZZZ'));
   });
 
+  describe('로비 목록 요약 색인', () => {
+    it('저장할 때마다 색인을 갱신한다', async () => {
+      // Given
+      const repository = newRepository();
+      await repository.init();
+
+      // When
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+      await repository.save(Room.create({ code: 'DEF2', hostName: '두리', token: 'b'.repeat(64), now: NOW }));
+
+      // Then
+      const summaries = await repository.findAllSummaries();
+      assert.deepEqual(
+        summaries.map((summary) => [summary.code, summary.hostName, summary.seatCount]).sort(),
+        [
+          ['AB2C', '하나', 1],
+          ['DEF2', '두리', 1],
+        ],
+      );
+    });
+
+    it('색인은 메모리에 있어 파일을 다시 읽지 않는다', async () => {
+      // Given
+      const repository = newRepository();
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+
+      // When (파일을 지워도 색인은 그대로다 — 게임을 다시 복원하지 않는다는 증거)
+      await rm(path.join(directory, 'AB2C.json'));
+
+      // Then
+      assert.equal((await repository.findAllSummaries()).length, 1);
+    });
+
+    it('삭제하면 색인에서도 빠진다', async () => {
+      // Given
+      const repository = newRepository();
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+
+      // When
+      await repository.delete('AB2C');
+
+      // Then
+      assert.deepEqual(await repository.findAllSummaries(), []);
+    });
+
+    it('init에서 기존 파일을 읽어 색인을 다시 세운다', async () => {
+      // Given (다른 인스턴스가 저장해 둔 파일)
+      const writer = newRepository();
+      await writer.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+
+      // When
+      const reader = newRepository();
+      await reader.init();
+
+      // Then
+      assert.deepEqual(
+        (await reader.findAllSummaries()).map((summary) => summary.code),
+        ['AB2C'],
+      );
+    });
+
+    it('진행 중인 방의 요약에도 게임 상태가 들어가지 않는다', async () => {
+      // Given
+      const random = new FakeRandomSource([1, 2]);
+      const repository = newRepository(random);
+      await repository.save(playingRoom(random));
+
+      // When
+      const [summary] = await repository.findAllSummaries();
+
+      // Then
+      assert.equal(summary.status, ROOM_STATUS.PLAYING);
+      assert.equal(summary.seatCount, 2);
+      assert.equal('game' in summary, false);
+    });
+
+    it('방 개수를 색인에서 바로 알려준다', async () => {
+      // Given
+      const repository = newRepository();
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+      await repository.save(Room.create({ code: 'DEF2', hostName: '두리', token: 'b'.repeat(64), now: NOW }));
+
+      // When / Then
+      assert.equal(await repository.countRooms(), 2);
+      await repository.delete('AB2C');
+      assert.equal(await repository.countRooms(), 1);
+    });
+
+    it('저장 디렉터리가 없어도 첫 저장에서 만들어 준다', async () => {
+      // Given (아직 없는 하위 경로)
+      const nested = path.join(directory, 'deep', 'rooms');
+      const repository = new FileRoomRepository({
+        directory: nested,
+        random: new FakeRandomSource(),
+        logger: silentLogger,
+      });
+
+      // When
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+
+      // Then
+      assert.equal((await repository.findByCode('AB2C')).code, 'AB2C');
+    });
+  });
+
   describe('스키마 검증', () => {
     it('깨진 JSON 파일은 건너뛰고 로그를 남긴다', async () => {
       // Given

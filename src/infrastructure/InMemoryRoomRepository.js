@@ -25,6 +25,15 @@ export class InMemoryRoomRepository {
     return text === undefined ? null : this.#parse(code, text);
   }
 
+  /** 로비 목록용 요약(파일 저장소의 색인과 같은 역할). */
+  async findAllSummaries() {
+    return (await this.findAll()).map((room) => room.toSummary());
+  }
+
+  async countRooms() {
+    return this.#rooms.size;
+  }
+
   async findAll() {
     const rooms = [];
     for (const [code, text] of [...this.#rooms.entries()]) {

@@ -167,6 +167,26 @@ export class Room {
     return now - this.#updatedAt > STALE_AFTER_MS;
   }
 
+  /** 대기실이면서 일정 시간 넘게 아무 변화가 없는 방(플러딩 정리 대상). */
+  isIdleLobby(now, idleMs) {
+    return this.isLobby() && now - this.#updatedAt > idleMs;
+  }
+
+  /**
+   * 로비 목록에 필요한 최소 정보. 좌석 토큰과 게임 상태는 담지 않는다.
+   * 저장소가 이 값을 색인해 두면 목록 조회 때 게임을 복원할 필요가 없다.
+   */
+  toSummary() {
+    return {
+      code: this.#code,
+      status: this.#status,
+      hostName: this.seatById(this.#hostSeatId)?.name ?? null,
+      seatCount: this.#seats.length,
+      roundLimit: this.#options.roundLimit,
+      updatedAt: this.#updatedAt,
+    };
+  }
+
   // ── 좌석 ────────────────────────────────────────────────────────────────
 
   join({ name, token, now }) {

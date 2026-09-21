@@ -1,4 +1,4 @@
-import { Room } from '../domain/room/Room.js';
+import { MAX_SEATS, ROOM_STATUS, Room } from '../domain/room/Room.js';
 import { generateRoomCode, isValidRoomCode } from '../domain/room/RoomCode.js';
 import { AppError } from './errors.js';
 import { KeyedMutex } from './KeyedMutex.js';
@@ -11,6 +11,13 @@ export const HOST_ACTIONS = Object.freeze({
   START: 'START',
   SET_AUTOPILOT: 'SET_AUTOPILOT',
 });
+
+/** 서버가 동시에 들고 있을 수 있는 최대 방 개수(플러딩 방어). */
+export const MAX_ROOMS = 200;
+/** 상한에 닿았을 때 먼저 쓸어낼 "방치된 대기실" 기준(30분). */
+export const IDLE_LOBBY_MS = 30 * 60 * 1000;
+/** 오래된 방 정리를 주기적으로 돌리는 간격(1시간). */
+export const STALE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 
 /** 방 코드 생성 재시도 횟수. */
 const CODE_ATTEMPTS = 20;
@@ -32,6 +39,7 @@ export class RoomService {
   #autoDriver = null;
   #presence;
   #mutex;
+  #maxRooms;
 
   constructor({
     repository,
@@ -43,6 +51,7 @@ export class RoomService {
     logger,
     presence,
     mutex,
+    maxRooms = MAX_ROOMS,
   }) {
     this.#repository = repository;
     this.#random = random;
@@ -53,6 +62,7 @@ export class RoomService {
     this.#logger = logger ?? console;
     this.#presence = presence ?? { onlineSeatIds: () => [] };
     this.#mutex = mutex ?? new KeyedMutex();
+    this.#maxRooms = maxRooms;
   }
 
   /** 컴퓨터/자동 진행 좌석을 대신 진행시키는 드라이버를 연결한다(순환 의존 방지). */
@@ -60,10 +70,14 @@ export class RoomService {
     this.#autoDriver = driver;
   }
 
+  /**
+   * 참가 가능한 방 목록.
+   * 저장소의 **요약 색인**만 읽는다 — 목록 한 번 볼 때마다 모든 방의 게임을 복원하지 않는다.
+   */
   async listRooms() {
-    const rooms = await this.#repository.findAll();
-    return rooms
-      .filter((room) => room.isLobby() && !room.isFull())
+    const summaries = await this.#repository.findAllSummaries();
+    return summaries
+      .filter((summary) => summary.status === ROOM_STATUS.LOBBY && summary.seatCount < MAX_SEATS)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .map(toRoomSummaryDto);
   }
@@ -106,6 +120,7 @@ export class RoomService {
   }
 
   async #createRoomLocked({ hostName }) {
+    await this.#enforceRoomCapacity();
     const now = this.#clock.now();
     const code = await this.#generateUniqueCode();
     const token = this.#tokenFactory.create();
@@ -211,6 +226,56 @@ export class RoomService {
       return;
     }
     this.#autoDriver?.cancelTimer(room.code);
+  }
+
+  /**
+   * 방 개수 상한을 지킨다.
+   * 상한에 닿으면 먼저 **방치된 대기실**(30분 이상 변화 없음)을 쓸어내고, 그래도 자리가 없으면
+   * 거절한다. 진행 중인 방은 사람이 돌아올 수 있으므로 건드리지 않는다.
+   */
+  async #enforceRoomCapacity() {
+    const summaries = await this.#repository.findAllSummaries();
+    if (summaries.length < this.#maxRooms) {
+      return;
+    }
+    const now = this.#clock.now();
+    let remaining = summaries.length;
+    for (const summary of summaries) {
+      if (summary.status === ROOM_STATUS.LOBBY && now - summary.updatedAt > IDLE_LOBBY_MS) {
+        await this.#deleteRoom(summary.code);
+        remaining -= 1;
+      }
+    }
+    if (remaining >= this.#maxRooms) {
+      throw new AppError('ERR017', `방 개수 상한(${this.#maxRooms}) 초과`);
+    }
+  }
+
+  /**
+   * 오래된 방 정리를 주기적으로 돌린다(시작 시 한 번만으로는 오래 켜 둔 서버가 계속 쌓인다).
+   * 타이머는 unref해 서버 종료를 막지 않는다.
+   * @returns {() => void} 정리 중단 함수
+   */
+  startStaleCleanup({ intervalMs = STALE_CLEANUP_INTERVAL_MS, timers = { setInterval, clearInterval } } = {}) {
+    const handle = timers.setInterval(() => {
+      void this.#runStaleCleanup();
+    }, intervalMs);
+    if (typeof handle?.unref === 'function') {
+      handle.unref();
+    }
+    return () => timers.clearInterval(handle);
+  }
+
+  /** 주기 정리는 실패해도 서버를 멈추지 않는다(다음 주기에 다시 시도). */
+  async #runStaleCleanup() {
+    try {
+      const removed = await this.cleanupStaleRooms();
+      if (removed.length > 0) {
+        this.#logger.info?.(`[RoomService] 오래된 방 ${removed.length}개 정리: ${removed.join(', ')}`);
+      }
+    } catch (error) {
+      this.#logger.error(`[RoomService] 주기 방 정리 실패: ${error.message}`);
+    }
   }
 
   /** 오래된 방 정리(시작 시 + 주기적으로). */

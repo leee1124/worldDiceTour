@@ -25,6 +25,7 @@ export function createApp({
   allowedHosts = [],
   sseLimits = {},
   presenceDebounceMs,
+  staleCleanupIntervalMs,
 }) {
   const sseHub = new SseHub({ logger, ...(heartbeatMs ? { heartbeatMs } : {}), ...sseLimits });
   const presence = { onlineSeatIds: (code) => sseHub.onlineSeatIds(code) };
@@ -75,6 +76,11 @@ export function createApp({
 
   const server = createHttpServer({ controller, publicDir, logger, allowedHosts });
 
+  // 오래된 방 정리는 시작 시 한 번으로 끝내지 않고 주기적으로 돈다(오래 켜 둔 서버 대비).
+  const stopStaleCleanup = roomService.startStaleCleanup(
+    staleCleanupIntervalMs === undefined ? {} : { intervalMs: staleCleanupIntervalMs },
+  );
+
   function currentPort() {
     const address = server.address();
     return typeof address === 'object' && address ? address.port : 0;
@@ -88,6 +94,7 @@ export function createApp({
     gameService,
     /** 테스트/종료용: 타이머와 열린 스트림을 모두 정리한 뒤 서버를 닫는다. */
     async close() {
+      stopStaleCleanup();
       driver.stop();
       sseHub.closeAll();
       await new Promise((resolve) => server.close(resolve));

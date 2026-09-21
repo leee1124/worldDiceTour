@@ -198,6 +198,50 @@ describe('Room(방 Aggregate)', () => {
     });
   });
 
+  describe('방 요약(로비 목록용)', () => {
+    it('목록에 필요한 값만 담은 요약을 만든다', () => {
+      // Given
+      const { room, host } = roomWithTwoSeats();
+      room.setOptions({ roundLimit: 20, bySeatId: host.id, now: NOW });
+
+      // When
+      const summary = room.toSummary();
+
+      // Then
+      assert.deepEqual(summary, {
+        code: 'AB2C',
+        status: ROOM_STATUS.LOBBY,
+        hostName: '하나',
+        seatCount: 2,
+        roundLimit: 20,
+        updatedAt: NOW,
+      });
+    });
+
+    it('요약에는 좌석 토큰이나 게임 상태가 들어가지 않는다', () => {
+      // Given
+      const { room, host } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource([1, 2]), now: NOW });
+
+      // When
+      const serialized = JSON.stringify(room.toSummary());
+
+      // Then
+      assert.equal(serialized.includes('token'), false);
+      assert.equal(serialized.includes('game'), false);
+      assert.equal(serialized.includes('seats'), false);
+    });
+
+    it('빈 방의 호스트 이름은 null이다', () => {
+      // Given
+      const room = createRoom();
+      room.removeSeat({ seatId: room.hostSeatId, bySeatId: room.hostSeatId, now: NOW });
+
+      // When / Then
+      assert.equal(room.toSummary().hostName, null);
+    });
+  });
+
   describe('호스트 권한', () => {
     it('호스트만 컴퓨터 좌석을 추가할 수 있다', () => {
       // Given

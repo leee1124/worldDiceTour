@@ -203,7 +203,216 @@ describe('RoomService(방 유스케이스)', () => {
     });
   });
 
+  describe('방 개수 상한(플러딩 방어)', () => {
+    /** 상한을 낮춰 조립한 서비스와 움직이는 시계. */
+    const cappedFixture = async ({ maxRooms = 2, start = 1_700_000_000_000 } = {}) => {
+      const fixture = createAppFixture({ random: codeRandom() });
+      let now = start;
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+        maxRooms,
+      });
+      return { fixture, roomService, advance: (ms) => { now += ms; }, at: () => now };
+    };
+
+    it('상한에 닿고 정리할 방도 없으면 ERR017로 거절한다', async () => {
+      // Given
+      const { roomService } = await cappedFixture({ maxRooms: 2 });
+      await roomService.createRoom({ hostName: '하나' });
+      await roomService.createRoom({ hostName: '두리' });
+
+      // When / Then
+      await assert.rejects(() => roomService.createRoom({ hostName: '세찌' }), { code: 'ERR017' });
+    });
+
+    it('상한에 닿으면 30분 넘게 방치된 대기실을 먼저 쓸어낸다', async () => {
+      // Given
+      const { fixture, roomService, advance } = await cappedFixture({ maxRooms: 2 });
+      const stale = await roomService.createRoom({ hostName: '옛방' });
+      advance(31 * 60 * 1000);
+      const fresh = await roomService.createRoom({ hostName: '새방' });
+
+      // When
+      const created = await roomService.createRoom({ hostName: '신규' });
+
+      // Then (방치된 방만 사라지고 새 방이 생겼다)
+      assert.equal(await fixture.repository.findByCode(stale.room.code), null);
+      assert.notEqual(await fixture.repository.findByCode(fresh.room.code), null);
+      assert.notEqual(await fixture.repository.findByCode(created.room.code), null);
+    });
+
+    it('진행 중인 방은 방치돼 보여도 쓸어내지 않는다', async () => {
+      // Given
+      const { fixture, roomService, advance } = await cappedFixture({ maxRooms: 1 });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      await roomService.joinSeat({ code: host.room.code, name: '두리' });
+      await roomService.hostAction({
+        code: host.room.code,
+        token: host.seatToken,
+        action: { type: 'START' },
+      });
+      advance(31 * 60 * 1000);
+
+      // When / Then
+      await assert.rejects(() => roomService.createRoom({ hostName: '신규' }), { code: 'ERR017' });
+      assert.notEqual(await fixture.repository.findByCode(host.room.code), null);
+    });
+
+    it('기본 상한은 200개다', async () => {
+      // Given / When
+      const { MAX_ROOMS } = await import('../../src/application/RoomService.js');
+
+      // Then
+      assert.equal(MAX_ROOMS, 200);
+    });
+  });
+
+  describe('로비 목록', () => {
+    it('전체 방을 복원하지 않고 요약 색인만 읽는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      await fixture.roomService.createRoom({ hostName: '하나' });
+      let findAllCalls = 0;
+      const spied = {
+        ...fixture.repository,
+        findAll: async () => {
+          findAllCalls += 1;
+          return [];
+        },
+        findAllSummaries: () => fixture.repository.findAllSummaries(),
+        findByCode: (code) => fixture.repository.findByCode(code),
+      };
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: spied,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: fixture.clock,
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+
+      // When
+      const rooms = await roomService.listRooms();
+
+      // Then
+      assert.equal(rooms.length, 1);
+      assert.equal(findAllCalls, 0, 'findAll(전체 복원)을 쓰지 않는다');
+      assert.deepEqual(Object.keys(rooms[0]).sort(), [
+        'code',
+        'hostName',
+        'maxSeats',
+        'options',
+        'seatCount',
+        'status',
+        'updatedAt',
+      ]);
+    });
+
+    it('자리가 찬 방과 진행 중인 방은 목록에서 빠진다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const open = await fixture.roomService.createRoom({ hostName: '열린방' });
+      const playing = await fixture.roomService.createRoom({ hostName: '진행방' });
+      await fixture.roomService.joinSeat({ code: playing.room.code, name: '두리' });
+      await fixture.roomService.hostAction({
+        code: playing.room.code,
+        token: playing.seatToken,
+        action: { type: 'START' },
+      });
+      const full = await fixture.roomService.createRoom({ hostName: '만석방' });
+      for (const name of ['둘', '셋', '넷']) {
+        await fixture.roomService.joinSeat({ code: full.room.code, name });
+      }
+
+      // When
+      const rooms = await fixture.roomService.listRooms();
+
+      // Then
+      assert.deepEqual(rooms.map((room) => room.code), [open.room.code]);
+    });
+  });
+
   describe('오래된 방 정리', () => {
+    it('주기적으로 정리를 돌리고 멈출 수 있다(unref된 타이머)', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const intervals = [];
+      let unrefCalled = false;
+      let tick;
+      const timers = {
+        setInterval: (fn, ms) => {
+          intervals.push(ms);
+          tick = fn;
+          return {
+            unref: () => {
+              unrefCalled = true;
+            },
+          };
+        },
+        clearInterval: () => {
+          tick = null;
+        },
+      };
+
+      // When
+      const stop = fixture.roomService.startStaleCleanup({ intervalMs: 1_000, timers });
+      await tick();
+
+      // Then
+      assert.deepEqual(intervals, [1_000]);
+      assert.equal(unrefCalled, true);
+      stop();
+      assert.equal(tick, null);
+    });
+
+    it('주기 정리가 실패해도 예외를 밖으로 던지지 않는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const errors = [];
+      let tick;
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: {
+          ...fixture.repository,
+          findAll: async () => {
+            throw new Error('디스크 장애');
+          },
+        },
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: fixture.clock,
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: (message) => errors.push(message) },
+      });
+
+      // When
+      roomService.startStaleCleanup({
+        intervalMs: 1_000,
+        timers: {
+          setInterval: (fn) => {
+            tick = fn;
+            return { unref: () => {} };
+          },
+          clearInterval: () => {},
+        },
+      });
+
+      // Then (타이머 콜백은 예외를 밖으로 내지 않고 로그만 남긴다)
+      assert.doesNotThrow(() => tick());
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.match(errors.at(-1), /정리/);
+    });
+
     it('24시간 넘게 방치된 방을 서버 시작 시 지운다', async () => {
       // Given
       const day = 24 * 60 * 60 * 1000;
