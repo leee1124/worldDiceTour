@@ -3,6 +3,7 @@ import { BASIC_BUILDINGS, BUILDING_TYPES, BuildingUnlocks } from './buildings.js
 import { SPACE_KINDS } from './data/board.js';
 
 // 건물 종류와 바퀴별 해금 규칙은 buildings.js가 갖는다. 기존 사용처를 위해 그대로 다시 내보낸다.
+// (새 코드는 `./buildings.js`에서 직접 가져올 것 — 이 재수출은 하위호환용이다.)
 export { BASIC_BUILDINGS, BUILDING_TYPES };
 
 /** 건설비 = 가격 × (10분의 n). 별장 0.3 / 빌딩 0.6 / 호텔 0.9 / 랜드마크 1.0 */
@@ -135,7 +136,7 @@ export class City {
    * 이번 건설 기회에 지을 수 있는 건물 목록.
    * 건설자의 바퀴 수에 따라 열린 건물만 제안한다(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴부터 호텔).
    * 3종을 이미 모두 가진 경우에만 랜드마크를 제안한다(같은 기회에 3종+랜드마크는 불가).
-   * 랜드마크는 바퀴로 막지 않는다 — 3종이 완성된 도시를 인수하면 그 자리에서 제안된다.
+   * 랜드마크는 바퀴로 막지 않는다 — 인수로 넘겨받은 건물이 섞여 3종이 채워지면 바퀴와 무관하게 제안된다(D23).
    * @param {{lap:number}} builder 건설자의 바퀴 수(빠뜨리면 규칙 우회가 되므로 필수)
    */
   buildableTypes({ lap } = {}) {

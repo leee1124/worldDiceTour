@@ -64,10 +64,12 @@ export function createPlayersView({ onSetAutopilot }) {
 
   function renderBadges(node, state, player, seat) {
     clear(node);
-    // 지을 수 있는 건물이 바퀴 수로 정해지므로(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔) 항상 보여 준다.
-    node.appendChild(badge(`🔄 ${lapLabel(player.lap)}`, 'muted'));
+    // 지을 수 있는 건물이 바퀴 수로 정해지므로(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔) 함께 보여 준다.
+    // 탈락한 좌석에는 더 이상 의미가 없어 달지 않는다.
     if (player.eliminated) {
       node.appendChild(badge('💀 파산', 'danger'));
+    } else {
+      node.appendChild(badge(`🔄 ${lapLabel(player.lap)}`, 'muted'));
     }
     if (isMySeat(state, player.seatId)) {
       node.appendChild(badge('이 기기', 'mine'));

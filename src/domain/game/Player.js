@@ -55,7 +55,7 @@ export class Player {
     this.#consecutiveDoubles = consecutiveDoubles;
     this.#loanUsed = loanUsed;
     this.#loanDebt = loanDebt;
-    // 바퀴 수가 없는 예전 스냅샷은 1바퀴로 복원된다(명세 10장 D22).
+    // 바퀴 수가 없는 예전 스냅샷은 1바퀴로 복원된다(명세 10장 D24).
     this.#lap = BuildingUnlocks.assertLap(lap);
   }
 

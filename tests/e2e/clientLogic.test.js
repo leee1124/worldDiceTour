@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { EVENT_TYPES } from '../../src/domain/game/events.js';
 import { BUILDING_TYPES, City } from '../../src/domain/game/City.js';
+import { BASIC_BUILDINGS, BuildingUnlocks } from '../../src/domain/game/buildings.js';
 import { BOARD_SPACES, SPACE_KINDS } from '../../src/domain/game/data/board.js';
 
 import { formatCompactWon, formatMoney, formatSignedWon, formatWon } from '../../public/js/format.js';
@@ -15,7 +16,7 @@ import {
   hopPath,
   sideOf,
 } from '../../public/js/domain/boardLayout.js';
-import { formatEventLine } from '../../public/js/domain/eventLog.js';
+import { LAP_UNLOCK_HINTS, formatEventLine } from '../../public/js/domain/eventLog.js';
 import { canBet, clampBet, quickChips, stepBet } from '../../public/js/domain/betRules.js';
 import {
   LAP_RULE_TEXT,
@@ -489,6 +490,28 @@ test('건설 미리보기: 잠긴 건물은 고를 수 없다', () => {
   assert.equal(validateSelection(['HOTEL'], options).ok, false);
   assert.equal(validateSelection(['VILLA', 'BUILDING'], options).ok, false);
   assert.equal(validateSelection(['VILLA'], options).ok, true);
+});
+
+test('건설 미리보기: 클라이언트 안내 문구가 서버 해금 규칙과 어긋나지 않는다', () => {
+  // Given 서버 도메인의 해금 표(BuildingUnlocks)
+  // When 클라이언트가 화면에 쓰는 문구를 만들면
+  // Then 건물마다 서버가 정한 해금 바퀴가 그대로 들어 있다
+  for (const type of BASIC_BUILDINGS) {
+    const lap = BuildingUnlocks.unlockLapOf(type);
+    assert.ok(
+      LAP_RULE_TEXT.includes(`${lap}바퀴`),
+      `${type}의 해금 바퀴 ${lap}이 안내 문구에 없다: ${LAP_RULE_TEXT}`,
+    );
+    assert.equal(unlockNotice(lap), lap > 1 ? `${lap}바퀴부터 지을 수 있습니다` : '');
+  }
+
+  // 로그의 해금 힌트는 "새로 열리는 바퀴"와 정확히 같은 키를 갖는다
+  assert.deepEqual(
+    Object.keys(LAP_UNLOCK_HINTS).map(Number).sort((a, b) => a - b),
+    [...new Set(BASIC_BUILDINGS.map((type) => BuildingUnlocks.unlockLapOf(type)))]
+      .filter((lap) => lap > 1)
+      .sort((a, b) => a - b),
+  );
 });
 
 test('건설 미리보기: 바퀴 안내 문구는 규칙을 그대로 옮긴다', () => {

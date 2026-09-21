@@ -70,12 +70,12 @@ export function unlockNotice(unlockLap) {
   return Number.isInteger(unlockLap) && unlockLap > 1 ? `${unlockLap}바퀴부터 지을 수 있습니다` : '';
 }
 
-function toRow(option, lockedList) {
+function toRow(option, inLockedList) {
   if (!option || typeof option.type !== 'string' || !ROW_ORDER.includes(option.type)) {
     return null;
   }
   const unlockLap = Number.isInteger(option.unlockLap) && option.unlockLap >= 1 ? option.unlockLap : 1;
-  const locked = lockedList || Boolean(option.locked);
+  const locked = inLockedList || Boolean(option.locked);
   return {
     type: option.type,
     cost: typeof option.cost === 'number' && Number.isFinite(option.cost) ? option.cost : 0,

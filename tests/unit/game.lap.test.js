@@ -119,6 +119,27 @@ describe('Game(바퀴 수 증가)', () => {
     assert.equal(lapOf(game, 's1'), 2);
   });
 
+  it('한 커맨드에서 출발 칸을 두 번 지나면 바퀴도 두 번 오른다', () => {
+    // Given (39번 칸에서 3칸 → 2번 행운 티켓 칸[출발 통과] → 출발 칸 직행 티켓으로 또 한 바퀴)
+    const game = buildGame({
+      positions: { s1: 39 },
+      drawPile: ['T11'],
+      random: new FakeRandomSource([1, 2, 0]),
+    });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then (월급도 두 번 나오므로 바퀴도 두 번 오른다 — 명세 10장 D22)
+    assert.deepEqual(
+      events.filter((event) => event.type === EVENT_TYPES.LAP_ADVANCED).map((event) => event.lap),
+      [2, 3],
+    );
+    assert.equal(events.filter((event) => event.type === EVENT_TYPES.SALARY_PAID).length, 2);
+    assert.equal(lapOf(game, 's1'), 3);
+    assert.equal(game.moneyReport().balanced, true);
+  });
+
   it('공항 이동으로 출발 칸을 지나면 바퀴가 오른다', () => {
     // Given (공항 칸에서 이동권을 든 채 3번 방콕으로 날아간다)
     const game = buildGame({

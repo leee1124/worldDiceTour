@@ -37,8 +37,11 @@ const DEFAULT_CONTEXT = {
 
 const line = (kind, text) => ({ kind, text });
 
-/** 새 바퀴에 들어설 때 함께 알려 줄 해금 안내(명세 4장: 1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔). */
-const LAP_UNLOCK_HINTS = Object.freeze({
+/**
+ * 새 바퀴에 들어설 때 함께 알려 줄 해금 안내(명세 4장: 1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔).
+ * 서버 도메인 `BuildingUnlocks`와 어긋나면 tests/e2e/clientLogic.test.js가 먼저 깨진다.
+ */
+export const LAP_UNLOCK_HINTS = Object.freeze({
   2: ' — 이제 빌딩까지 지을 수 있습니다',
   3: ' — 이제 호텔까지 지을 수 있습니다',
 });

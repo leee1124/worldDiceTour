@@ -290,7 +290,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `isOver` | 게임 종료 여부 |
 | `players[].cash` | 보유 현금 |
 | `players[].position` | 보드 칸 번호(0~39) |
-| `players[].lap` | 지금 몇 바퀴째인지(1부터). 출발 칸을 앞으로 지나거나 도착해 **월급을 받는 순간마다 +1**(월급이 대출로 압류돼도 +1, 뒤로 밀려 도착하거나 조난 이송이면 그대로). 이 값이 지을 수 있는 건물을 정한다: 1바퀴 별장 / 2바퀴 빌딩 / 3바퀴부터 호텔 |
+| `players[].lap` | 지금 몇 바퀴째인지(1부터). 출발 칸을 앞으로 지나거나 도착해 **월급을 받는 순간마다 +1**(월급이 대출로 압류돼도 +1, 뒤로 밀려 도착하거나 조난 이송이면 그대로. 한 커맨드에 두 번 오를 수도 있다). 이 값이 지을 수 있는 건물을 정한다: 1바퀴 별장 / 2바퀴 빌딩 / 3바퀴부터 호텔 |
 | `players[].eliminated` | 파산 탈락 |
 | `players[].islandRemainingTurns` | 조난 섬에 남은 턴(0이면 자유) |
 | `players[].airportPending` | 다음 자기 턴에 공항 이동권을 쓸 수 있는지 |
@@ -408,8 +408,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `TURN_STARTED` | `playerId`, `round` | 새 턴 시작 |
 | `DICE_ROLLED` | `playerId`, `die1`, `die2`, `sum`, `isDouble` | 주사위 연출 |
 | `MOVED` | `playerId`, `from`, `to`, `steps`, `passedStart` | 말 이동. `steps`가 `null`이면 순간이동(조난 이송) |
+| `LAP_ADVANCED` | `playerId`, `lap` | **한 바퀴 완주**(출발 칸을 앞으로 지나거나 도착). 순서는 `MOVED` → `LAP_ADVANCED` → 월급 이벤트 → `LANDED`이며, 새 바퀴 수를 담는다. 월급이 전액 압류되면 `SALARY_PAID`가 없으므로 "바퀴가 올랐는지"는 이 이벤트로 판단할 것. **한 커맨드에 두 번 이상 올 수 있다**(티켓 연쇄로 출발 칸을 두 번 지날 때). 그때마다 짝이 되는 `SALARY_PAID`/`SALARY_SEIZED`가 따라온다 |
 | `LANDED` | `playerId`, `index`, `kind`, `name` | 도착 칸 |
-| `LAP_ADVANCED` | `playerId`, `lap` | **한 바퀴 완주**(출발 칸을 앞으로 지나거나 도착). 새 바퀴 수를 담으며 `SALARY_PAID`/`SALARY_SEIZED`보다 **먼저** 온다. 월급이 전액 압류되면 `SALARY_PAID`가 없으므로 "바퀴가 올랐는지"는 이 이벤트로 판단할 것. 한 커맨드에 두 번 오지 않는다 |
 | `EXTRA_TURN` | `playerId` | 더블로 한 번 더 |
 | `TURN_ENDED` | `playerId` | 턴 종료 |
 | `ROUND_ADVANCED` | `round` | 라운드 증가 |
