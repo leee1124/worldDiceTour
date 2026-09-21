@@ -433,10 +433,16 @@ export class Game {
     this.#offerBuild(player, city.index);
   }
 
-  /** 도시 거래 결과(돈 이동 + 이벤트)를 반영한다. */
+  /**
+   * 서브시스템이 돌려준 결과(돈 이동 + 이벤트)를 반영한다.
+   * 잭팟이 실제로 움직였으면 중앙 표시가 따라올 수 있도록 변화 이벤트를 덧붙인다.
+   */
   #applyTrade({ intents, events }) {
-    this.#treasury.apply(intents);
+    const { jackpotChanged } = this.#treasury.apply(intents);
     this.#emitAll(events);
+    if (jackpotChanged) {
+      this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
+    }
   }
 
   #skipBuy() {
@@ -803,6 +809,7 @@ export class Game {
       ticket,
       player,
       board: this.#board,
+      casino: this.#casino,
       livingPlayers: this.livingPlayers(),
     });
     switch (action.action) {

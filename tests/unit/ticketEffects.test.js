@@ -2,17 +2,23 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Board } from '../../src/domain/game/Board.js';
+import { Casino } from '../../src/domain/game/Casino.js';
 import { Player } from '../../src/domain/game/Player.js';
 import { TICKET_ACTIONS, TicketEffects } from '../../src/domain/game/TicketEffects.js';
 import { SINKS } from '../../src/domain/game/payment/DebtNote.js';
 import { EVENT_TYPES } from '../../src/domain/game/events.js';
-import { MONEY_REASONS } from '../../src/domain/shared/MoneyIntent.js';
+import { COUNTERPARTIES, MONEY_REASONS } from '../../src/domain/shared/MoneyIntent.js';
 import { TICKET_EFFECTS } from '../../src/domain/game/data/tickets.js';
 
 const effects = new TicketEffects();
 const ticket = (effect, id = 'T01') => ({ id, text: '테스트 티켓', effect });
 
-function scene({ cash = { s1: 1_000_000, s2: 1_000_000, s3: 1_000_000 }, cities = [], positions = {} } = {}) {
+function scene({
+  cash = { s1: 1_000_000, s2: 1_000_000, s3: 1_000_000 },
+  cities = [],
+  positions = {},
+  jackpot = 0,
+} = {}) {
   const players = Object.entries(cash).map(
     ([id, amount]) =>
       new Player({ id, name: id, cash: amount, position: positions[id] ?? 0 }),
@@ -20,12 +26,19 @@ function scene({ cash = { s1: 1_000_000, s2: 1_000_000, s3: 1_000_000 }, cities 
   return {
     players,
     board: Board.restore(cities),
+    casino: new Casino({ jackpot }),
     byId: (id) => players.find((player) => player.id === id),
   };
 }
 
-const resolve = (effect, { player, board, players }) =>
-  effects.resolve({ ticket: ticket(effect), player, board, livingPlayers: players });
+const resolve = (effect, { player, board, players, casino, ticketId = 'T01' }) =>
+  effects.resolve({
+    ticket: ticket(effect, ticketId),
+    player,
+    board,
+    casino,
+    livingPlayers: players,
+  });
 
 describe('TicketEffects(행운 티켓 효과 규칙)', () => {
   describe('수령', () => {
@@ -239,6 +252,71 @@ describe('TicketEffects(행운 티켓 효과 규칙)', () => {
 
       // Then
       assert.equal(action.amount, 160_000);
+    });
+  });
+
+  describe('「잭팟 당첨권」·「잭팟 나눔 행사」: 적립금 수령', () => {
+    it('지분 100%는 적립금 전액을 받고 적립금을 비운다', () => {
+      // Given
+      const { byId, board, players, casino } = scene({ jackpot: 326_500 });
+
+      // When
+      const action = resolve(
+        { type: TICKET_EFFECTS.CLAIM_JACKPOT, share: 100 },
+        { player: byId('s1'), board, players, casino, ticketId: 'T21' },
+      );
+
+      // Then
+      assert.equal(action.action, TICKET_ACTIONS.SETTLE);
+      assert.equal(action.amount, 326_500);
+      assert.equal(action.intents.length, 1);
+      assert.equal(action.intents[0].amount, 326_500);
+      assert.equal(action.intents[0].counterparty, COUNTERPARTIES.JACKPOT);
+      assert.equal(action.intents[0].reason, MONEY_REASONS.TICKET);
+      assert.deepEqual(action.events, [
+        {
+          type: EVENT_TYPES.JACKPOT_CLAIMED,
+          payload: { playerId: 's1', amount: 326_500, share: 100, remaining: 0 },
+        },
+      ]);
+    });
+
+    it('지분 50%는 내림으로 받고 나머지는 적립금에 남는다', () => {
+      // Given (홀수 금액)
+      const { byId, board, players, casino } = scene({ jackpot: 125_001 });
+
+      // When
+      const action = resolve(
+        { type: TICKET_EFFECTS.CLAIM_JACKPOT, share: 50 },
+        { player: byId('s1'), board, players, casino, ticketId: 'T22' },
+      );
+
+      // Then
+      assert.equal(action.amount, 62_500);
+      assert.equal(action.events[0].payload.remaining, 62_501);
+      assert.equal(action.events[0].payload.share, 50);
+    });
+
+    it('적립금이 0원이면 돈은 움직이지 않고 금액 0원 이벤트만 남긴다', () => {
+      // Given (위로금은 없다 — 경제를 깨끗하게 유지한다)
+      const { byId, board, players, casino } = scene({ jackpot: 0 });
+
+      // When
+      const action = resolve(
+        { type: TICKET_EFFECTS.CLAIM_JACKPOT, share: 100 },
+        { player: byId('s1'), board, players, casino, ticketId: 'T21' },
+      );
+
+      // Then
+      assert.equal(action.action, TICKET_ACTIONS.SETTLE);
+      assert.equal(action.amount, 0);
+      assert.deepEqual(action.intents, []);
+      assert.deepEqual(action.events, [
+        {
+          type: EVENT_TYPES.JACKPOT_CLAIMED,
+          payload: { playerId: 's1', amount: 0, share: 100, remaining: 0 },
+        },
+      ]);
     });
   });
 

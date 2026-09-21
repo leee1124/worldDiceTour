@@ -28,6 +28,7 @@
 | 20 | 동작 | `SET_OPTIONS`에 `finance`를 **넣을 수 있고, 생략하거나 일부 키만 보내면 나머지는 기존 값이 유지된다** | 기존 클라이언트(roundLimit만 보내는)는 그대로 동작한다 |
 | 21 | 동작 | 저장 파일에 `schemaVersion: 2`가 생겼다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방(버전 필드 없음)은 서버가 자동으로 승급해 그대로 이어진다 |
 | 22 | **추가 필드** | `pending.sellable` 항목에 `assetKind`("PROPERTY")와 `assetId`가 가산됐다. `index`·`name`·`refund`는 그대로다 | 기존 정리 모달은 고칠 것이 없다. 앞으로 주식·예금이 같은 목록에 섞이면 **`assetKind`로 분기**하면 되고, `index`는 부동산 항목에만 있다 |
+| 34 | 동작 + **새 이벤트** | **행운 티켓이 22장이 됐다**: 잭팟 적립금을 받는 두 장이 추가됐다 — `T21 잭팟 당첨권`(전액)과 `T22 잭팟 나눔 행사`(절반, 내림). 새 효과 종류 `CLAIM_JACKPOT`(`share`: `100` \| `50`)과 새 이벤트 `JACKPOT_CLAIMED { playerId, amount, share, remaining }`. 적립금이 실제로 줄면 기존 `JACKPOT_CHANGED`가 뒤따르고, 적립금이 0원이면 `amount: 0`인 `JACKPOT_CLAIMED`만 발생한다(돈은 움직이지 않는다) | 티켓 카드 문구는 `TICKET_DRAWN.text`를 그대로 쓰면 된다(효과 라벨은 `effect.share`로 "전액/절반"을 구분할 수 있다). 로그/연출에 `JACKPOT_CLAIMED`를 추가할 것 — 모르는 이벤트는 무시해도 잭팟 숫자는 `view.jackpot`과 `JACKPOT_CHANGED`로 맞는다. `amount: 0`인 경우를 "당첨 연출"로 보여 주지 말 것 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -462,6 +463,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `MONEY_LOST` | `playerId`, `amount`, `reason`, `ticketId?`, `toPlayerIds?` | 은행/타인에게 지불 |
 | `MONEY_TRANSFERRED` | `fromId`, `toId`, `amount`, `reason` | 플레이어 간 이동 |
 | `JACKPOT_CHANGED` | `jackpot` | 잭팟 적립금 변화 |
+| `JACKPOT_CLAIMED` | `playerId`, `amount`, `share`, `remaining` | **잭팟 수령 티켓**(`T21` 전액 / `T22` 절반). `amount`는 실제로 받은 금액(`floor(적립금 × share / 100)`), `remaining`은 수령 뒤 남은 적립금이다. `amount + remaining`이 수령 전 적립금과 정확히 같다. 적립금이 0원이면 `amount: 0`·`remaining: 0`이고 **돈은 전혀 움직이지 않는다**(위로금 없음) — 이때는 `JACKPOT_CHANGED`도 발생하지 않는다. 금액이 움직였으면 곧바로 `JACKPOT_CHANGED`가 따라온다 |
 
 `reason`: `SALARY`·`PURCHASE`·`BUILD`·`TOLL`·`TAX`·`TICKET`·`CASINO`·`ISLAND_RESCUE`·`LIQUIDATION`·`BANKRUPTCY`·`ACQUISITION`·`LOAN`
 
@@ -509,7 +511,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 
 ### 행운 티켓 효과(`TICKET_DRAWN.effect.type`)
 
-`GAIN`·`LOSE`(`amount`) / `MOVE_RELATIVE`(`steps`) / `MOVE_TO`(`index`) / `TO_ISLAND` / `COLLECT_FROM_ALL`·`PAY_TO_ALL`(`amount`) / `PAY_PER_BUILDING`(`amount`) / `GAIN_PER_CITY`(`amount`) / `NEAREST_RESORT` / `TAX_RATE`(`rate`)
+`GAIN`·`LOSE`(`amount`) / `MOVE_RELATIVE`(`steps`) / `MOVE_TO`(`index`) / `TO_ISLAND` / `COLLECT_FROM_ALL`·`PAY_TO_ALL`(`amount`) / `PAY_PER_BUILDING`(`amount`) / `GAIN_PER_CITY`(`amount`) / `NEAREST_RESORT` / `TAX_RATE`(`rate`) / `CLAIM_JACKPOT`(`share`: `100` \| `50`)
 
 ---
 

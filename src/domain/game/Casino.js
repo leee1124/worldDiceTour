@@ -70,6 +70,30 @@ export class Casino {
     return amount;
   }
 
+  /**
+   * 적립금의 `share`%(내림)를 지급하는 **돈 이동 의사**를 만든다.
+   *
+   * `play()`와 같은 순수 계산이다 — 적립금을 건드리지 않고 "얼마를 어디서 옮겨야 하는지"만
+   * 알려준다. 실제 이동은 `Treasury.apply()`가 한다. 지분과 나머지의 합은 항상 현재 적립금과
+   * 정확히 같으므로(내림에서 흘린 원은 적립금에 남는다) 총합이 보존된다.
+   * 적립금이 0원이면 옮길 돈이 없어 의사도 만들지 않는다(빈 지급 의사를 만들지 않는다).
+   *
+   * @param {{playerId:string, share:number, reason:string, meta?:object}} params `share`는 1~100 정수
+   * @returns {{amount:number, remaining:number, intents:import('../shared/MoneyIntent.js').MoneyIntent[]}}
+   */
+  claimShare({ playerId, share, reason, meta = null }) {
+    if (!Number.isInteger(share) || share < 1 || share > 100) {
+      throw DomainError.invalidArgument(`잭팟 수령 지분이 올바르지 않습니다: ${String(share)}`);
+    }
+    const amount = Math.floor((this.#jackpot * share) / 100);
+    return {
+      amount,
+      remaining: this.#jackpot - amount,
+      intents:
+        amount > 0 ? [MoneyIntent.fromJackpot({ playerId, amount, reason, meta })] : [],
+    };
+  }
+
   /** 보유 현금 기준 베팅 한도. */
   betLimits(cash) {
     const max = Math.min(cash, MAX_BET);

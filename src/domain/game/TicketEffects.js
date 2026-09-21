@@ -35,10 +35,11 @@ export class TicketEffects {
    * @param {{id:string, effect:object}} params.ticket
    * @param {import('./Player.js').Player} params.player
    * @param {import('./Board.js').Board} params.board
+   * @param {import('./Casino.js').Casino} [params.casino] 잭팟 적립금의 주인(수령 티켓에만 필요)
    * @param {import('./Player.js').Player[]} params.livingPlayers 탈락하지 않은 좌석(좌석 순서)
    * @returns {{action: string, amount?: number, steps?: number, items?: object[], reason?: string, event?: object, intents?: object[], events?: object[]}}
    */
-  resolve({ ticket, player, board, livingPlayers = [] }) {
+  resolve({ ticket, player, board, casino = null, livingPlayers = [] }) {
     const { effect } = ticket;
     switch (effect.type) {
       case TICKET_EFFECTS.GAIN:
@@ -69,6 +70,8 @@ export class TicketEffects {
           amount: Math.floor(player.cash * effect.rate),
           sink: TAX_SINK,
         });
+      case TICKET_EFFECTS.CLAIM_JACKPOT:
+        return this.#claimJackpot({ ticket, player, casino, share: effect.share });
       case TICKET_EFFECTS.MOVE_RELATIVE:
         return { action: TICKET_ACTIONS.MOVE, steps: effect.steps };
       case TICKET_EFFECTS.MOVE_TO:
@@ -109,6 +112,37 @@ export class TicketEffects {
         {
           type: EVENT_TYPES.MONEY_GAINED,
           payload: { playerId: player.id, amount, reason, ticketId: ticket.id },
+        },
+      ],
+    };
+  }
+
+  /**
+   * 「잭팟 당첨권」·「잭팟 나눔 행사」: 쌓인 잭팟 적립금의 일부(또는 전부)를 받는다.
+   *
+   * **얼마가 움직이는지는 적립금의 주인(`Casino`)이 계산한다** — 지분과 내림 규칙은 잭팟의
+   * 규칙이지 티켓의 규칙이 아니다. 티켓의 규칙은 "어떤 지분을 청구하는가"와
+   * "적립금이 비어 있어도 위로금은 없다"는 것뿐이다(경제를 깨끗하게 유지한다).
+   * 금액이 0원이어도 이벤트는 남긴다 — 뽑은 사람은 비어 있었다는 사실을 알아야 한다.
+   *
+   * 사유는 `TICKET`을 그대로 쓴다: 잭팟 이동은 총합(현금 + 잭팟)을 바꾸지 않아 장부에
+   * 기록되지 않으므로 새 사유를 만들 이유가 없다(사유 목록을 넓히면 저장 스키마 승급이 따라온다).
+   */
+  #claimJackpot({ ticket, player, casino, share }) {
+    const { amount, remaining, intents } = casino.claimShare({
+      playerId: player.id,
+      share,
+      reason: MONEY_REASONS.TICKET,
+      meta: { ticketId: ticket.id },
+    });
+    return {
+      action: TICKET_ACTIONS.SETTLE,
+      amount,
+      intents,
+      events: [
+        {
+          type: EVENT_TYPES.JACKPOT_CLAIMED,
+          payload: { playerId: player.id, amount, share, remaining },
         },
       ],
     };

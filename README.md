@@ -73,7 +73,7 @@ npm start        # = node server.js
 | **범례 · 모바일 상황판** | 보드 아래 범례(건물 배지·플레이어 색/모양). 폰에서는 보드 아래 고정 상황판에 차례 · 📍 현재 칸 · 주사위 · "내 위치" · "확대"(보드 170%) |
 | **중앙 코어** | 라운드 · 잭팟 · 현재 차례와 페이즈 안내 · **📍 현재 위치** · 주사위(눈 + 숫자 배지, 더블 표시) · 주 행동 버튼. 넓은 화면에서는 보드 안쪽에, 세로 화면에서는 보드 아래에 놓인다 |
 | **플레이어 패널** | 색·모양으로 구분되는 좌석, 현금(증감 카운트), 총자산, **현재 칸(누르면 그 말을 강조)**, **"n바퀴" 배지**, 상태 배지(조난 · 대출/채무 · 컴퓨터 · 자동 진행 · 오프라인 · 파산) |
-| **게임 로그** | 서버 도메인 이벤트 44종을 한국어 한 줄로 기록 |
+| **게임 로그** | 서버 도메인 이벤트 45종을 한국어 한 줄로 기록 |
 | **카지노** | 라스베이거스 칸에 도착하면 열리는 네온 화면. 홀짝 / 하이로우세븐 / 슬롯 탭, 10,000원 단위 베팅 조작, 3릴 슬롯과 7️⃣7️⃣7️⃣ 잭팟 연출 |
 
 ## 플레이 방법
@@ -201,11 +201,11 @@ src/
       Board.js  City.js      40칸 보드, 도시/휴양지(건물·통행료·투자액·인수·매각·바퀴별 선택지)
       buildings.js           건물 3종 + 랜드마크, 바퀴별 해금 규칙(BuildingUnlocks)
       Player.js              현금 잔액·위치·바퀴 수·조난·공항 이동권·연속 더블·대출
-      TicketDeck.js          행운 티켓 20장(즉시 효과)
+      TicketDeck.js          행운 티켓 22장(즉시 효과)
       Casino.js  Dice.js     홀짝/하이로우세븐/슬롯 판정(순수) + 잭팟 보관, 주사위
       BankLedger.js          은행 순유입 장부 + 사유별 내역(돈의 보존 불변식 2단)
       phases.js commands.js events.js   페이즈·커맨드(+COMMAND_OWNERSHIP)·이벤트(단일 출처)
-      data/board.js data/tickets.js     보드 40칸·티켓 20장 데이터
+      data/board.js data/tickets.js     보드 40칸·티켓 22장 데이터
     room/
       Room.js                Aggregate Root: 좌석 한도·호스트 권한·상태 전이·게임 시작
       FinanceOptions.js      구조화된 options.finance(기본값 전부 꺼짐 + 허용 목록)
@@ -249,7 +249,7 @@ public/                      클라이언트 (빌드 없음, 의존성 0)
     store.js                 클라이언트 상태(room/view 스냅샷, 이 기기 좌석) + 선택자
     dom.js                   innerHTML 없는 DOM 생성 도우미(XSS 구조적 차단)
     format.js                금액 표기
-    domain/                  DOM 없는 순수 규칙: boardLayout(좌표·이동 경로) · eventLog(44종 로그)
+    domain/                  DOM 없는 순수 규칙: boardLayout(좌표·이동 경로) · eventLog(45종 로그)
                              betRules(베팅 한도) · buildRules(조합 비용·통행료 미리보기·바퀴 잠금 행)
                              buildingSlots(건물 3칸 표시) · tokenLayout(말 부채꼴 배치) · locationLabel(현재 위치 문구)
                              movePlan(이동 연출 시간표) · commandLock(중복 전송 잠금) · labels · particles(한국어 조사)

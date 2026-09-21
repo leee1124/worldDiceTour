@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Casino, CASINO_GAMES, SLOT_SYMBOLS } from '../../src/domain/game/Casino.js';
+import { COUNTERPARTIES, MONEY_REASONS } from '../../src/domain/shared/MoneyIntent.js';
 import { DomainError } from '../../src/domain/shared/DomainError.js';
 import { FakeRandomSource } from '../support/FakeRandomSource.js';
 
@@ -263,5 +264,80 @@ describe('Casino(라스베이거스 카지노)', () => {
 
     // When / Then
     assert.throws(() => casino.accumulate(-1), DomainError);
+  });
+
+  describe('잭팟 수령 지분 계산(claimShare)', () => {
+    it('지분 100%는 적립금 전액의 수령 의사를 만든다', () => {
+      // Given
+      const casino = new Casino({ jackpot: 326_500 });
+
+      // When
+      const claim = casino.claimShare({
+        playerId: 's1',
+        share: 100,
+        reason: MONEY_REASONS.TICKET,
+        meta: { ticketId: 'T21' },
+      });
+
+      // Then
+      assert.equal(claim.amount, 326_500);
+      assert.equal(claim.remaining, 0);
+      assert.equal(claim.intents.length, 1);
+      assert.equal(claim.intents[0].playerId, 's1');
+      assert.equal(claim.intents[0].amount, 326_500, '+면 수령');
+      assert.equal(claim.intents[0].counterparty, COUNTERPARTIES.JACKPOT);
+      assert.equal(claim.intents[0].affectsLedger, false, '잭팟 이동은 장부에 남지 않는다');
+    });
+
+    it('지분 50%는 내림으로 계산하고 나머지는 적립금에 남긴다', () => {
+      // Given (홀수 금액이라 반으로 정확히 나뉘지 않는다)
+      const casino = new Casino({ jackpot: 125_001 });
+
+      // When
+      const claim = casino.claimShare({ playerId: 's1', share: 50, reason: MONEY_REASONS.TICKET });
+
+      // Then
+      assert.equal(claim.amount, 62_500, '내림');
+      assert.equal(claim.remaining, 62_501, '남는 쪽이 1원을 갖는다(합계가 정확히 보존된다)');
+      assert.equal(claim.amount + claim.remaining, 125_001);
+    });
+
+    it('적립금이 0원이면 옮길 돈이 없어 이동 의사도 만들지 않는다', () => {
+      // Given
+      const casino = new Casino({ jackpot: 0 });
+
+      // When
+      const claim = casino.claimShare({ playerId: 's1', share: 100, reason: MONEY_REASONS.TICKET });
+
+      // Then
+      assert.equal(claim.amount, 0);
+      assert.equal(claim.remaining, 0);
+      assert.deepEqual(claim.intents, []);
+    });
+
+    it('판정만 하는 순수 계산이므로 적립금을 건드리지 않는다', () => {
+      // Given
+      const casino = new Casino({ jackpot: 500_000 });
+
+      // When
+      casino.claimShare({ playerId: 's1', share: 100, reason: MONEY_REASONS.TICKET });
+
+      // Then (실제 이동은 Treasury가 MoneyIntent로 적용한다)
+      assert.equal(casino.jackpot, 500_000);
+    });
+
+    it('1~100 정수가 아닌 지분은 거부한다', () => {
+      // Given
+      const casino = new Casino({ jackpot: 100_000 });
+
+      // When / Then
+      for (const share of [0, -50, 101, 12.5, '50', null, undefined]) {
+        assert.throws(
+          () => casino.claimShare({ playerId: 's1', share, reason: MONEY_REASONS.TICKET }),
+          DomainError,
+          `지분 ${String(share)}는 거부해야 한다`,
+        );
+      }
+    });
   });
 });

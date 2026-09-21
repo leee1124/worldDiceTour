@@ -22,9 +22,11 @@ export const TICKET_EFFECTS = Object.freeze({
   NEAREST_RESORT: 'NEAREST_RESORT',
   /** 현금의 일정 비율을 잭팟에 납부 */
   TAX_RATE: 'TAX_RATE',
+  /** 잭팟 적립금의 `share`%(내림)를 수령 */
+  CLAIM_JACKPOT: 'CLAIM_JACKPOT',
 });
 
-/** 행운 티켓 20장. 문구는 전부 자체 창작. */
+/** 행운 티켓 22장. 문구는 전부 자체 창작. */
 export const TICKETS = Object.freeze([
   { id: 'T01', text: '복권 소액 당첨! 100,000원을 받습니다.', effect: { type: TICKET_EFFECTS.GAIN, amount: 100_000 } },
   { id: 'T02', text: '여행 브이로그 대박! 200,000원을 받습니다.', effect: { type: TICKET_EFFECTS.GAIN, amount: 200_000 } },
@@ -46,6 +48,8 @@ export const TICKETS = Object.freeze([
   { id: 'T18', text: '관광 붐! 보유 도시 수 × 30,000원을 받습니다.', effect: { type: TICKET_EFFECTS.GAIN_PER_CITY, amount: 30_000 } },
   { id: 'T19', text: '휴양 충동! 가장 가까운 휴양지로 전진합니다.', effect: { type: TICKET_EFFECTS.NEAREST_RESORT } },
   { id: 'T20', text: '세무조사! 현금의 5%를 납부합니다(잭팟 적립).', effect: { type: TICKET_EFFECTS.TAX_RATE, rate: 0.05 } },
+  { id: 'T21', text: '잭팟 당첨권! 라스베이거스에 쌓인 잭팟 적립금을 전부 받습니다.', effect: { type: TICKET_EFFECTS.CLAIM_JACKPOT, share: 100 } },
+  { id: 'T22', text: '잭팟 나눔 행사! 잭팟 적립금의 절반을 받습니다.', effect: { type: TICKET_EFFECTS.CLAIM_JACKPOT, share: 50 } },
 ]);
 
 export const TICKETS_BY_ID = Object.freeze(

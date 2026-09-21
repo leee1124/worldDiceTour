@@ -135,9 +135,29 @@ export const TICKET_EFFECT_LABELS = Object.freeze({
   GAIN_PER_CITY: '도시 수 비례 수령',
   NEAREST_RESORT: '가까운 휴양지로 이동',
   TAX_RATE: '현금 비율 납부',
+  CLAIM_JACKPOT: '잭팟 적립금 수령',
 });
 
-export function ticketEffectLabel(type) {
+/**
+ * 잭팟 수령 티켓 두 장은 효과 종류가 같고 **지분만 다르다**(전액/절반).
+ * 카드마다 다른 문구를 보여 주기 위해 지분별 문구를 따로 둔다.
+ */
+export const JACKPOT_CLAIM_LABELS = Object.freeze({
+  100: '잭팟 적립금 전액 수령',
+  50: '잭팟 적립금 절반 수령',
+});
+
+/**
+ * @param {string} type `TICKET_DRAWN.effect.type`
+ * @param {object} [effect] 효과 전체(있으면 지분 같은 세부 값까지 문구에 반영한다)
+ */
+export function ticketEffectLabel(type, effect = null) {
+  if (type === 'CLAIM_JACKPOT') {
+    const byShare = JACKPOT_CLAIM_LABELS[effect?.share];
+    if (byShare) {
+      return byShare;
+    }
+  }
   return lookup(TICKET_EFFECT_LABELS, type, '즉시 효과');
 }
 

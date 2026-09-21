@@ -20,7 +20,7 @@ export async function playTicketCard({ playerName, text, effect }) {
     el('div', { class: 'ticket-face ticket-face--front' }, [
       el('span', { class: 'ticket-eyebrow', text: `${playerName} · 행운 티켓` }),
       el('p', { class: 'ticket-text', text }),
-      el('span', { class: 'ticket-effect', text: ticketEffectLabel(effect?.type) }),
+      el('span', { class: 'ticket-effect', text: ticketEffectLabel(effect?.type, effect) }),
     ]),
   ]);
 
