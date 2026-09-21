@@ -212,6 +212,42 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
   });
 });
 
+describe('Game(정리 페이즈에 채무가 없는 깨진 상태)', () => {
+  /** 스냅샷이 손상되면 AWAIT_LIQUIDATION인데 채무가 비어 있을 수 있다. */
+  const debtlessLiquidation = () =>
+    buildGame({
+      phase: PHASES.AWAIT_LIQUIDATION,
+      debt: null,
+      cities: [{ index: 39, ownerId: 's1' }],
+      random: new FakeRandomSource([]),
+    });
+
+  for (const [label, type, payload] of [
+    ['선택 매각', COMMAND_TYPES.SELL, { cityIndex: 39 }],
+    ['자동 매각', COMMAND_TYPES.AUTO_SELL, {}],
+    ['대출', COMMAND_TYPES.TAKE_LOAN, {}],
+    ['파산 선언', COMMAND_TYPES.DECLARE_BANKRUPTCY, {}],
+  ]) {
+    it(`${label}은 원시 TypeError가 아니라 규격 도메인 예외로 거부된다`, () => {
+      // Given
+      const game = debtlessLiquidation();
+
+      // When / Then
+      assert.throws(
+        () => game.execute('s1', type, payload),
+        (error) => {
+          assert.equal(error.name, 'DomainError');
+          assert.equal(error.code, DOMAIN_ERROR_CODES.INVALID_STATE);
+          return true;
+        },
+      );
+      assert.equal(game.version, 0);
+      assert.equal(game.playerById('s1').eliminated, false);
+      assert.equal(game.board.cityAt(39).isOwnedBy('s1'), true);
+    });
+  }
+});
+
 describe('Game(대출)', () => {
   it('대출을 받으면 현금 1,000,000원이 들어오고 채무 1,200,000원이 생긴다', () => {
     // Given

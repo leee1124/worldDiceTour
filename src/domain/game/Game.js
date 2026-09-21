@@ -684,9 +684,21 @@ export class Game {
     this.#moveBy(player, steps, 0);
   }
 
+  /**
+   * 정리 페이즈 커맨드의 공통 전제: 메워야 할 채무가 실제로 있어야 한다.
+   * 스냅샷이 손상되면 AWAIT_LIQUIDATION인데 채무가 비어 있을 수 있는데, 그때
+   * 원시 TypeError가 클라이언트 경로까지 올라가면 ERR010(500)이 된다.
+   */
+  #assertPendingDebt() {
+    if (!this.#turn.debt) {
+      throw DomainError.invalidState('메워야 할 채무가 없습니다(정리 페이즈 상태가 손상됨)');
+    }
+  }
+
   #sell({ cityIndex }) {
     const player = this.#current;
-    if (!Number.isInteger(cityIndex) || !this.#turn.debt) {
+    this.#assertPendingDebt();
+    if (!Number.isInteger(cityIndex)) {
       throw DomainError.invalidArgument(`매각할 칸이 올바르지 않습니다: ${cityIndex}`);
     }
     if (!this.#board.isOwnable(cityIndex) || !this.#board.cityAt(cityIndex).isOwnedBy(player.id)) {
@@ -1108,6 +1120,7 @@ export class Game {
 
   #autoSell() {
     const player = this.#current;
+    this.#assertPendingDebt();
     const owned = this.#board
       .ownedBy(player.id)
       .sort((a, b) => a.liquidationValue() - b.liquidationValue() || a.index - b.index);
@@ -1126,6 +1139,7 @@ export class Game {
 
   #takeLoan() {
     const player = this.#current;
+    this.#assertPendingDebt();
     if (!player.canTakeLoan()) {
       throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
     }
@@ -1140,6 +1154,7 @@ export class Game {
   }
 
   #declareBankruptcy() {
+    this.#assertPendingDebt();
     this.#bankrupt(this.#current);
   }
 
