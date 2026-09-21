@@ -1,5 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -81,6 +82,45 @@ async function createStartedRoom() {
     body: { type: 'START' },
   });
   return { code, host: created.body, guest: joined.body };
+}
+
+/**
+ * 아주 큰 본문을 보낸다. 서버가 한도를 넘는 즉시 읽기를 멈추고 소켓을 끊으므로, 클라이언트가
+ * 413 응답을 다 받기 전에 쓰기 쪽에서 소켓 오류(ECONNRESET/EPIPE)를 볼 수도 있다 — 두 결과 모두
+ * "한도를 넘는 즉시 끊는다"는 같은 동작의 정상적인 두 얼굴이므로, 여기서는 어느 쪽이든 담아 돌려준다.
+ */
+function postOversizedBody(targetBaseUrl, urlPath, payload) {
+  const url = new URL(urlPath, targetBaseUrl);
+  return new Promise((resolve) => {
+    const req = http.request(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: `${url.pathname}${url.search}`,
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+      },
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          text += chunk;
+        });
+        res.on('end', () => {
+          let json = null;
+          try {
+            json = text.length > 0 ? JSON.parse(text) : null;
+          } catch {
+            json = null;
+          }
+          resolve({ kind: 'response', status: res.statusCode, headers: res.headers, body: json });
+        });
+      },
+    );
+    req.on('error', (error) => resolve({ kind: 'reset', error }));
+    req.write(payload);
+    req.end();
+  });
 }
 
 describe('HTTP 서버(REST + SSE)', () => {
@@ -225,16 +265,36 @@ describe('HTTP 서버(REST + SSE)', () => {
     });
 
     it('본문이 아주 커도 한도를 넘는 즉시 끊고 413을 돌려준다', async () => {
-      // Given (한도의 30배)
+      // Given (한도의 30배. 로그로 서버가 실제로 얼마나 읽고 멈췄는지 확인한다)
       const huge = JSON.stringify({ hostName: 'a'.repeat(500_000) });
+      const logs = [];
+      const originalError = silentLogger.error;
+      silentLogger.error = (message) => logs.push(message);
 
-      // When
-      const response = await request(baseUrl, { method: 'POST', path: '/api/rooms', body: huge });
+      // When (OS에 따라 413 응답을 온전히 받거나, 쓰는 도중 소켓이 끊길 수 있다 — 둘 다 허용한다)
+      const outcome = await postOversizedBody(baseUrl, '/api/rooms', huge);
+      silentLogger.error = originalError;
 
-      // Then
-      assert.equal(response.status, 413);
-      assert.equal(response.body.code, 'ERR009');
-      assert.equal(response.headers.connection, 'close');
+      // Then (413을 받았다면 규격대로여야 한다)
+      if (outcome.kind === 'response') {
+        assert.equal(outcome.status, 413);
+        assert.equal(outcome.body.code, 'ERR009');
+        assert.equal(outcome.headers.connection, 'close');
+      } else {
+        assert.match(String(outcome.error.code ?? outcome.error.message), /ECONNRESET|EPIPE/);
+      }
+
+      // Then (둘 중 어느 경우든 본문을 끝까지 읽지 않고 한도를 넘는 즉시 멈췄다)
+      const [, reportedSize] = logs.join(' ').match(/본문 크기 초과: (\d+)바이트/) ?? [];
+      assert.ok(reportedSize, `한도 초과 로그가 없습니다: ${logs.join(' | ')}`);
+      assert.ok(
+        Number(reportedSize) < huge.length,
+        `본문을 끝까지 읽었습니다: ${reportedSize} >= ${huge.length}`,
+      );
+
+      // Then (서버는 살아 있다 — 새 연결의 정상 요청은 200이다)
+      const followUp = await request(baseUrl, { path: '/api/server-info' });
+      assert.equal(followUp.status, 200);
     });
 
     it('JSON이 아니면 400이다', async () => {
