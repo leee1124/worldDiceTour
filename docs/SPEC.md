@@ -1,6 +1,6 @@
 # 월드 다이스 투어 (World Dice Tour) — 게임 명세
 
-로컬에서 즐기는 세계일주 주사위 보드게임. 한 화면에서 2~4명이 번갈아 플레이한다(핫시트).
+로컬 네트워크(LAN)에서 즐기는 세계일주 주사위 보드게임. 호스트 PC가 서버를 띄우고 **방을 만들면, 같은 와이파이의 다른 기기(폰/태블릿/PC)가 브라우저로 접속**해 함께 플레이한다. 한 기기에 여러 명이 앉는 핫시트도 같은 방식으로 지원(한 기기가 좌석 여러 개 보유).
 아이템/캐릭터/스킬 없음 — 주사위와 카드 운, 그리고 "살까/지을까/걸까" 선택만 있다.
 
 ## 0. 저작권 원칙
@@ -11,50 +11,77 @@
 
 ## 1. 기술 스택
 
-- 빌드 없는 Vanilla JS (ES Modules) + HTML + CSS. 런타임 의존성 0개.
-- 테스트: Node 내장 러너 `node --test` (Node 24).
-- 실행: `npm start` → 의존성 없는 Node 정적 서버(`server.js`, 127.0.0.1:5173 바인딩, 경로 탈출 방지).
-- 저장: `localStorage` 자동 저장/이어하기.
+- 빌드 없는 Vanilla JS (ES Modules) + HTML + CSS. **런타임 의존성 0개** (npm 패키지 설치 불필요).
+- 서버: Node 24 내장 `node:http`. 실시간 동기화는 **SSE(Server-Sent Events) + fetch POST** (WebSocket 라이브러리 불필요).
+- 서버는 `0.0.0.0:5173`에 바인딩하고 시작 시 LAN 접속 주소(`http://192.168.x.x:5173`)를 콘솔에 출력. `PORT` 환경변수 지원.
+- 테스트: Node 내장 러너 `node --test`.
+- 저장: 서버가 방 상태를 `data/rooms/*.json`에 자동 저장(서버 재시작 후 이어하기). 클라이언트는 좌석 토큰만 `localStorage`에 보관(재접속용).
 
-## 2. 아키텍처 (레이어 분리)
+## 2. 아키텍처 (레이어 분리, 서버 권위)
+
+**게임 상태와 모든 난수(주사위/티켓/카지노)는 서버에만 존재**한다. 클라이언트는 커맨드를 보내고 DTO 스냅샷+이벤트를 받아 그리기만 한다.
 
 ```
 src/
-  domain/          순수 비즈니스 로직 (DOM/브라우저 API 의존 금지)
-    Game.js          Aggregate Root — 턴/페이즈 상태기계, 규칙 집행
-    Player.js        Entity — pay/receive/이동/조난/파산 로직 보유
-    City.js          Entity(소유 가능한 칸) — 통행료 계산, 건설, 매각가 계산
-    Board.js         40칸 구성, 칸 조회
-    Money.js 등      Value Object (필요 시)
-    TicketDeck.js    행운 티켓 덱 (셔플/드로우/소진 시 재셔플)
-    Casino.js        카지노 게임 3종의 판정/배당 로직
-    Dice.js          RandomSource 인터페이스에 의존하는 주사위
-    data/board.js, data/tickets.js   정적 데이터
+  domain/            순수 비즈니스 로직 (node/브라우저 API 의존 금지)
+    game/  Game.js(Aggregate Root: 턴/페이즈 상태기계), Player.js, City.js, Board.js,
+           TicketDeck.js, Casino.js, Dice.js, data/board.js, data/tickets.js
+    room/  Room.js(Aggregate Root: 로비/좌석/호스트/게임 시작), Seat.js
+    shared/ DomainError.js, RandomSource·Repository 인터페이스(JSDoc typedef)
   application/
-    GameService.js   유스케이스 조합만 담당. 엔티티를 절대 반환하지 않고 DTO(plain object 스냅샷)만 반환
-    dto.js           GameViewDto 변환
-    errors.js        규격화된 에러 { code, message }
+    RoomService.js     방 생성/참가/좌석 추가·제거/시작/컴퓨터 전환 유스케이스
+    GameService.js     게임 커맨드 유스케이스 (조합만 담당)
+    AutoPlayerPolicy.js 컴퓨터 플레이어 의사결정
+    dto.js             RoomDto / GameViewDto (엔티티·토큰 절대 미노출)
+    errors.js          규격화된 에러 { code, message }
   infrastructure/
-    CryptoRandomSource.js      crypto.getRandomValues 기반 (RandomSource 구현)
-    LocalStorageGameRepository.js  (GameRepository 구현, 직렬화/역직렬화 + 스키마 검증)
-  ui/
-    GameController.js  DOM 이벤트 → GameService 호출 → 뷰 갱신
-    views/*            보드/플레이어 패널/모달/로그 렌더링
-index.html, styles/, server.js, tests/
+    CryptoRandomSource.js   node:crypto 기반 (RandomSource 구현)
+    FileRoomRepository.js   JSON 파일 저장 (RoomRepository 구현, 역직렬화 시 스키마 검증)
+    InMemoryRoomRepository.js (테스트용)
+  server/             Controller 레이어
+    httpServer.js      라우팅, 정적 파일 서빙(경로 탈출 방지), 본문 크기 제한(16KB), JSON 파싱 검증
+    roomController.js  REST 핸들러 — 입력 화이트리스트 검증 → Service 호출 → DTO 응답
+    sseHub.js          방별 SSE 구독자 관리, 브로드캐스트, 하트비트
+public/               클라이언트 (index.html, styles/, js/)
+    js/api.js(fetch+EventSource), js/GameController.js, js/views/*
+server.js, tests/
 ```
 
-- 도메인은 `RandomSource`(`nextInt(min,max)`), `GameRepository`(`save/load/clear`) **인터페이스(덕 타이핑 + JSDoc typedef)** 에 의존. 테스트에서는 결정적 가짜 구현을 주입.
+- 도메인은 `RandomSource`(`nextInt(min,max)`), `RoomRepository`(`save/findByCode/findAll/delete`) 인터페이스에만 의존. 테스트는 결정적 가짜 구현 주입.
 - 비즈니스 로직은 엔티티 안에 캡슐화(빈약한 도메인 모델 금지). Service는 조합만.
-- 모든 커맨드는 도메인에서 **현재 페이즈 + 현재 턴 플레이어** 를 검증한다(권한 검증에 해당). 잘못된 페이즈의 커맨드는 `DomainError(code)`.
-- UI는 사용자 입력 문자열을 `textContent`로만 출력(innerHTML에 사용자 입력 금지). 에러는 `{code, message}`만 노출하고 상세는 `console.error` 로깅. 빈 catch 금지.
-- 입력 검증(화이트리스트): 플레이어 이름 `^[가-힣a-zA-Z0-9 ]{1,10}$`, 인원 2~4, 베팅액은 정수·범위 검증, 목적지 인덱스 0~39 정수.
+- 에러 응답은 `{ code: "ERR0xx", message }` 규격만 반환. 스택/내부 메시지는 서버 로그로만. 빈 catch 금지.
+- 클라이언트는 서버에서 온 문자열(이름 등)을 `textContent`로만 출력(innerHTML에 외부 문자열 금지).
+
+### 2.1 방/좌석/권한 모델 (LAN)
+
+- **방(Room)**: 4자리 코드(`[A-HJ-NP-Z2-9]{4}`, 헷갈리는 문자 제외). 상태 `LOBBY → PLAYING → FINISHED`. 방 목록 조회로 LAN 게임 목록처럼 참가.
+- **좌석(Seat)**: 방 안의 플레이어 자리(2~4). 종류 `HUMAN | COMPUTER`. 좌석을 만들면 서버가 **좌석 토큰**(crypto 랜덤 32바이트 hex)을 발급 — 이 토큰을 가진 기기만 그 좌석의 커맨드를 보낼 수 있다. 한 기기가 좌석 여러 개를 가질 수 있음(핫시트).
+- **호스트**: 방을 만든 좌석. 호스트 토큰만 게임 옵션 변경/컴퓨터 좌석 추가/시작/좌석 강퇴/**오프라인 좌석을 컴퓨터 자동 진행으로 전환(및 복귀)** 가능.
+- **권한 검증은 Service/도메인에서**: 모든 게임 커맨드는 `토큰 → 좌석 → 현재 턴 플레이어 일치 + 현재 페이즈 허용 커맨드` 검증. 토큰 비교는 `crypto.timingSafeEqual`. 토큰은 어떤 DTO/SSE/로그에도 싣지 않는다.
+- 접속 끊김: SSE 연결 수로 좌석 온라인 여부 표시. 재접속 시 localStorage 토큰으로 좌석 복구.
+
+### 2.2 API
+
+| 메서드/경로 | 설명 |
+|---|---|
+| `GET /api/server-info` | LAN 접속 URL 목록(로비에 "다른 기기에서 이 주소로 접속" 안내용) |
+| `GET /api/rooms` | 참가 가능한 방 목록(RoomSummaryDto) |
+| `POST /api/rooms` | 방 생성 `{ hostName }` → `{ room, seatId, seatToken }` |
+| `POST /api/rooms/:code/seats` | 좌석 참가 `{ name }` → `{ seatId, seatToken }` (LOBBY에서만) |
+| `DELETE /api/rooms/:code/seats/:seatId` | 본인 퇴장 또는 호스트 강퇴 |
+| `POST /api/rooms/:code/host-actions` | `{ type: ADD_COMPUTER \| SET_OPTIONS \| START \| SET_AUTOPILOT, ... }` |
+| `POST /api/rooms/:code/commands` | 게임 커맨드 `{ seatId, type: ROLL \| BUY \| SKIP_BUY \| BUILD \| SKIP_BUILD \| CASINO_BET \| CASINO_LEAVE \| ISLAND_PAY \| ISLAND_ROLL \| TRAVEL \| SELL \| ... , payload }` |
+| `GET /api/rooms/:code/events` | SSE 스트림: `room`(로비 변경), `game`(GameViewDto + 이번 커맨드의 이벤트 목록) |
+
+- 인증 헤더 `Authorization: Bearer <seatToken>`. 입력 검증(화이트리스트): 이름 `^[가-힣a-zA-Z0-9 ]{1,10}$`, 방 코드 정규식, 커맨드 type enum, 베팅액 정수·단위·범위, 목적지 0~39 정수 등. 알 수 없는 필드는 무시.
+- 컴퓨터 좌석/자동 진행 좌석의 턴은 서버가 짧은 지연(연출용 ~800ms)을 두고 AutoPlayerPolicy로 진행.
 
 ## 3. 기본 규칙
 
 - 화폐 단위 원. 시작 자금 **3,000,000원**. 출발 칸을 **지나거나 도착**하면 월급 **200,000원**.
 - 주사위 2개. **더블이면 한 번 더**. 3연속 더블이면 즉시 조난 섬으로.
 - 승리: 마지막까지 파산하지 않은 1인. 설정에서 **라운드 제한(없음/20/30)** 선택 가능 — 제한 도달 시 총자산(현금+도시 매입가+건설비) 1위 승리.
-- 플레이어는 사람 또는 **컴퓨터(단순 규칙 기반)**: 현금이 가격의 2배 이상이면 구매/건설, 카지노는 최소액으로 1회, 공항은 빈 도시 중 최고가로 이동. 컴퓨터 의사결정은 application 레이어의 `AutoPlayerPolicy`로 분리.
+- 좌석은 사람 또는 **컴퓨터(단순 규칙 기반)**: 현금이 가격의 2배 이상이면 구매/건설, 카지노는 최소액으로 1회, 공항은 빈 도시 중 최고가로 이동. 컴퓨터 의사결정은 application 레이어의 `AutoPlayerPolicy`로 분리.
 
 ## 4. 보드 (40칸, 한 변 10칸 + 모서리)
 
@@ -159,11 +186,14 @@ index.html, styles/, server.js, tests/
 - 칸에 소유자 색 띠, 건물 단계 아이콘, 말(토큰) 표시. 말 이동은 한 칸씩 애니메이션.
 - 우측(모바일은 하단)에 플레이어 패널(현금/자산/상태), 게임 로그.
 - 모달: 구매/건설/통행료 안내/행운 티켓 뒤집기/카지노(3종 탭, 베팅 슬라이더, 슬롯 릴 연출)/공항 목적지 선택(보드 칸 클릭)/정리 매각/게임 종료 순위.
-- 시작 화면: 인원(2~4), 이름, 사람/컴퓨터, 라운드 제한, 이어하기 버튼.
+- 시작 화면: **방 만들기 / 방 목록에서 참가 / 코드로 참가**, 이전 방 재접속.
+- 로비: 방 코드와 LAN 접속 주소 크게 표시, 좌석 목록(온라인 표시), "이 기기에서 플레이어 추가"(핫시트), 호스트 전용: 컴퓨터 추가/라운드 제한/시작.
+- 게임 중: 내 기기의 좌석 차례일 때만 행동 버튼 활성화, 남의 차례에는 관전(같은 연출이 모든 기기에서 재생). 모바일 세로 화면 대응 필수.
 - 이미지 에셋 없이 CSS + 이모지/인라인 SVG만 사용. 키보드 접근성(버튼 포커스, Space/Enter로 주사위).
 
 ## 9. 테스트 (TDD)
 
 - Red → Green → Refactor. 테스트 설명은 **한국어**, 본문은 Given/When/Then 주석 구조.
-- 단위(domain), 통합(GameService + 가짜 Repository/RandomSource로 시나리오 플레이), 스모크 E2E(무작위 시드 컴퓨터 4인 자동 대전이 예외 없이 GAME_OVER에 도달 + 돈의 보존 불변식 검증).
+- 단위(domain: Game/Room/Casino 등), 통합(Service + 가짜 Repository/RandomSource 시나리오, **실제 http 서버를 임시 포트로 띄워 REST+SSE 검증**: 방 생성→참가→시작→커맨드→브로드캐스트), 스모크 E2E(컴퓨터 4인 자동 대전이 예외 없이 GAME_OVER 도달 + 돈의 보존 불변식 검증).
+- **권한 테스트 필수**: 토큰 없음/다른 좌석 토큰/내 차례 아님/잘못된 페이즈/호스트 아님 → 각각 규격 에러, 상태 불변.
 - 핵심 도메인 로직 라인 커버리지 80% 이상 (`node --test --experimental-test-coverage`).
