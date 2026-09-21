@@ -9,6 +9,7 @@
 | 1 | 동작 | `DELETE /api/rooms/:code/seats/:seatId`는 **대기실에서만** 가능. 게임 중/종료 후에는 `409 ERR005` | 게임 중 "나가기" 버튼은 좌석 삭제 대신 **연결만 끊기**로 구현. 호스트가 그 좌석을 자동 진행으로 돌릴 수 있다 |
 | 2 | 동작 | `TRAVEL`의 `destination`이 **현재 칸**이면 `400 ERR001`. `pending.forbiddenIndexes`가 이제 `[30]`이 아니라 `[30, <현재 칸>]`을 담는다(공항 칸에 서 있으면 `[30]`) | 공항 목적지 선택 UI는 `forbiddenIndexes`에 든 칸을 **모두** 비활성화할 것 |
 | 3 | 동작 | 공항 칸(30)에 더블로 도착해도 `EXTRA_TURN` 이벤트가 없다 | 더블 연출 후 곧바로 턴이 넘어간다 |
+| 4 | 동작 | 통행료를 `AWAIT_LIQUIDATION`을 거쳐(`SELL`/`AUTO_SELL`/`TAKE_LOAN`) 낸 경우 **인수를 제안하지 않는다** — `ACQUIRE_OFFERED` 없이 `TURN_ENDED` | 정리 후 인수 모달을 기대하지 말 것. 현금으로 바로 낸 통행료 뒤에는 이전과 같이 제안된다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -300,7 +301,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `SKIP_BUILD` | 건설 포기 |
 | `START_BUILD` | 출발 칸 보너스. `pending.candidates` 중 하나의 `index`와 그 후보의 `options`에서 고른 건물 |
 | `SKIP_START_BUILD` | 보너스 포기 |
-| `ACQUIRE` | 통행료를 낸 남의 도시를 `pending.price`(= invested × 2)에 인수. **보유 현금만** 사용(부족하면 `ERR008`). 인수 후 `AWAIT_BUILD` |
+| `ACQUIRE` | 통행료를 낸 남의 도시를 `pending.price`(= invested × 2)에 인수. **보유 현금만** 사용(부족하면 `ERR008`). 인수 후 `AWAIT_BUILD`. 통행료를 정리 페이즈로 낸 턴에는 이 페이즈에 오지 않는다 |
 | `SKIP_ACQUIRE` | 인수 포기 |
 | `CASINO_BET` | `game`: `ODD_EVEN`(choice `ODD`\|`EVEN`) / `HIGH_LOW_SEVEN`(choice `LOW`\|`HIGH`\|`SEVEN`) / `SLOT`(choice 불필요). `bet`은 10,000원 단위, 10,000 ~ min(현금, 500,000). 한 방문 최대 3판 |
 | `CASINO_LEAVE` | 카지노에서 나가 턴 종료 |
@@ -312,7 +313,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `TAKE_LOAN` | 게임당 1회. 현금 +1,000,000, 채무 1,200,000. 이후 월급이 채무 상환에 압류된다. 이미 썼으면 `ERR005` |
 | `DECLARE_BANKRUPTCY` | 정리 페이즈에서 **항상 가능**. 남은 현금을 채권자에게 넘기고 모든 자산 초기화 후 탈락 |
 
-> 현금 ≥ 지불액이 되는 즉시 지불이 자동 완료되고 중단됐던 흐름(예: 통행료 뒤의 인수 제안)이 이어진다.
+> 현금 ≥ 지불액이 되는 즉시 지불이 자동 완료되고 중단됐던 흐름이 이어진다.
+> 단 **정리 페이즈를 거친 통행료 뒤에는 인수를 제안하지 않는다** — 인수는 보유 현금으로만 할 수 있으므로(명세 4장), 매각·대출로 만든 돈으로 인수하는 길을 막는다.
 
 ---
 

@@ -1082,7 +1082,9 @@ export class Game {
         amount: items.reduce((sum, item) => sum + item.amount, 0),
       });
     }
-    const next = this.#turn.debt.next;
+    // 인수는 "보유 현금으로만" 가능하다(명세 4장). 정리 페이즈를 거쳐 매각·대출로 돈을
+    // 마련한 통행료였다면 그 돈으로 인수하는 셈이 되므로, 제안 없이 턴을 끝낸다.
+    const next = wasLiquidation ? { kind: CONTINUATIONS.TURN_END } : this.#turn.debt.next;
     this.#turn.debt = null;
     this.#continueAfterPayment(next);
   }

@@ -369,7 +369,7 @@ describe('Game(도시 인수)', () => {
     assert.equal(game.currentPlayerId, 's2');
   });
 
-  it('통행료를 정리 매각으로 낸 뒤에도 인수 제안이 이어진다', () => {
+  it('통행료를 정리 매각으로 낸 뒤에는 인수를 제안하지 않고 턴이 끝난다', () => {
     // Given (통행료 28,000원을 현금 5,000원으로는 못 내고, 서울을 팔아 충당)
     const game = buildGame({
       cash: { s1: 5_000 },
@@ -384,8 +384,9 @@ describe('Game(도시 인수)', () => {
     // When
     game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 39 });
 
-    // Then
-    assert.equal(game.phase, PHASES.AWAIT_ACQUIRE);
-    assertMoneyConserved(game, '매각 후 인수 제안');
+    // Then (매각 대금으로 인수하는 것은 "현금으로만 인수" 규칙 위반)
+    assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+    assert.equal(game.currentPlayerId, 's2');
+    assertMoneyConserved(game, '매각 후 인수 금지');
   });
 });

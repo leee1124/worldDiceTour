@@ -120,6 +120,78 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     assertMoneyConserved(game, '자동 매각');
   });
 
+  describe('정리로 낸 통행료 뒤에는 인수를 제안하지 않는다(현금으로만 인수)', () => {
+    /** 방콕(3, 통행료 140,000 / 인수가 392,000) 통행료를 못 내는 상태 + 팔면 넉넉해지는 서울. */
+    const richAssetGame = () =>
+      insolventGame({
+        cities: [
+          { index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL] },
+          { index: 39, ownerId: 's1', buildings: [VILLA, BUILDING, HOTEL] },
+        ],
+      });
+
+    it('대출로 메운 경우', () => {
+      // Given
+      const game = insolventGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.TAKE_LOAN);
+
+      // Then (대출금 덕에 인수가 392,000원을 낼 수는 있지만 제안하지 않는다)
+      assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
+      assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+      assert.ok(eventTypes(events).includes(EVENT_TYPES.TURN_ENDED));
+      assertMoneyConserved(game, '대출 후 인수 금지');
+    });
+
+    it('자동 매각으로 메운 경우', () => {
+      // Given
+      const game = richAssetGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.AUTO_SELL);
+
+      // Then
+      assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
+      assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+      assertMoneyConserved(game, '자동 매각 후 인수 금지');
+    });
+
+    it('선택 매각으로 메운 경우', () => {
+      // Given
+      const game = richAssetGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 39 });
+
+      // Then
+      assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
+      assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+      assertMoneyConserved(game, '선택 매각 후 인수 금지');
+    });
+
+    it('현금으로 바로 낸 경우에는 그대로 인수를 제안한다', () => {
+      // Given (통행료 140,000원을 처음부터 현금으로 낼 수 있다)
+      const game = buildGame({
+        cities: [{ index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL] }],
+        random: new FakeRandomSource([1, 2]),
+      });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED).index, 3);
+      assert.equal(game.phase, PHASES.AWAIT_ACQUIRE);
+    });
+  });
+
   it('자동 매각으로 충분하면 더 비싼 자산은 남긴다', () => {
     // Given
     const game = insolventGame({
