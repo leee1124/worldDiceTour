@@ -1,6 +1,7 @@
-import { ROOM_STATUS, MAX_SEATS, Room } from '../domain/room/Room.js';
+import { ROOM_SCHEMA_VERSION, ROOM_STATUS, MAX_SEATS, Room } from '../domain/room/Room.js';
 import {
   ALLOWED_FINANCE_OPTIONS,
+  DEFAULT_FINANCE_OPTIONS,
   FINANCE_OPTION_KEYS,
 } from '../domain/room/FinanceOptions.js';
 import { SEAT_KINDS } from '../domain/room/Seat.js';
@@ -34,14 +35,74 @@ export function serializeRoom(room) {
   return JSON.stringify(room.toSnapshot());
 }
 
+/** 지금 코드가 쓰는 스냅샷 스키마 버전. */
+export const CURRENT_ROOM_SCHEMA_VERSION = ROOM_SCHEMA_VERSION;
+
 /**
- * 저장된 방 스냅샷을 검증하고 Room으로 복원한다.
+ * 스키마 단계별 승급 목록. **Phase마다 한 줄 추가**하고 기존 단계는 고치지 않는다 —
+ * 옛 파일은 여전히 그 경로를 그대로 지나 올라와야 한다.
+ */
+const MIGRATIONS = Object.freeze([{ from: 1, to: 2, apply: migrateV1ToV2 }]);
+
+/**
+ * 저장 스냅샷을 현재 스키마로 승급한다.
+ *
+ * `schemaVersion`이 없으면 1로 본다(그 필드가 생기기 전에 저장된 방). 미래 버전은 이 코드가
+ * 해석할 수 없으므로 거부한다 — 모르는 필드를 무시하고 진행하면 그 방을 **덮어써서** 잃는다.
+ *
+ * @param {unknown} raw
+ * @returns {object} 새 객체(입력을 변형하지 않는다)
+ */
+export function migrateRoomSnapshot(raw) {
+  assert(isPlainObject(raw), '방 스냅샷이 객체가 아닙니다');
+  const declared = raw.schemaVersion;
+  assert(
+    declared === undefined || (isFiniteInteger(declared) && declared >= 1),
+    `스키마 버전 오류: ${String(declared)}`,
+  );
+  const from = declared ?? 1;
+  assert(
+    from <= CURRENT_ROOM_SCHEMA_VERSION,
+    `미래 스키마 버전입니다(${from} > ${CURRENT_ROOM_SCHEMA_VERSION}). 서버를 업데이트하세요`,
+  );
+
+  let snapshot = raw;
+  let version = from;
+  while (version < CURRENT_ROOM_SCHEMA_VERSION) {
+    const step = MIGRATIONS.find((migration) => migration.from === version);
+    assert(step, `스키마 ${version} → ${CURRENT_ROOM_SCHEMA_VERSION} 승급 경로가 없습니다`);
+    snapshot = step.apply(snapshot);
+    version = step.to;
+  }
+  return snapshot;
+}
+
+/**
+ * v1 → v2: 금융 옵션 기본값(전부 꺼짐)을 채운다.
+ * **진행 중인 판에 기능이 갑자기 끼어들지 않는다** — 밸런스/불변식이 판 중간에 바뀌면 안 된다.
+ * 장부의 사유별 내역(`ledger.byReason`)은 과거 순유입의 사유를 되살릴 수 없으므로 비워 둔다
+ * (그 방의 `moneyReport().breakdownBalanced`만 false가 되고, 보존 불변식은 그대로 성립한다).
+ */
+function migrateV1ToV2(raw) {
+  return {
+    ...raw,
+    schemaVersion: 2,
+    options: {
+      roundLimit: raw.options?.roundLimit ?? null,
+      finance: { ...DEFAULT_FINANCE_OPTIONS },
+    },
+  };
+}
+
+/**
+ * 저장된 방 스냅샷을 승급 → 검증 → Room으로 복원한다.
  * @param {unknown} snapshot
  * @param {import('../domain/shared/interfaces.js').RandomSource} random
  */
 export function deserializeRoom(snapshot, random) {
-  validateRoomSnapshot(snapshot);
-  return Room.restore(snapshot, random);
+  const migrated = migrateRoomSnapshot(snapshot);
+  validateRoomSnapshot(migrated);
+  return Room.restore(migrated, random);
 }
 
 export function parseRoomJson(text, random) {
@@ -54,9 +115,16 @@ export function parseRoomJson(text, random) {
   return deserializeRoom(snapshot, random);
 }
 
-/** 방 스냅샷 스키마 검증(화이트리스트 방식). */
+/**
+ * 방 스냅샷 스키마 검증(화이트리스트 방식).
+ * **승급이 끝난 스냅샷**을 받는다. `schemaVersion`은 없거나(구버전 검증) 현재 버전이어야 한다.
+ */
 export function validateRoomSnapshot(snapshot) {
   assert(isPlainObject(snapshot), '방 스냅샷이 객체가 아닙니다');
+  assert(
+    snapshot.schemaVersion === undefined || snapshot.schemaVersion === ROOM_SCHEMA_VERSION,
+    `승급되지 않은 스키마 버전: ${String(snapshot.schemaVersion)}`,
+  );
   assert(isValidRoomCode(snapshot.code), `방 코드 형식 오류: ${snapshot.code}`);
   assert(Object.values(ROOM_STATUS).includes(snapshot.status), `방 상태 오류: ${snapshot.status}`);
   assert(Array.isArray(snapshot.seats), '좌석 목록이 배열이 아닙니다');
@@ -113,7 +181,33 @@ function validateOptionsSnapshot(options) {
   }
 }
 
+/**
+ * 게임 서브시스템별 검증기.
+ *
+ * 앞으로 붙는 서브시스템(market / finance / derivatives / report)은 **이 목록에 한 줄**을
+ * 추가하고 자기 검증 함수만 쓰면 된다. `validateGameSnapshot`은 더 이상 자라지 않는다.
+ * 순서는 진단 메시지의 우선순위이기도 하므로 함부로 바꾸지 않는다.
+ */
+const GAME_SUBSYSTEM_VALIDATORS = Object.freeze([
+  { name: 'players', validate: (game, context) => validatePlayersSnapshot(game.players, context) },
+  { name: 'board', validate: (game, context) => validateBoardSnapshot(game.board, context) },
+  { name: 'casino', validate: (game) => validateCasinoSnapshot(game.casino) },
+  { name: 'ledger', validate: (game) => validateLedgerSnapshot(game.ledger) },
+  { name: 'economy', validate: (game) => validateEconomySnapshot(game) },
+  { name: 'deck', validate: (game) => validateDeckSnapshot(game.deck) },
+  { name: 'turn', validate: (game, context) => validateTurnSnapshot(game, context.seatIds) },
+]);
+
 function validateGameSnapshot(game, seats) {
+  validateGameCore(game);
+  const context = { seatIds: new Set(seats.map((seat) => seat.id)) };
+  for (const validator of GAME_SUBSYSTEM_VALIDATORS) {
+    validator.validate(game, context);
+  }
+}
+
+/** 상태기계 본체(페이즈·버전·라운드·턴 인덱스). 서브시스템 검증의 전제다. */
+function validateGameCore(game) {
   assert(isPlainObject(game), '게임 스냅샷이 객체가 아닙니다');
   assert(ALL_PHASES.includes(game.phase), `게임 페이즈 오류: ${game.phase}`);
   assert(isFiniteInteger(game.version) && game.version >= 0, '게임 version 오류');
@@ -123,8 +217,10 @@ function validateGameSnapshot(game, seats) {
     isFiniteInteger(game.turnIndex) && game.turnIndex >= 0 && game.turnIndex < game.players.length,
     `턴 인덱스 오류: ${game.turnIndex}`,
   );
-  const seatIds = new Set(seats.map((seat) => seat.id));
-  for (const player of game.players) {
+}
+
+function validatePlayersSnapshot(players, { seatIds }) {
+  for (const player of players) {
     assert(isPlainObject(player), '플레이어가 객체가 아닙니다');
     assert(seatIds.has(player.id), `좌석에 없는 플레이어입니다: ${player.id}`);
     assert(isFiniteInteger(player.cash) && player.cash >= 0, `현금 오류: ${player.cash}`);
@@ -132,25 +228,36 @@ function validateGameSnapshot(game, seats) {
     assert(typeof player.eliminated === 'boolean', 'eliminated 값 오류');
     assert(isFiniteInteger(player.loanDebt) && player.loanDebt >= 0, '대출 채무 오류');
   }
-  assert(Array.isArray(game.board), '보드 스냅샷이 배열이 아닙니다');
-  for (const city of game.board) {
+}
+
+function validateBoardSnapshot(board, { seatIds }) {
+  assert(Array.isArray(board), '보드 스냅샷이 배열이 아닙니다');
+  for (const city of board) {
     assert(isPlainObject(city), '보드 칸이 객체가 아닙니다');
     assert(isBoardIndex(city.index), `칸 번호 오류: ${city.index}`);
     assert(city.ownerId === null || seatIds.has(city.ownerId), `칸 소유자 오류: ${city.ownerId}`);
     assert(Array.isArray(city.buildings), '건물 목록 오류');
     assert(typeof city.landmark === 'boolean', '랜드마크 값 오류');
   }
+}
+
+function validateCasinoSnapshot(casino) {
   assert(
-    isPlainObject(game.casino) && isFiniteInteger(game.casino.jackpot) && game.casino.jackpot >= 0,
-    `잭팟 오류: ${game.casino?.jackpot}`,
+    isPlainObject(casino) && isFiniteInteger(casino.jackpot) && casino.jackpot >= 0,
+    `잭팟 오류: ${casino?.jackpot}`,
   );
-  validateLedgerSnapshot(game.ledger);
+}
+
+/** 돈의 보존 불변식 기준값. */
+function validateEconomySnapshot(game) {
   assert(
     game.initialTotal === undefined || (isFiniteInteger(game.initialTotal) && game.initialTotal >= 0),
     `초기 총액 오류: ${game.initialTotal}`,
   );
-  assert(isPlainObject(game.deck) && Array.isArray(game.deck.drawPile), '티켓 덱 오류');
-  validateTurnSnapshot(game, seatIds);
+}
+
+function validateDeckSnapshot(deck) {
+  assert(isPlainObject(deck) && Array.isArray(deck.drawPile), '티켓 덱 오류');
 }
 
 /**
