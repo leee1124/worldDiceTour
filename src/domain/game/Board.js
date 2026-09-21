@@ -82,6 +82,11 @@ export class Board {
     return this.cities().filter((city) => city.isOwnedBy(playerId));
   }
 
+  /** 그 좌석이 지금 건설 기회를 받을 수 있는 도시(칸 번호 순). */
+  buildableBy(playerId, cash) {
+    return this.ownedBy(playerId).filter((city) => city.canOfferBuildWith(cash));
+  }
+
   resortCountOf(playerId) {
     return this.ownedBy(playerId).filter((city) => city.isResort).length;
   }

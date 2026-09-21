@@ -156,6 +156,17 @@ export class City {
     return BASIC_BUILDINGS.filter((type) => !this.#buildings.has(type));
   }
 
+  /** 이번 건설 기회에 고를 수 있는 건물과 비용. */
+  buildOptions() {
+    return this.buildableTypes().map((type) => ({ type, cost: this.buildCost(type) }));
+  }
+
+  /** 이 현금으로 건설 기회를 열 수 있는지(지을 것이 있고 가장 싼 것을 낼 수 있는지). */
+  canOfferBuildWith(cash) {
+    const options = this.buildOptions();
+    return options.length > 0 && cash >= Math.min(...options.map((option) => option.cost));
+  }
+
   /** 건설 가능 여부만 검증한다(상태 변경 없음). */
   assertCanBuild(types) {
     if (!Array.isArray(types) || types.length === 0) {

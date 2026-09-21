@@ -1,5 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
 import { assertAmount } from '../shared/Money.js';
+import { MONEY_REASONS, MoneyIntent } from '../shared/MoneyIntent.js';
 import { Dice } from './Dice.js';
 
 export const CASINO_GAMES = Object.freeze({
@@ -115,6 +116,30 @@ export class Casino {
       jackpotAccumulated,
       detail: outcome.detail,
     };
+  }
+
+  /**
+   * 한 판의 돈 이동 의사.
+   *
+   * 진 베팅액의 절반(내림)은 잭팟으로, 나머지는 은행으로 간다. 배당은 은행에서 나오고
+   * 잭팟 당첨금만 잭팟에서 나온다 — 그래서 총합(현금 + 잭팟)의 변화가 장부 순유입과 정확히 맞는다.
+   * 잭팟 당첨은 항상 배당이 있는 판이므로 적립과 지급이 같은 판에 함께 일어나지 않는다.
+   *
+   * @param {{playerId:string, bet:number, result:object}} params `result`는 `play()`의 반환값
+   * @returns {import('../shared/MoneyIntent.js').MoneyIntent[]}
+   */
+  moneyIntentsFor({ playerId, bet, result }) {
+    const reason = MONEY_REASONS.CASINO;
+    const meta = { game: result.game };
+    const amounts = [
+      [result.jackpotAccumulated, MoneyIntent.toJackpot],
+      [bet - result.jackpotAccumulated, MoneyIntent.toBank],
+      [result.payout - result.jackpotWon, MoneyIntent.fromBank],
+      [result.jackpotWon, MoneyIntent.fromJackpot],
+    ];
+    return amounts
+      .filter(([amount]) => amount > 0)
+      .map(([amount, make]) => make({ playerId, amount, reason, meta }));
   }
 
   #judge({ game, bet, choice }, random) {
