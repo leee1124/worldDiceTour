@@ -139,10 +139,18 @@ export class Holdings {
     return wiped;
   }
 
+  /**
+   * 저장 형태 `{ 좌석: { 종목: {qty, avgCost} } }`.
+   *
+   * **프로토타입이 없는 객체로 만든다.** 평범한 객체 리터럴에 `raw['__proto__'] = …`를 대입하면
+   * 프로토타입 설정자가 가로채 **그 좌석의 보유가 조용히 사라진다**(= 자산이 없어진다).
+   * 손상되거나 조작된 방 파일에 그런 키가 들어올 수 있으므로, 어떤 키든 그대로 실리게 한다.
+   * (`JSON.stringify`는 프로토타입 없는 객체도 정상적으로 직렬화한다.)
+   */
   toSnapshot() {
-    const raw = {};
+    const raw = Object.create(null);
     for (const playerId of [...this.#bySeat.keys()].sort()) {
-      const positions = {};
+      const positions = Object.create(null);
       for (const position of this.positionsOf(playerId)) {
         positions[position.instrumentId] = { qty: position.qty, avgCost: position.avgCost };
       }

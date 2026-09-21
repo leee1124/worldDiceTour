@@ -91,8 +91,12 @@ export class DepositAccount {
     return balance;
   }
 
+  /**
+   * 저장 형태 `{ 좌석: 잔액 }`. **프로토타입이 없는 객체로 만든다** —
+   * `raw['__proto__'] = 10000`은 평범한 객체에서 조용히 사라져 잔액이 없어진다(`Holdings` 참고).
+   */
   toSnapshot() {
-    const raw = {};
+    const raw = Object.create(null);
     for (const seatId of [...this.#balances.keys()].sort()) {
       raw[seatId] = this.#balances.get(seatId);
     }

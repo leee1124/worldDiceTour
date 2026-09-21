@@ -118,7 +118,9 @@ export class MatchRecorder {
   }
 
   toSnapshot() {
-    const pnl = {};
+    // 좌석 id로 키를 만드는 객체는 프로토타입 없이 만든다(`Holdings.toSnapshot` 참고 —
+    // `__proto__` 좌석의 손익이 조용히 사라지지 않게).
+    const pnl = Object.create(null);
     for (const seatId of [...this.#pnl.keys()].sort()) {
       pnl[seatId] = Object.fromEntries(this.#pnl.get(seatId));
     }

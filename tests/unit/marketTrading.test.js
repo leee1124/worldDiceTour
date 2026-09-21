@@ -259,8 +259,8 @@ describe('DepositAccount(예금 계좌)', () => {
     // Given
     const account = new DepositAccount({ s1: 120_000 });
 
-    // When / Then
-    assert.deepEqual(account.toSnapshot(), { s1: 120_000 });
+    // When / Then (스냅샷은 프로토타입이 없는 객체다 — 내용으로 비교한다)
+    assert.deepEqual({ ...account.toSnapshot() }, { s1: 120_000 });
     assert.throws(() => new DepositAccount({ s1: -1 }), { code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT });
     assert.throws(() => new DepositAccount({ s1: 5_555 }), {
       code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
@@ -849,5 +849,39 @@ describe('OrderQueue(남의 턴 예약 주문)', () => {
     // Then
     assert.deepEqual(restored.toSnapshot(), queue.toSnapshot());
     assert.equal(restored.ofSeat('s1')[0].id, 'ord-2', 'id를 재사용하지 않는다');
+  });
+});
+
+describe('스냅샷 키 오염 방어(프로토타입 키)', () => {
+  it('Holdings는 __proto__ 좌석도 스냅샷에서 잃지 않는다', () => {
+    // Given (손상·조작된 방 파일에 JSON.parse가 만든 `__proto__` 키가 들어올 수 있다.
+    //        평범한 객체 리터럴에 그 키를 대입하면 **조용히 사라져** 보유 수량이 없어진다)
+    const raw = JSON.parse(
+      '{"__proto__":{"AIR":{"qty":3,"avgCost":100}},"s1":{"AIR":{"qty":2,"avgCost":100}}}',
+    );
+    const holdings = new Holdings(raw);
+
+    // When
+    const snapshot = holdings.toSnapshot();
+
+    // Then
+    assert.equal(holdings.qtyOf('__proto__', 'AIR'), 3);
+    assert.deepEqual(Object.keys(snapshot).sort(), ['__proto__', 's1'], '키가 사라졌다');
+    assert.deepEqual(new Holdings(snapshot).toSnapshot(), snapshot, '왕복이 깨졌다');
+    assert.equal(Object.prototype.AIR, undefined, 'Object.prototype이 오염됐다');
+  });
+
+  it('DepositAccount도 __proto__ 좌석 잔액을 잃지 않는다', () => {
+    // Given
+    const raw = JSON.parse('{"__proto__":10000,"s1":20000}');
+    const account = new DepositAccount(raw);
+
+    // When
+    const snapshot = account.toSnapshot();
+
+    // Then
+    assert.equal(account.balanceOf('__proto__'), 10_000);
+    assert.deepEqual(Object.keys(snapshot).sort(), ['__proto__', 's1'], '잔액이 사라졌다');
+    assert.deepEqual(new DepositAccount(snapshot).toSnapshot(), snapshot);
   });
 });
