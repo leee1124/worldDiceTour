@@ -69,19 +69,10 @@ export class BankLedger {
     return this.netFromBank - this.attributedNet;
   }
 
-  receiveFromBank(amount, reason) {
-    this.#assert(amount);
-    this.#record(reason, amount);
-    this.#fromBank += amount;
-  }
-
-  payToBank(amount, reason) {
-    this.#assert(amount);
-    this.#record(reason, -amount);
-    this.#toBank += amount;
-  }
-
-  /** 순변화가 +면 은행 유입, -면 은행 유출로 기록한다. */
+  /**
+   * 사유별 순변화를 기록한다(장부를 바꾸는 **유일한** 메서드, 호출자는 `Treasury`뿐).
+   * `net`이 +면 은행 유출(플레이어 유입), −면 은행 유입으로 쌓는다.
+   */
   applyNet(net, reason) {
     if (!Number.isInteger(net)) {
       throw DomainError.invalidArgument(`장부 순변화가 정수가 아닙니다: ${net}`);
@@ -109,13 +100,6 @@ export class BankLedger {
       return;
     }
     this.#byReason.set(reason, next);
-  }
-
-  #assert(amount) {
-    if (!Number.isInteger(amount) || amount < 0) {
-      throw DomainError.invalidArgument(`장부 금액이 올바르지 않습니다: ${amount}`);
-    }
-    assertAmount(amount, '장부 금액');
   }
 
   toSnapshot() {
