@@ -24,7 +24,12 @@ import { Liquidator } from './payment/Liquidator.js';
 import { NetWorth } from './payment/NetWorth.js';
 import { PAYMENT_OUTCOMES, PaymentFlow } from './payment/PaymentFlow.js';
 import { PROPERTY_ASSET_KIND, PropertyAssets } from './payment/PropertyAssets.js';
-import { COMMAND_PHASES, COMMAND_TYPES } from './commands.js';
+import {
+  COMMAND_OWNERSHIP,
+  COMMAND_OWNERSHIPS,
+  COMMAND_PHASES,
+  COMMAND_TYPES,
+} from './commands.js';
 import { EVENT_TYPES, GAME_OVER_REASONS, MONEY_REASONS } from './events.js';
 import { PHASES } from './phases.js';
 import { SPACE_KINDS } from './data/board.js';
@@ -73,6 +78,7 @@ export class Game {
   /** @type {PaymentFlow} */ #payment;
   /** @type {Bankruptcy} */ #bankruptcy;
   /** @type {LapIncome} */ #lapIncome;
+  /** @type {Readonly<Record<string, (payload: object) => void>>} */ #handlers;
   #phase;
   #version;
   #initialTotal;
@@ -119,6 +125,8 @@ export class Game {
       treasury: this.#treasury,
       findPlayer: (id) => this.playerById(id),
     });
+
+    this.#handlers = this.#buildHandlers();
 
     const { debt = null, ...turnRest } = turn ?? {};
     this.#turn = { ...EMPTY_TURN, ...turnRest };
@@ -228,6 +236,17 @@ export class Game {
 
   get currentPlayerId() {
     return this.#players[this.#clock.turnIndex]?.id ?? null;
+  }
+
+  /**
+   * 지금 커맨드를 보낼 수 있는 **행동 주체** 좌석(한 번에 한 명).
+   *
+   * 오늘은 항상 턴 소유자와 같다. 앞으로 압류 경매처럼 "현재 턴 플레이어가 아닌 좌석이
+   * 결정을 내리는" 구간이 생기면 이 값만 달라지고, `currentSeatId`는 턴 소유자로 남는다.
+   * 그래서 자동 진행 드라이버·SSE·뮤텍스 모델을 흔들지 않는다.
+   */
+  get actingSeatId() {
+    return this.currentPlayerId;
   }
 
   get #current() {
@@ -349,7 +368,7 @@ export class Game {
   // ── 커맨드 ──────────────────────────────────────────────────────────────
 
   /**
-   * 커맨드를 실행한다. 턴 소유권 → 페이즈 → 페이로드 순으로 검증한 뒤 상태를 바꾼다.
+   * 커맨드를 실행한다. 행동 주체 → 페이즈 → 페이로드 순으로 검증한 뒤 상태를 바꾼다.
    * @param {string} seatId 이미 인증이 끝난 좌석 id
    * @param {string} type COMMAND_TYPES
    * @param {object} payload
@@ -357,68 +376,59 @@ export class Game {
    */
   execute(seatId, type, payload = {}) {
     const allowedPhases = COMMAND_PHASES[type];
-    if (!allowedPhases) {
+    const handler = this.#handlers[type];
+    if (!allowedPhases || !handler) {
       throw DomainError.invalidArgument(`알 수 없는 커맨드입니다: ${type}`);
     }
     if (this.isOver()) {
       throw DomainError.invalidPhase('이미 끝난 게임입니다');
     }
-    this.#assertTurn(seatId);
+    this.#assertOwnership(type, seatId);
     if (!allowedPhases.includes(this.#phase)) {
       throw DomainError.invalidPhase(`${this.#phase} 페이즈에서는 ${type} 커맨드를 쓸 수 없습니다`);
     }
 
     this.#events = [];
-    this.#dispatch(type, payload ?? {});
+    handler(payload ?? {});
     this.#version += 1;
     return [...this.#events];
   }
 
-  #dispatch(type, payload) {
-    switch (type) {
-      case COMMAND_TYPES.ROLL:
-        return this.#roll();
-      case COMMAND_TYPES.BUY:
-        return this.#buy();
-      case COMMAND_TYPES.SKIP_BUY:
-        return this.#skipBuy();
-      case COMMAND_TYPES.BUILD:
-        return this.#build(payload);
-      case COMMAND_TYPES.SKIP_BUILD:
-        return this.#skipBuild();
-      case COMMAND_TYPES.START_BUILD:
-        return this.#startBuild(payload);
-      case COMMAND_TYPES.SKIP_START_BUILD:
-        return this.#skipStartBuild();
-      case COMMAND_TYPES.ACQUIRE:
-        return this.#acquire();
-      case COMMAND_TYPES.SKIP_ACQUIRE:
-        return this.#skipAcquire();
-      case COMMAND_TYPES.CASINO_BET:
-        return this.#casinoBet(payload);
-      case COMMAND_TYPES.CASINO_LEAVE:
-        return this.#casinoLeave();
-      case COMMAND_TYPES.ISLAND_PAY:
-        return this.#islandPay();
-      case COMMAND_TYPES.ISLAND_ROLL:
-        return this.#islandRoll();
-      case COMMAND_TYPES.TRAVEL:
-        return this.#travel(payload);
-      case COMMAND_TYPES.SELL:
-        return this.#sell(payload);
-      case COMMAND_TYPES.AUTO_SELL:
-        return this.#autoSell();
-      case COMMAND_TYPES.TAKE_LOAN:
-        return this.#takeLoan();
-      case COMMAND_TYPES.DECLARE_BANKRUPTCY:
-        return this.#declareBankruptcy();
-      default:
-        throw DomainError.invalidArgument(`처리할 수 없는 커맨드입니다: ${type}`);
-    }
+  /** 커맨드 종류 → 처리기. `COMMAND_PHASES`/`COMMAND_OWNERSHIP`과 짝을 이룬다. */
+  #buildHandlers() {
+    return Object.freeze({
+      [COMMAND_TYPES.ROLL]: () => this.#roll(),
+      [COMMAND_TYPES.BUY]: () => this.#buy(),
+      [COMMAND_TYPES.SKIP_BUY]: () => this.#skipBuy(),
+      [COMMAND_TYPES.BUILD]: (payload) => this.#build(payload),
+      [COMMAND_TYPES.SKIP_BUILD]: () => this.#skipBuild(),
+      [COMMAND_TYPES.START_BUILD]: (payload) => this.#startBuild(payload),
+      [COMMAND_TYPES.SKIP_START_BUILD]: () => this.#skipStartBuild(),
+      [COMMAND_TYPES.ACQUIRE]: () => this.#acquire(),
+      [COMMAND_TYPES.SKIP_ACQUIRE]: () => this.#skipAcquire(),
+      [COMMAND_TYPES.CASINO_BET]: (payload) => this.#casinoBet(payload),
+      [COMMAND_TYPES.CASINO_LEAVE]: () => this.#casinoLeave(),
+      [COMMAND_TYPES.ISLAND_PAY]: () => this.#islandPay(),
+      [COMMAND_TYPES.ISLAND_ROLL]: () => this.#islandRoll(),
+      [COMMAND_TYPES.TRAVEL]: (payload) => this.#travel(payload),
+      [COMMAND_TYPES.SELL]: (payload) => this.#sell(payload),
+      [COMMAND_TYPES.AUTO_SELL]: () => this.#autoSell(),
+      [COMMAND_TYPES.TAKE_LOAN]: () => this.#takeLoan(),
+      [COMMAND_TYPES.DECLARE_BANKRUPTCY]: () => this.#declareBankruptcy(),
+    });
   }
 
-  #assertTurn(seatId) {
-    if (!this.currentPlayerId || this.currentPlayerId !== seatId) {
+  /**
+   * 이 커맨드를 보낼 자격이 있는 좌석인지 확인한다.
+   * 지금은 모든 커맨드가 `CURRENT_PLAYER`라 "내 차례인가"와 같지만, 표를 통해 판단하므로
+   * 앞으로 다른 행동 주체(경매 입찰자 등)가 추가되어도 여기 한 줄만 늘어난다.
+   */
+  #assertOwnership(type, seatId) {
+    const ownership = COMMAND_OWNERSHIP[type];
+    if (ownership !== COMMAND_OWNERSHIPS.CURRENT_PLAYER) {
+      throw DomainError.invalidArgument(`알 수 없는 행동 주체 규칙입니다: ${ownership}`);
+    }
+    if (!this.actingSeatId || this.actingSeatId !== seatId) {
       throw DomainError.notYourTurn(`현재 턴은 ${this.currentPlayerId}입니다 (요청: ${seatId})`);
     }
   }

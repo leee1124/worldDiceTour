@@ -84,6 +84,9 @@ export function toGameViewDto(game) {
     round: game.round,
     roundLimit: game.options.roundLimit,
     currentSeatId: game.currentPlayerId,
+    // 지금 결정을 내릴 좌석. 오늘은 `currentSeatId`와 항상 같고, 앞으로 경매처럼
+    // 턴 소유자가 아닌 좌석이 행동하는 구간에서만 달라진다.
+    actingSeatId: game.actingSeatId,
     jackpot: game.jackpot,
     isOver: game.isOver(),
     players: game.players.map((player) => ({

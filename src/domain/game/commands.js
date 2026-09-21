@@ -24,6 +24,25 @@ export const COMMAND_TYPES = Object.freeze({
 
 export const ALL_COMMAND_TYPES = Object.freeze(Object.values(COMMAND_TYPES));
 
+/**
+ * 커맨드를 보낼 수 있는 **행동 주체**의 종류.
+ *
+ * 지금은 한 가지뿐이지만, 앞으로 "현재 턴 플레이어가 아닌 행동 주체"가 생긴다
+ * (예: 압류 경매의 입찰자 좌석). 그때 상태기계를 흔들지 않도록 골격을 미리 둔다 —
+ * 검증은 `COMMAND_PHASES`(어떤 페이즈인가)와 이 표(누가 보낼 수 있는가)의 이중 검사다.
+ */
+export const COMMAND_OWNERSHIPS = Object.freeze({
+  /** 지금 차례인 좌석만 보낼 수 있다. */
+  CURRENT_PLAYER: 'CURRENT_PLAYER',
+});
+
+/** 커맨드별 행동 주체(단일 출처). 지금은 전부 현재 턴 플레이어다. */
+export const COMMAND_OWNERSHIP = Object.freeze(
+  Object.fromEntries(
+    ALL_COMMAND_TYPES.map((type) => [type, COMMAND_OWNERSHIPS.CURRENT_PLAYER]),
+  ),
+);
+
 /** 커맨드별 허용 페이즈(단일 출처). */
 export const COMMAND_PHASES = Object.freeze({
   [COMMAND_TYPES.ROLL]: [PHASES.AWAIT_ROLL],
