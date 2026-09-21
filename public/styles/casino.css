@@ -1,0 +1,468 @@
+/* ==========================================================================
+   라스베이거스 카지노 — 네온 야경 톤. 보드의 따뜻한 종이 톤과 의도적으로 대비시킨다.
+   ========================================================================== */
+
+.modal--neon {
+  width: min(32rem, 100%);
+  border-color: var(--neon-pink);
+  background:
+    radial-gradient(80% 60% at 20% 0%, rgba(255, 61, 154, 0.28), transparent 65%),
+    radial-gradient(70% 60% at 90% 15%, rgba(47, 243, 224, 0.2), transparent 60%),
+    linear-gradient(180deg, #16062a, #08040f 75%);
+  box-shadow: var(--shadow-lift), 0 0 60px rgba(255, 61, 154, 0.25);
+}
+
+.modal-backdrop--neon {
+  background: rgba(6, 2, 14, 0.82);
+}
+
+.modal--neon .modal-head {
+  border-bottom-color: rgba(255, 61, 154, 0.35);
+  background: linear-gradient(120deg, rgba(255, 61, 154, 0.18), transparent 70%);
+}
+
+.modal--neon .modal-title {
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 61, 154, 0.8);
+}
+
+.casino {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* ── 전광판 ─────────────────────────────────────────────────── */
+
+.casino-marquee {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid rgba(47, 243, 224, 0.25);
+  border-bottom: 1px solid rgba(47, 243, 224, 0.25);
+}
+
+.marquee-text {
+  color: var(--neon-cyan);
+  font-family: var(--font-num);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  text-shadow: 0 0 10px rgba(47, 243, 224, 0.9);
+  animation: neon-buzz 4.5s ease-in-out infinite;
+}
+
+.marquee-bulb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--neon-pink);
+  animation: marquee-bulbs 1.8s ease-in-out infinite;
+}
+
+.marquee-bulb:last-child {
+  animation-delay: 0.9s;
+}
+
+/* ── 상단(잭팟·판수·현금) ───────────────────────────────────── */
+
+.casino-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.neon-jackpot {
+  display: flex;
+  flex-direction: column;
+}
+
+.neon-label {
+  color: var(--neon-cyan);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+}
+
+.neon-amount {
+  color: #fff;
+  font-family: var(--font-num);
+  font-size: clamp(1.3rem, 6vw, 1.9rem);
+  font-weight: 800;
+  text-shadow: 0 0 14px rgba(255, 61, 154, 0.9), 0 0 30px rgba(255, 61, 154, 0.5);
+}
+
+.casino-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.meta-label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.casino-cash {
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.rounds-dots {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.round-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.round-dot--on {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+}
+
+.round-dot--off {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── 탭 ─────────────────────────────────────────────────────── */
+
+.casino-tabs {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.casino-tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 42px;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.casino-tab--on {
+  border-color: rgba(255, 61, 154, 0.6);
+  background: linear-gradient(135deg, rgba(255, 61, 154, 0.35), rgba(143, 108, 255, 0.3));
+  color: #fff;
+  box-shadow: 0 0 16px rgba(255, 61, 154, 0.4);
+}
+
+.tab-icon {
+  font-size: 1.05rem;
+}
+
+@media (max-width: 26rem) {
+  .tab-label {
+    font-size: 0.78rem;
+  }
+}
+
+/* ── 무대(릴 · 주사위) ──────────────────────────────────────── */
+
+.casino-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 5.6rem;
+  padding: 0.6rem;
+  border: 1px solid rgba(47, 243, 224, 0.22);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(70% 90% at 50% 0%, rgba(143, 108, 255, 0.2), transparent 70%),
+    rgba(0, 0, 0, 0.45);
+}
+
+.reel-box {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.reel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4rem;
+  height: 4.2rem;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #1c0d33, #0a0517);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.8);
+}
+
+.reel-symbol {
+  font-size: 2.1rem;
+  line-height: 1;
+}
+
+.reel--spinning .reel-symbol {
+  animation: reel-spin 160ms linear infinite;
+  filter: blur(0.6px);
+}
+
+.reel--stopped {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 18px rgba(47, 243, 224, 0.55), inset 0 0 18px rgba(0, 0, 0, 0.7);
+}
+
+.casino-dice {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.casino-die {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.1rem;
+  height: 3.1rem;
+  border-radius: 22%;
+  background: linear-gradient(160deg, #fff, #d6d0e4);
+  color: #1b0a2c;
+  font-family: var(--font-num);
+  font-size: 1.7rem;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+}
+
+.casino-die--rolling {
+  animation: die-tumble 620ms cubic-bezier(0.4, 0.1, 0.3, 1) infinite;
+}
+
+/* ── 결과 배너 ──────────────────────────────────────────────── */
+
+.casino-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-height: 3.2rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.casino-banner--show {
+  animation: modal-in 260ms cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+
+.banner-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.banner-amount {
+  font-family: var(--font-num);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.banner-note,
+.banner-jackpot {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.76rem;
+}
+
+.casino-banner[data-tone='win'] {
+  background: rgba(47, 243, 224, 0.14);
+}
+
+.casino-banner[data-tone='win'] .banner-amount {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 14px rgba(47, 243, 224, 0.7);
+}
+
+.casino-banner[data-tone='lose'] {
+  background: rgba(255, 61, 154, 0.12);
+}
+
+.casino-banner[data-tone='lose'] .banner-amount {
+  color: #ff9aa0;
+}
+
+.casino-banner[data-tone='jackpot'] {
+  background: linear-gradient(120deg, rgba(255, 61, 154, 0.32), rgba(239, 193, 101, 0.32));
+}
+
+.casino-banner[data-tone='jackpot'] .banner-amount,
+.casino-banner[data-tone='jackpot'] .banner-jackpot {
+  color: var(--gold-300);
+  text-shadow: 0 0 16px rgba(247, 216, 148, 0.9);
+}
+
+.casino--jackpot {
+  animation: jackpot-bump 700ms ease-out;
+}
+
+/* ── 선택지 ─────────────────────────────────────────────────── */
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.choice-chip {
+  display: flex;
+  flex: 1 1 8rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+  min-height: var(--tap);
+  padding: 0.4rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.choice-chip--on {
+  border-color: var(--neon-cyan);
+  background: rgba(47, 243, 224, 0.16);
+  box-shadow: 0 0 14px rgba(47, 243, 224, 0.3);
+}
+
+.choice-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.choice-label {
+  font-size: 0.94rem;
+  font-weight: 800;
+}
+
+.choice-hint {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+}
+
+.casino-hint,
+.casino-payout {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.78rem;
+}
+
+/* ── 베팅 조작 ──────────────────────────────────────────────── */
+
+.bet-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.bet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.bet-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.bet-value {
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.bet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bet-step {
+  width: var(--tap);
+  height: var(--tap);
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.bet-step:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bet-range {
+  flex: 1;
+  height: var(--tap);
+  accent-color: var(--neon-pink);
+  cursor: pointer;
+}
+
+.chip-row--bet .btn--chip {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.chip-row--bet .btn--chip-on {
+  border-color: var(--neon-pink);
+  background: rgba(255, 61, 154, 0.22);
+  color: #fff;
+}
+
+.btn--neon {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--neon-pink), var(--neon-violet));
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(255, 61, 154, 0.35);
+}
+
+.btn--neon:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff5faa, #a184ff);
+}
+
+.casino--spectating .bet-control,
+.casino--spectating .casino-tabs {
+  opacity: 0.7;
+}

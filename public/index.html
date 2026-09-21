@@ -3,24 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="같은 와이파이의 기기들이 모여 즐기는 세계일주 주사위 보드게임" />
     <title>월드 다이스 투어</title>
-    <style>
-      body {
-        margin: 0;
-        padding: 2rem;
-        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-        background: #0f172a;
-        color: #e2e8f0;
-      }
-      main { max-width: 32rem; margin: 0 auto; }
-      code { background: #1e293b; padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
-    </style>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles/base.css" />
+    <link rel="stylesheet" href="/styles/animations.css" />
+    <link rel="stylesheet" href="/styles/home.css" />
+    <link rel="stylesheet" href="/styles/board.css" />
+    <link rel="stylesheet" href="/styles/panels.css" />
+    <link rel="stylesheet" href="/styles/modals.css" />
+    <link rel="stylesheet" href="/styles/casino.css" />
   </head>
   <body>
-    <main>
-      <h1>🎲 월드 다이스 투어</h1>
-      <p>서버가 실행 중입니다. 게임 화면(클라이언트 UI)은 아직 준비 중입니다.</p>
-      <p>서버 API 문서는 <code>docs/API.md</code>를 참고하세요.</p>
-    </main>
+    <noscript>
+      <p class="noscript-note">이 게임은 자바스크립트가 필요합니다. 브라우저 설정에서 자바스크립트를 켜 주세요.</p>
+    </noscript>
+
+    <!-- 화면(홈/대기실/게임)은 js/views/*에서 DOM API로 만들어 이 자리에 붙인다. -->
+    <main id="app" class="app"></main>
+
+    <!-- 모달·시트·토스트가 쌓이는 자리 -->
+    <div id="overlay-root" class="overlay-root"></div>
+
+    <script type="module" src="/js/main.js"></script>
   </body>
 </html>
