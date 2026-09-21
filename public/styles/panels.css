@@ -172,6 +172,44 @@
   gap: 0.5rem;
 }
 
+/* 카드 윗부분을 통째로 "말 위치 보기" 버튼으로 쓴다. */
+.player-head--locate {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.15rem 0.2rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.player-head--locate:hover,
+.player-head--locate:focus-visible {
+  border-color: rgba(239, 193, 101, 0.45);
+  background: rgba(239, 193, 101, 0.1);
+}
+
+.player-locate-icon {
+  margin-left: auto;
+  flex: 0 0 auto;
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+/* 이 사람이 지금 서 있는 칸. */
+.player-location {
+  overflow: hidden;
+  color: var(--gold-300);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .player-mark {
   position: relative;
   display: inline-flex;

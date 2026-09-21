@@ -17,7 +17,14 @@
 
 .game-main {
   min-width: 0;
-  /* 아주 좁은 화면에서는 보드가 최소 폭을 유지하고 가로로 살짝 밀린다. */
+}
+
+/*
+  아주 좁은 화면에서는 보드가 최소 폭을 유지하고 가로로 밀린다.
+  스크롤 상자를 **보드에만** 두는 이유: 게임 열 전체를 스크롤 상자로 만들면
+  그 안의 상황판(position: sticky)이 붙을 기준을 잃는다.
+*/
+.board-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
 }
@@ -224,56 +231,6 @@
   }
 }
 
-/*
-  폰 폭(보드 32rem 이하, 칸 ≈ 33~40px): 칸에 이름과 건물만 남긴다.
-  - 종류 아이콘·가격/통행료 글자는 뺀다(겹치고 잘린다) → 칸을 누르면 상세 시트가 전부 보여 준다.
-  - 건물은 글자를 접고 굵은 점 세 개 + 랜드마크 별로 줄인다.
-*/
-@container (max-width: 32rem) {
-  .cell-kind,
-  .cell-hint {
-    display: none;
-  }
-
-  .cell-body {
-    justify-content: center;
-    padding: 0.12em 0.05em;
-  }
-
-  .cell-builds {
-    --badge: clamp(8px, 2.9cqi, 12px);
-    gap: 1.5px;
-  }
-
-  .build-slot {
-    border-radius: 50%;
-    color: transparent !important;
-  }
-
-  .build-slot-text {
-    display: none;
-  }
-
-  .build-landmark {
-    padding: 0;
-    border-radius: 50%;
-    width: clamp(11px, 3.6cqi, 15px);
-    height: clamp(11px, 3.6cqi, 15px);
-    justify-content: center;
-    font-size: clamp(8px, 2.6cqi, 11px);
-  }
-
-  .build-landmark-text {
-    display: none;
-  }
-
-  /* 소유 칸은 띠만으로는 약하다 — 칸 전체에 옅은 소유자 색을 깐다. */
-  .cell--owned {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--owner-color, #fff) 34%, #fffaf0), #fffaf0 70%);
-  }
-}
-
 .cell-hint {
   color: var(--ink-700);
   font-family: var(--font-num);
@@ -368,6 +325,65 @@
 
 .build-landmark-star {
   font-size: 1.15em;
+}
+
+/*
+  폰 폭(보드 32rem 이하, 칸 ≈ 33~40px): 칸에 이름과 건물만 남긴다.
+  - 종류 아이콘·가격/통행료 글자는 뺀다(겹치고 잘린다) → 칸을 누르면 상세 시트가 전부 보여 준다.
+  - 건물은 글자를 접고 굵은 점 세 개 + 랜드마크 별로 줄인다.
+  (기본 규칙보다 **뒤에** 두어야 덮어쓸 수 있다.)
+*/
+@container (max-width: 32rem) {
+  .cell-kind,
+  .cell-hint {
+    display: none;
+  }
+
+  .cell-body {
+    justify-content: center;
+    padding: 0.12em 0.05em;
+  }
+
+  .cell-builds {
+    --badge: clamp(8px, 3cqi, 13px);
+    gap: 1.5px;
+  }
+
+  .build-slot {
+    border-radius: 50%;
+    color: transparent;
+  }
+
+  .build-slot--on {
+    border-width: 1px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85), 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .build-slot-text {
+    display: none;
+  }
+
+  .build-landmark {
+    width: clamp(12px, 4cqi, 16px);
+    height: clamp(12px, 4cqi, 16px);
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: clamp(9px, 2.9cqi, 12px);
+  }
+
+  .build-landmark-text {
+    display: none;
+  }
+
+  /* 소유 칸은 띠만으로는 약하다 — 칸 전체에 더 진한 소유자 색을 깐다. */
+  .cell--owned {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--owner-color, #ffffff) 38%, #fffaf0),
+      #fffaf0 72%
+    );
+  }
 }
 
 /* 모서리 칸 */
@@ -1055,4 +1071,265 @@
     --die-size: 3.5rem;
     gap: 0.7rem;
   }
+}
+
+/* ── 모바일 상황판(보드 바로 아래) ──────────────────────────── */
+
+/*
+  폰에서는 보드가 작아 보드만으로는 상황이 안 읽힌다.
+  차례 · 현재 칸 · 방금 나온 눈 · "내 위치 보기"를 한 줄에 모아 스크롤해도 붙어 있게 한다.
+  넓은 화면에서는 중앙 코어가 같은 정보를 더 크게 보여 주므로 숨긴다.
+*/
+.status-strip {
+  display: none;
+}
+
+@media (max-width: 68rem) {
+  .status-strip {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.6rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    border: 1px solid rgba(239, 193, 101, 0.28);
+    border-radius: var(--radius-md);
+    background: rgba(6, 18, 27, 0.96);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+  }
+
+  .status-strip--my-turn {
+    border-color: rgba(47, 243, 224, 0.55);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(47, 243, 224, 0.3);
+  }
+}
+
+.strip-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.strip-line--tools {
+  justify-content: space-between;
+}
+
+.strip-who {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.strip-chip {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: var(--seat-ruby);
+}
+
+.strip-chip[data-slot='ruby'] {
+  background: var(--seat-ruby);
+}
+.strip-chip[data-slot='azure'] {
+  background: var(--seat-azure);
+}
+.strip-chip[data-slot='amber'] {
+  background: var(--seat-amber);
+}
+.strip-chip[data-slot='jade'] {
+  background: var(--seat-jade);
+}
+
+.strip-chip[data-shape='circle'] {
+  border-radius: 50%;
+}
+.strip-chip[data-shape='square'] {
+  border-radius: 3px;
+}
+.strip-chip[data-shape='diamond'] {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.86);
+}
+.strip-chip[data-shape='hexagon'] {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+  border: 0;
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.strip-name {
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strip-tag {
+  flex: 0 0 auto;
+  padding: 0.02rem 0.35rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-500);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.strip-tag--mine {
+  background: rgba(47, 243, 224, 0.16);
+  color: var(--neon-cyan);
+}
+
+.strip-location {
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--gold-300);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 상황판 주사위는 작게(중앙 코어의 큰 주사위와 같은 눈). */
+.dice-row--strip {
+  --die-size: 2.1rem;
+  flex: 0 0 auto;
+  gap: 0.45rem;
+  padding-top: 0.4rem;
+}
+
+.dice-row--strip .dice-sum {
+  min-width: 1.8em;
+}
+
+.strip-btn {
+  flex: 0 0 auto;
+  min-height: var(--tap);
+}
+
+/* ── 범례 ───────────────────────────────────────────────────── */
+
+.legend {
+  margin-top: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.legend-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.7rem;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.legend-hint {
+  color: var(--text-500);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.legend-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0 0.7rem 0.7rem;
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* 범례 안의 배지는 보드와 달리 항상 읽히는 고정 크기로 둔다. */
+.legend .build-slot {
+  --badge: 16px;
+  flex: 0 0 auto;
+}
+
+.legend .build-landmark {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.legend-text {
+  color: var(--text-300);
+  font-size: 0.78rem;
+}
+
+.legend-owner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: var(--legend-color, var(--text-500));
+}
+
+.legend-owner--ruby {
+  --legend-color: var(--seat-ruby);
+}
+.legend-owner--azure {
+  --legend-color: var(--seat-azure);
+}
+.legend-owner--amber {
+  --legend-color: var(--seat-amber);
+}
+.legend-owner--jade {
+  --legend-color: var(--seat-jade);
+}
+
+.legend-owner[data-shape='circle'] {
+  border-radius: 50%;
+}
+.legend-owner[data-shape='square'] {
+  border-radius: 3px;
+}
+.legend-owner[data-shape='diamond'] {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.86);
+}
+.legend-owner[data-shape='hexagon'] {
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+  border: 0;
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.legend-note {
+  color: var(--text-500);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+/* 넓은 화면에서는 기본으로 펼쳐 둔다(자리가 넉넉하다). */
+@media (min-width: 68.01rem) {
+  .legend-body {
+    display: flex;
+  }
+}
+
+/* ── 보드 확대(폰) ──────────────────────────────────────────── */
+
+/*
+  transform: scale()은 레이아웃 상자를 키우지 않아 스크롤로 가장자리에 닿지 못한다.
+  그래서 폭 자체를 늘려 격자를 다시 흐르게 한다(칸·글자·말이 모두 같이 커진다).
+*/
+.board-stage--zoom {
+  width: 170%;
+  max-width: none;
 }

@@ -5,8 +5,36 @@
 import { el } from '../../dom.js';
 import { formatWon } from '../../format.js';
 import { BUILDING_ORDER, buildingIcon, buildingLabel, spaceKindIcon, spaceKindLabel } from '../../domain/labels.js';
+import { buildingSlotView } from '../../domain/buildingSlots.js';
 import { CELL_GROUPS, cornerOf, groupOf } from '../../domain/boardLayout.js';
 import { citySummary, infoRow, moneyRow } from './parts.js';
+
+/** 건물 3종을 "지음 / 아직 안 지음"으로 빠짐없이 보여 준다(보드 배지와 같은 표를 쓴다). */
+function buildingStatusList(space) {
+  const view = buildingSlotView(space);
+  if (view.landmark) {
+    return el('div', { class: 'build-status build-status--landmark' }, [
+      el('span', { class: 'build-landmark' }, [
+        el('span', { class: 'build-landmark-star', text: '★' }),
+        el('span', { class: 'build-landmark-text', text: '랜드마크' }),
+      ]),
+      el('span', { class: 'build-status-note', text: '별장·빌딩·호텔을 모두 대신하는 최종 단계입니다.' }),
+    ]);
+  }
+  if (view.slots.length === 0) {
+    return null;
+  }
+  return el('div', { class: 'build-status' }, view.slots.map((slot) =>
+    el('div', { class: ['build-status-row', slot.built ? 'build-status-row--on' : 'build-status-row--off'] }, [
+      el('span', {
+        class: ['build-slot', `build-slot--${slot.type.toLowerCase()}`, slot.built ? 'build-slot--on' : 'build-slot--off'],
+        'aria-hidden': 'true',
+      }, [el('span', { class: 'build-slot-text', text: slot.short })]),
+      el('span', { class: 'build-status-label', text: slot.label }),
+      el('span', { class: 'build-status-state', text: slot.built ? '지음' : '아직 안 지음' }),
+    ]),
+  ));
+}
 
 export const CELL_SHEET_ID = 'cell-sheet';
 
@@ -53,6 +81,9 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
               ownerName: space.ownerId ? ownerName : null,
             })
           : null,
+        // 소유자는 맨 위에 못 박는다(보드에서는 색으로만 보이던 정보).
+        ownable ? infoRow('소유자', space.ownerId ? (ownerName ?? '다른 플레이어') : '주인 없음') : null,
+        buildingStatusList(space),
         ownable ? moneyRow('매입가', space.price) : null,
         space.ownerId ? moneyRow('현재 통행료', space.toll, { tone: 'gold' }) : null,
         space.ownerId ? moneyRow('투자액', space.invested, { note: '매각 환급 = 50%' }) : null,
@@ -64,7 +95,6 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
           : ownable && space.ownerId
             ? infoRow('인수', space.landmark ? '랜드마크는 인수 불가' : '휴양지는 인수 불가')
             : null,
-        ownable && !space.ownerId ? infoRow('소유', '주인 없음') : null,
         remaining.length > 0
           ? el('div', { class: 'sheet-remaining' }, [
               el('p', { class: 'effect-title', text: '지을 수 있는 건물' }),

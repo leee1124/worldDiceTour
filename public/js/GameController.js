@@ -34,6 +34,8 @@ import { createCenterView } from './views/centerView.js';
 import { createPlayersView } from './views/playersView.js';
 import { createLogView } from './views/logView.js';
 import { createGameView } from './views/gameView.js';
+import { createStatusStrip } from './views/statusStrip.js';
+import { createLegendView } from './views/legendView.js';
 import { createCasinoView, CASINO_MODAL_ID, casinoModalSpec } from './views/casinoView.js';
 import { createModalHost } from './views/modals/modalHost.js';
 import { BUY_MODAL_ID, buyModalSpec } from './views/modals/buyModal.js';
@@ -103,8 +105,20 @@ export function createGameController({ appRoot, overlayRoot }) {
   });
   const playersView = createPlayersView({
     onSetAutopilot: (seatId, enabled) => void setAutopilot(seatId, enabled),
+    // 카드를 누르면 그 사람의 말과 칸을 잠깐 강조한다("어디 있는지 모르겠다"의 가장 빠른 답).
+    onFocusPlayer: (seatId) => focusSeatOnBoard(seatId),
   });
   const logView = createLogView();
+  const statusStrip = createStatusStrip({
+    onFindMe: () => findMyToken(),
+    onToggleZoom: (zoomed) => {
+      boardView.setZoom(zoomed);
+      if (zoomed) {
+        findMyToken();
+      }
+    },
+  });
+  const legendView = createLegendView();
   const casinoView = createCasinoView({
     onBet: (bet) => void sendCommand('CASINO_BET', bet),
     onLeave: () => void sendCommand('CASINO_LEAVE'),
@@ -114,10 +128,39 @@ export function createGameController({ appRoot, overlayRoot }) {
     centerView,
     playersView,
     logView,
+    statusStrip,
+    legendView,
     onReconnectNow: () => void resyncAndReconnect(),
   });
 
+  // 상황판의 주사위도 중앙 코어와 똑같은 눈을 보여 준다(값의 출처는 DICE_ROLLED 하나뿐).
+  centerView.attachDiceMirror(statusStrip.dice);
+
   appRoot.append(homeView.element, lobbyView.element, gameView.element);
+
+  /* ── "내 말 찾기" ─────────────────────────────────────────── */
+
+  /** 한 좌석의 말과 그 칸을 잠깐 강조한다. */
+  function focusSeatOnBoard(seatId) {
+    const player = store.state.view?.players.find((item) => item.seatId === seatId) ?? null;
+    if (!player || player.eliminated) {
+      toast.info('보드 위에 없는 좌석입니다.');
+      return;
+    }
+    boardView.findSeat(seatId, player.position);
+  }
+
+  /** 이 기기의 좌석 중 지금 차례인 좌석을(없으면 첫 좌석을) 찾아 비춘다. */
+  function findMyToken() {
+    const state = store.state;
+    const mine = state.mySeats.map((seat) => seat.seatId);
+    if (mine.length === 0) {
+      toast.info('이 기기에는 좌석이 없습니다.');
+      return;
+    }
+    const current = state.view?.currentSeatId;
+    focusSeatOnBoard(mine.includes(current) ? current : mine[0]);
+  }
 
   /* ── 재생 엔진 ────────────────────────────────────────────── */
 

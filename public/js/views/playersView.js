@@ -5,15 +5,16 @@
 
 import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
+import { playerCellLabel } from '../domain/locationLabel.js';
 import { countTo } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
-import { isHostSeatMine, isMySeat, slotOf } from '../store.js';
+import { isHostSeatMine, isMySeat, slotOf, spaceNameOf } from '../store.js';
 
 function badge(text, tone) {
   return el('span', { class: ['badge', `badge--${tone}`], text });
 }
 
-export function createPlayersView({ onSetAutopilot }) {
+export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) {
   const listNode = el('div', { class: 'player-list' });
   const element = el('section', { class: 'panel panel--players' }, [
     el('h2', { class: 'panel-title' }, ['👥 플레이어']),
@@ -34,19 +35,32 @@ export function createPlayersView({ onSetAutopilot }) {
     const badges = el('div', { class: 'badge-row' });
     const tools = el('div', { class: 'player-tools' });
 
-    const root = el('article', { class: 'player-card', dataset: { seat: player.seatId, slot: slot.color } }, [
-      el('div', { class: 'player-head' }, [
+    const location = el('span', { class: 'player-location' });
+
+    // 카드 윗부분 전체가 "이 사람 어디 있지?" 버튼이다(키보드로도 누를 수 있다).
+    const head = button(
+      {
+        class: 'player-head player-head--locate',
+        title: `${player.name}의 말 위치 보기`,
+        on: { click: () => onFocusPlayer(player.seatId) },
+      },
+      [
         el('span', {
           class: ['player-mark', `player-mark--${slot.color}`],
           dataset: { shape: slot.shape },
-          role: 'img',
-          'aria-label': `${slot.shapeLabel} 모양 말`,
+          'aria-hidden': 'true',
         }, [el('span', { class: 'player-mark-label', text: player.name.slice(0, 1) })]),
         el('div', { class: 'player-identity' }, [
           el('span', { class: 'player-name', text: player.name }),
+          location,
           holdings,
         ]),
-      ]),
+        el('span', { class: 'player-locate-icon', 'aria-hidden': 'true', text: '🔎' }),
+      ],
+    );
+
+    const root = el('article', { class: 'player-card', dataset: { seat: player.seatId, slot: slot.color } }, [
+      head,
       el('div', { class: 'player-money' }, [
         el('span', { class: 'player-money-label', text: '현금' }),
         cash,
@@ -57,7 +71,7 @@ export function createPlayersView({ onSetAutopilot }) {
       tools,
     ]);
 
-    cards.set(player.seatId, { root, cash, assets, badges, tools, holdings });
+    cards.set(player.seatId, { root, cash, assets, badges, tools, holdings, location });
     return root;
   }
 
@@ -163,6 +177,16 @@ export function createPlayersView({ onSetAutopilot }) {
         }
 
         setText(card.assets, formatWon(player.totalAssets));
+        // 카드마다 "지금 어느 칸에 서 있는지"를 글자로 적어 둔다.
+        setText(
+          card.location,
+          playerCellLabel({
+            index: player.position,
+            spaceName: spaceNameOf(state, player.position),
+            islandRemainingTurns: player.islandRemainingTurns,
+            eliminated: player.eliminated,
+          }),
+        );
         setText(card.holdings, `도시 ${player.cityCount} · 휴양지 ${player.resortCount}`);
         renderBadges(card.badges, state, player, seat);
         renderTools(card.tools, state, player, seat);
