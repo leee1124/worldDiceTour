@@ -11,5 +11,3 @@ export const HOST_ACTIONS = Object.freeze({
   START: 'START',
   SET_AUTOPILOT: 'SET_AUTOPILOT',
 });
-
-export const ALL_HOST_ACTIONS = Object.freeze(Object.values(HOST_ACTIONS));
