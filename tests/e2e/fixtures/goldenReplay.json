@@ -3,92 +3,92 @@
     {
       "seed": 1,
       "roundLimit": 30,
-      "commands": 262,
+      "commands": 259,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 585104,
+      "jackpot": 131760,
       "initialTotal": 12000000,
-      "netFromBank": -8378000,
-      "totalCash": 3036896,
-      "eventCount": 1127,
-      "eventSequenceHash": "c1baa98fdf2684daf5a601a4087cb70d45e8f3d0bbf415495cdadb65bab5d9b7",
-      "commandSequenceHash": "2af3d8d1889ccc35872f9c9c68b90efa4427dfd09559cc1e15b08353cf8bceb9",
+      "netFromBank": -9379000,
+      "totalCash": 2489240,
+      "eventCount": 1115,
+      "eventSequenceHash": "8c8550ec3c9de2239f4f838a0f657590dc426c2e643a68c02f0dfc6a8aa0fdef",
+      "commandSequenceHash": "1079a1badd6513b8e3ae27490ca81167b204aad446e7f32203196fd3fe1027f3",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 2166400,
+          "cash": 1501340,
           "loanDebt": 0,
-          "totalAssets": 7654400
+          "totalAssets": 7368340
         },
         {
           "rank": 2,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 542000,
+          "cash": 771100,
           "loanDebt": 0,
-          "totalAssets": 3514000
+          "totalAssets": 5967100
         },
         {
           "rank": 3,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 27800,
+          "cash": 216800,
           "loanDebt": 0,
-          "totalAssets": 2619800
+          "totalAssets": 2402800
         },
         {
           "rank": 4,
           "playerId": "seat-3",
-          "eliminated": false,
-          "cash": 300696,
-          "loanDebt": 1200000,
-          "totalAssets": -899304
+          "eliminated": true,
+          "cash": 0,
+          "loanDebt": 1000000,
+          "totalAssets": 0
         }
       ]
     },
     {
       "seed": 7,
       "roundLimit": 30,
-      "commands": 276,
+      "commands": 249,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 364650,
+      "jackpot": 151985,
       "initialTotal": 12000000,
-      "netFromBank": -9711000,
-      "totalCash": 1924350,
-      "eventCount": 1170,
-      "eventSequenceHash": "f615103dacbc84670da8271f080b42b499205f94b395d006eab7638e613dfd03",
-      "commandSequenceHash": "1908e1d4f1d255d78728768c87b157899aebf3d42b4eb6796195cf42f6e340d7",
+      "netFromBank": -9039500,
+      "totalCash": 2808515,
+      "eventCount": 1066,
+      "eventSequenceHash": "ae9825c224e9a522b06112301092ec957fcf5bc1bf93dc4321216bc7461439bf",
+      "commandSequenceHash": "0f72c55c3bf18e9cfd8dffd4bc79e2d3682a5c7ba052e2a9ae1104b19682accc",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-4",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 444000,
+          "cash": 2712400,
           "loanDebt": 0,
-          "totalAssets": 7562000
+          "totalAssets": 9530400
         },
         {
           "rank": 2,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 1143450,
+          "cash": 42565,
           "loanDebt": 0,
-          "totalAssets": 3843450
+          "totalAssets": 3877565
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 336900,
+          "cash": 53550,
           "loanDebt": 0,
-          "totalAssets": 2669900
+          "totalAssets": 53550
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-2",
           "eliminated": true,
           "cash": 0,
           "loanDebt": 1000000,
@@ -99,143 +99,143 @@
     {
       "seed": 42,
       "roundLimit": 30,
-      "commands": 252,
+      "commands": 263,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 800110,
+      "jackpot": 18265,
       "initialTotal": 12000000,
-      "netFromBank": -8751500,
-      "totalCash": 2448390,
-      "eventCount": 1069,
-      "eventSequenceHash": "6fd9a8534d34bb950e32cbdbc61ef0dc0a1613b17adacb7974bd4988c9e5069a",
-      "commandSequenceHash": "3e3e1868dfab36cfc170845f5d38f3dc8e03b94b35fcabf3139bf6898b191315",
+      "netFromBank": -9296500,
+      "totalCash": 2685235,
+      "eventCount": 1120,
+      "eventSequenceHash": "e857193884cae0929fc0ffeb10d4475421e66e51f765516c3f9946d16650de50",
+      "commandSequenceHash": "f6a82eb5b8030656f2db579889c8b3f33e4d06a275abb7656f856ff5837fe2b9",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-1",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 2351800,
+          "cash": 905200,
           "loanDebt": 0,
-          "totalAssets": 6469800
+          "totalAssets": 6410200
         },
         {
           "rank": 2,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 86370,
+          "cash": 393710,
           "loanDebt": 0,
-          "totalAssets": 3850370
+          "totalAssets": 4301710
         },
         {
           "rank": 3,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 5620,
+          "cash": 510000,
           "loanDebt": 0,
-          "totalAssets": 3133620
+          "totalAssets": 2666000
         },
         {
           "rank": 4,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 4600,
-          "loanDebt": 0,
-          "totalAssets": 1044600
+          "cash": 876325,
+          "loanDebt": 1200000,
+          "totalAssets": -323675
         }
       ]
     },
     {
       "seed": 99,
       "roundLimit": 30,
-      "commands": 239,
+      "commands": 234,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 354835,
+      "jackpot": 17750,
       "initialTotal": 12000000,
-      "netFromBank": -9774000,
-      "totalCash": 1871165,
-      "eventCount": 1025,
-      "eventSequenceHash": "516b6d8ce77a95a3566ec9556ddadcd52cb9d71f667a8004cf9ae54f7e80891e",
-      "commandSequenceHash": "ffd3b6aba4cef201d748ae998a3e9113aad6ad473274d7efd82a3a061af9f422",
+      "netFromBank": -9493500,
+      "totalCash": 2488750,
+      "eventCount": 1003,
+      "eventSequenceHash": "e7128bb382bcd32ba91cbdf7762feb644fb7d5a94dc1ce3c8fe626d811b76303",
+      "commandSequenceHash": "11ea65b238709128f31e36214ac50a0a61975713a97f0b476921d9e9df4cd05f",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 1476265,
+          "cash": 533100,
           "loanDebt": 0,
-          "totalAssets": 8072265
+          "totalAssets": 7139100
         },
         {
           "rank": 2,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 66400,
+          "cash": 844000,
           "loanDebt": 0,
-          "totalAssets": 3324400
+          "totalAssets": 4044000
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 328500,
+          "cash": 159750,
           "loanDebt": 0,
-          "totalAssets": 2536500
+          "totalAssets": 2523750
         },
         {
           "rank": 4,
           "playerId": "seat-3",
-          "eliminated": true,
-          "cash": 0,
-          "loanDebt": 1000000,
-          "totalAssets": 0
+          "eliminated": false,
+          "cash": 951900,
+          "loanDebt": 1200000,
+          "totalAssets": -248100
         }
       ]
     },
     {
       "seed": 123,
       "roundLimit": 30,
-      "commands": 260,
+      "commands": 246,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 90550,
+      "jackpot": 232667,
       "initialTotal": 12000000,
-      "netFromBank": -9761000,
-      "totalCash": 2148450,
-      "eventCount": 1068,
-      "eventSequenceHash": "92d5b0479a1f22926251ae6354d0db81da22609bfdf0a17bf741cd1a994f41e7",
-      "commandSequenceHash": "7e005acc7ae38f4497343a2c14f76ac3ee4fbb9320452cac15d8919da99c6f5b",
+      "netFromBank": -7548500,
+      "totalCash": 4218833,
+      "eventCount": 1039,
+      "eventSequenceHash": "6fd97495fb35c44858744a321f481664b723ad618cbefcd585bcaad3f07cf2eb",
+      "commandSequenceHash": "6e567f4acc4b9a3ecb958709a4f408119ee12c703c0b404449cf6b3c6c6d8ebd",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 711000,
+          "cash": 2365434,
           "loanDebt": 0,
-          "totalAssets": 6257000
+          "totalAssets": 7189434
         },
         {
           "rank": 2,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 1093450,
+          "cash": 1599674,
           "loanDebt": 0,
-          "totalAssets": 5124450
+          "totalAssets": 4111674
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 344000,
+          "cash": 253725,
           "loanDebt": 0,
-          "totalAssets": 4682000
+          "totalAssets": 3822725
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 1200000,
+          "loanDebt": 800000,
           "totalAssets": 0
         }
       ]
@@ -243,47 +243,47 @@
     {
       "seed": 2024,
       "roundLimit": 30,
-      "commands": 263,
+      "commands": 268,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 222855,
+      "jackpot": 5000,
       "initialTotal": 12000000,
-      "netFromBank": -8656000,
-      "totalCash": 3121145,
-      "eventCount": 1095,
-      "eventSequenceHash": "8f78e80606590cc5ff03725396c9644c9cf28545496ca986041bb88cf8aff6e0",
-      "commandSequenceHash": "8cdbf5bc298d4bd22d60913809ab431cdd2f5c755c049f269e24a65eb950dbe2",
+      "netFromBank": -8268500,
+      "totalCash": 3726500,
+      "eventCount": 1117,
+      "eventSequenceHash": "8b8d92212c9c8557c510d6af9946b344e53a4cc0689c7f0853cab1dbdc13faf1",
+      "commandSequenceHash": "f534e08c42148a14fae0afd409bc1c64c24869a657dc3e7e3f35516f849e934c",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 2652145,
+          "cash": 3149200,
           "loanDebt": 0,
-          "totalAssets": 8540145
+          "totalAssets": 10191200
         },
         {
           "rank": 2,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 322000,
+          "cash": 324000,
           "loanDebt": 0,
-          "totalAssets": 4119000
+          "totalAssets": 3858000
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 147000,
-          "loanDebt": 0,
-          "totalAssets": 1483000
+          "cash": 253300,
+          "loanDebt": 1000000,
+          "totalAssets": -354700
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-2",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 1200000,
+          "loanDebt": 800000,
           "totalAssets": 0
         }
       ]
@@ -291,463 +291,463 @@
     {
       "seed": 31337,
       "roundLimit": 30,
-      "commands": 254,
+      "commands": 269,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 433000,
+      "jackpot": 247655,
       "initialTotal": 12000000,
-      "netFromBank": -9412500,
-      "totalCash": 2154500,
-      "eventCount": 1112,
-      "eventSequenceHash": "bb46e77e93c38630170040c2152f4d7ea217897bee2edb7190137f930f0eb3d1",
-      "commandSequenceHash": "bd9a90a63ebd65835670012a3175824754d7ff10c11cc34a389fb4f3cd2ae0c4",
+      "netFromBank": -9611500,
+      "totalCash": 2140845,
+      "eventCount": 1161,
+      "eventSequenceHash": "a432a8842c253865881613aeba3fdad389b72abc121b2ca0f61626ef26fb51c5",
+      "commandSequenceHash": "10c9834be90827d470253971b6f094d66eac31dd98ddf8d7eea75b7b498c24c9",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 1356100,
+          "cash": 59345,
           "loanDebt": 0,
-          "totalAssets": 9368100
+          "totalAssets": 5011345
         },
         {
           "rank": 2,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 93400,
+          "cash": 984000,
           "loanDebt": 0,
-          "totalAssets": 4539400
+          "totalAssets": 4552000
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 705000,
+          "cash": 668000,
           "loanDebt": 0,
-          "totalAssets": 1426000
+          "totalAssets": 2916000
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
-          "eliminated": true,
-          "cash": 0,
-          "loanDebt": 1000000,
-          "totalAssets": 0
+          "playerId": "seat-4",
+          "eliminated": false,
+          "cash": 429500,
+          "loanDebt": 0,
+          "totalAssets": 2289500
         }
       ]
     },
     {
       "seed": 65535,
       "roundLimit": 30,
-      "commands": 266,
+      "commands": 251,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 832090,
+      "jackpot": 681710,
       "initialTotal": 12000000,
-      "netFromBank": -8068500,
-      "totalCash": 3099410,
-      "eventCount": 1152,
-      "eventSequenceHash": "7e59e3434e7bbe5296fd9910bb9273ba3e5f6175969de4b2622989902d23d381",
-      "commandSequenceHash": "489cada9ad099fa14401f3dcc661d51ff5228880473090afe890d3b78a9ca502",
+      "netFromBank": -9866500,
+      "totalCash": 1451790,
+      "eventCount": 1071,
+      "eventSequenceHash": "12d1932d9e8d63299ad8c1b4bbe855b1ad81a992a99092b7c805ae3797174265",
+      "commandSequenceHash": "9f62fbc45895cf92e878109ef43eba8da541fc902a52592af869eadaf7a0bf8c",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 2263210,
+          "cash": 685500,
           "loanDebt": 0,
-          "totalAssets": 8229210
+          "totalAssets": 7233500
         },
         {
           "rank": 2,
-          "playerId": "seat-2",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 512800,
+          "cash": 371790,
           "loanDebt": 0,
-          "totalAssets": 3544800
+          "totalAssets": 5217790
         },
         {
           "rank": 3,
-          "playerId": "seat-3",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 148900,
+          "cash": 134000,
           "loanDebt": 0,
-          "totalAssets": 1976900
+          "totalAssets": 1174000
         },
         {
           "rank": 4,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 174500,
+          "cash": 260500,
           "loanDebt": 1000000,
-          "totalAssets": -825500
+          "totalAssets": -343500
         }
       ]
     },
     {
       "seed": 777777,
       "roundLimit": 30,
-      "commands": 266,
+      "commands": 261,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 804550,
+      "jackpot": 154535,
       "initialTotal": 12000000,
-      "netFromBank": -9493500,
-      "totalCash": 1701950,
-      "eventCount": 1115,
-      "eventSequenceHash": "c917400d30d5ce40d09560adde133bf6be83e424e4e89670cc56f940d3f9ed6d",
-      "commandSequenceHash": "52526d9871104544420a6efbcd552dd195647248c56f3f9c5ba07f7e5b27fe95",
+      "netFromBank": -10186000,
+      "totalCash": 1659465,
+      "eventCount": 1099,
+      "eventSequenceHash": "a8d9625164773c0cd02c1ceb7b53eac443a2ebbaba2b5f4dd4983e8d5deec4be",
+      "commandSequenceHash": "b3edd41b79e8e4f27204fc3659b7913f6c71f8c5422f23ff1bd101d9e0ed385a",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 682600,
+          "cash": 617130,
           "loanDebt": 0,
-          "totalAssets": 4930600
+          "totalAssets": 6817130
         },
         {
           "rank": 2,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 285210,
+          "cash": 626735,
           "loanDebt": 0,
-          "totalAssets": 3377210
+          "totalAssets": 3406735
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 91900,
+          "cash": 304000,
           "loanDebt": 0,
-          "totalAssets": 2293900
+          "totalAssets": 2426000
         },
         {
           "rank": 4,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 642240,
+          "cash": 111600,
           "loanDebt": 0,
-          "totalAssets": 1782240
+          "totalAssets": 1871600
         }
       ]
     },
     {
       "seed": 1000003,
       "roundLimit": 30,
-      "commands": 251,
+      "commands": 244,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 282420,
+      "jackpot": 188467,
       "initialTotal": 12000000,
-      "netFromBank": -6787000,
-      "totalCash": 4930580,
-      "eventCount": 1101,
-      "eventSequenceHash": "efb4a424253d0e0263466b2409df1c0c1837b001a0b9e75caaf2cc74314a5e26",
-      "commandSequenceHash": "a243bdb350c6bc001349810be078bd8f0663b76a7a29cad6737aabbc1ef1a5b6",
+      "netFromBank": -10151000,
+      "totalCash": 1660533,
+      "eventCount": 1065,
+      "eventSequenceHash": "06e99fc86cac0a0b8de464b8e7a1aefe6c48266033a3d3758cdd1e0f6cda19f9",
+      "commandSequenceHash": "d240b8fa4a2706eb9c5fb60ebcb45eebfcb5d031cf95ff33757a56a529233621",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 1458380,
+          "cash": 1199433,
           "loanDebt": 0,
-          "totalAssets": 7975380
+          "totalAssets": 9612433
         },
         {
           "rank": 2,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 2868000,
+          "cash": 298100,
           "loanDebt": 0,
-          "totalAssets": 6588000
+          "totalAssets": 6482100
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 500200,
-          "loanDebt": 1200000,
-          "totalAssets": -699800
+          "cash": 163000,
+          "loanDebt": 1000000,
+          "totalAssets": -837000
         },
         {
           "rank": 4,
-          "playerId": "seat-1",
-          "eliminated": false,
-          "cash": 104000,
-          "loanDebt": 1000000,
-          "totalAssets": -896000
+          "playerId": "seat-2",
+          "eliminated": true,
+          "cash": 0,
+          "loanDebt": 1200000,
+          "totalAssets": 0
         }
       ]
     },
     {
       "seed": 3,
       "roundLimit": 20,
-      "commands": 202,
+      "commands": 193,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 280900,
+      "jackpot": 285900,
       "initialTotal": 12000000,
-      "netFromBank": -9648500,
-      "totalCash": 2070600,
-      "eventCount": 781,
-      "eventSequenceHash": "a61852e07b9a6486730ead369b08c6838277e6bcaa3ebd31138b9b1b15e70c15",
-      "commandSequenceHash": "f79fe168f64208f47e50f1c5b3bb7ec634e040f8c02102caefe7a62b81aeed17",
+      "netFromBank": -7837000,
+      "totalCash": 3877100,
+      "eventCount": 772,
+      "eventSequenceHash": "8fd585dd506db6bb350c88b11b4a1a794565088b53ffef2d82ac12d337b0a191",
+      "commandSequenceHash": "8bb8039cdc9c3286ae0a491c200ef8b5b08e61fa8ae38abacf9dd0ea697d371b",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 1270000,
+          "cash": 1983000,
           "loanDebt": 0,
-          "totalAssets": 6828000
+          "totalAssets": 7080000
         },
         {
           "rank": 2,
-          "playerId": "seat-1",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 349000,
+          "cash": 802000,
           "loanDebt": 0,
-          "totalAssets": 3554000
+          "totalAssets": 3738000
         },
         {
           "rank": 3,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 187600,
+          "cash": 257000,
           "loanDebt": 0,
-          "totalAssets": 1707600
+          "totalAssets": 789000
         },
         {
           "rank": 4,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 264000,
-          "loanDebt": 1000000,
-          "totalAssets": -316000
+          "cash": 835100,
+          "loanDebt": 1200000,
+          "totalAssets": -364900
         }
       ]
     },
     {
       "seed": 11,
       "roundLimit": 20,
-      "commands": 184,
+      "commands": 180,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 122200,
+      "jackpot": 0,
       "initialTotal": 12000000,
-      "netFromBank": -10014000,
-      "totalCash": 1863800,
-      "eventCount": 765,
-      "eventSequenceHash": "e52da7442a1486a7e794f468adc66cc5b40c97d9a3377be0e353edb04580abb2",
-      "commandSequenceHash": "3edb29ae632a6d025539dca1f84a53e0e9a8decea5795b125ecb502f960be431",
+      "netFromBank": -9002500,
+      "totalCash": 2997500,
+      "eventCount": 743,
+      "eventSequenceHash": "33c5749345c44c04b6a1f9ed69c73ecf96a2d8207a2e9c09820195884696b0b3",
+      "commandSequenceHash": "54bfba587be93ad29d09ce586311b42991d47a34f9efb76f954308270a616911",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-3",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 913600,
+          "cash": 1296850,
           "loanDebt": 0,
-          "totalAssets": 4961600
+          "totalAssets": 7948850
         },
         {
           "rank": 2,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 773000,
+          "cash": 782450,
           "loanDebt": 0,
-          "totalAssets": 4746000
+          "totalAssets": 3834450
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 49000,
+          "cash": 248200,
           "loanDebt": 0,
-          "totalAssets": 1934000
+          "totalAssets": 1794200
         },
         {
           "rank": 4,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 128200,
-          "loanDebt": 0,
-          "totalAssets": 1762200
+          "cash": 670000,
+          "loanDebt": 1000000,
+          "totalAssets": -330000
         }
       ]
     },
     {
       "seed": 77,
       "roundLimit": 20,
-      "commands": 170,
+      "commands": 186,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 300850,
+      "jackpot": 0,
       "initialTotal": 12000000,
-      "netFromBank": -10001000,
-      "totalCash": 1698150,
-      "eventCount": 694,
-      "eventSequenceHash": "4a1f2cbf0e8fe9df406436c6884b79e8ad11942bcf864c2db2c2f99c9a71c9d4",
-      "commandSequenceHash": "22591c3e55f5f5c9b0a35fe6d196e634f82139e4cc1c6ac469e767aa842d718c",
+      "netFromBank": -8930500,
+      "totalCash": 3069500,
+      "eventCount": 744,
+      "eventSequenceHash": "380e79760b92f5b2efacbbeae3e03d92cd4cd3d3f3ca876ab2b1f2399b610d7b",
+      "commandSequenceHash": "ebdda2d13d6e3330af55b47fae91e7260e2e08a9fc9c222ae7ff1280e2f68a45",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 683700,
+          "cash": 756000,
           "loanDebt": 0,
-          "totalAssets": 4520700
+          "totalAssets": 3992000
         },
         {
           "rank": 2,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 588000,
+          "cash": 1547300,
           "loanDebt": 0,
-          "totalAssets": 3364000
+          "totalAssets": 3483300
         },
         {
           "rank": 3,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 146900,
+          "cash": 463000,
           "loanDebt": 0,
-          "totalAssets": 3038900
+          "totalAssets": 3385000
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 279550,
+          "cash": 303200,
           "loanDebt": 0,
-          "totalAssets": 2855550
+          "totalAssets": 2553200
         }
       ]
     },
     {
       "seed": 512,
       "roundLimit": 20,
-      "commands": 184,
+      "commands": 197,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 256600,
+      "jackpot": 231400,
       "initialTotal": 12000000,
-      "netFromBank": -9833000,
-      "totalCash": 1910400,
-      "eventCount": 746,
-      "eventSequenceHash": "63d78804d4a84322e9b93e32f5fa324563b306a3dcce36e1b7c06965a364184e",
-      "commandSequenceHash": "ae03af07eecf7124a38dd3b4ddca651482191c37ea757a058110601985d2c19a",
+      "netFromBank": -9076000,
+      "totalCash": 2692600,
+      "eventCount": 759,
+      "eventSequenceHash": "5ae2581017d16047361ff615a7ecf22fcf64f4d91cafaeb96086f05b1cfb52a5",
+      "commandSequenceHash": "f7493649327a6b489f6eaa1763d2527611ca674b62093fe06cc8d03eba2f16c8",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 1013000,
+          "cash": 1084000,
           "loanDebt": 0,
-          "totalAssets": 5597000
+          "totalAssets": 5330000
         },
         {
           "rank": 2,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 309000,
+          "cash": 1038000,
           "loanDebt": 0,
-          "totalAssets": 3539000
+          "totalAssets": 4874000
         },
         {
           "rank": 3,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 148800,
+          "cash": 313600,
           "loanDebt": 0,
-          "totalAssets": 2768800
+          "totalAssets": 1787600
         },
         {
           "rank": 4,
-          "playerId": "seat-1",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 439600,
+          "cash": 257000,
           "loanDebt": 0,
-          "totalAssets": 2443600
+          "totalAssets": 1099000
         }
       ]
     },
     {
       "seed": 4096,
       "roundLimit": 20,
-      "commands": 172,
+      "commands": 182,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 567020,
+      "jackpot": 280940,
       "initialTotal": 12000000,
-      "netFromBank": -8107500,
-      "totalCash": 3325480,
-      "eventCount": 696,
-      "eventSequenceHash": "f02d71d333e27256af38f2065a917c6c70cf2ca4b12f52512a80f6ba9acd517c",
-      "commandSequenceHash": "600c7c143e823ed40211bbe95b12ae4c62d200e754a7d469792447d76791f450",
+      "netFromBank": -9935000,
+      "totalCash": 1784060,
+      "eventCount": 749,
+      "eventSequenceHash": "cc2176c9f4c5c086f87b3136684b946e52ab46deb953c7217b09d21d555b97b5",
+      "commandSequenceHash": "8680233cacc2b8f54d01ea91b2154fbc7bfcbf539fe1957345371b4426231a7a",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 1448780,
+          "cash": 769400,
           "loanDebt": 0,
-          "totalAssets": 4942780
+          "totalAssets": 5939400
         },
         {
           "rank": 2,
-          "playerId": "seat-2",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 656000,
+          "cash": 337800,
           "loanDebt": 0,
-          "totalAssets": 3970000
+          "totalAssets": 3881800
         },
         {
           "rank": 3,
-          "playerId": "seat-3",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 349400,
+          "cash": 304260,
           "loanDebt": 0,
-          "totalAssets": 3907400
+          "totalAssets": 3124260
         },
         {
           "rank": 4,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 871300,
+          "cash": 372600,
           "loanDebt": 1000000,
-          "totalAssets": -128700
+          "totalAssets": -42400
         }
       ]
     },
     {
       "seed": 20260921,
       "roundLimit": null,
-      "commands": 478,
-      "finalRound": 73,
+      "commands": 480,
+      "finalRound": 69,
       "isOver": true,
-      "jackpot": 936057,
+      "jackpot": 0,
       "initialTotal": 12000000,
-      "netFromBank": -9284500,
-      "totalCash": 1779443,
-      "eventCount": 2108,
-      "eventSequenceHash": "d153c0a4c1a4d0707bca3f095612d08ee8be6db4342fc8bdf8c9f61880fcc0f6",
-      "commandSequenceHash": "0c8040a3f013de1328d5d59ce4a25e087fd144d59573b96b2fa69be2ceb4c94f",
+      "netFromBank": -10969000,
+      "totalCash": 1031000,
+      "eventCount": 2154,
+      "eventSequenceHash": "91f58523cc0080f7b4a44134fb992f2c78c0c6c11593155de22e0fc405b398c0",
+      "commandSequenceHash": "3d5b49ccefce235508b94a4012dbb54ee48e90d71d288956d810e10186b42c40",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 1779443,
+          "cash": 1031000,
           "loanDebt": 0,
-          "totalAssets": 12435443
+          "totalAssets": 12501000
         },
         {
           "rank": 2,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 800000,
+          "loanDebt": 1200000,
           "totalAssets": 0
         },
         {
@@ -755,7 +755,7 @@
           "playerId": "seat-3",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 1200000,
+          "loanDebt": 600000,
           "totalAssets": 0
         },
         {
@@ -763,7 +763,7 @@
           "playerId": "seat-4",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 800000,
+          "loanDebt": 1200000,
           "totalAssets": 0
         }
       ]
