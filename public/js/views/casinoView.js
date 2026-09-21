@@ -13,6 +13,7 @@ import { canBet, clampBet, quickChips, stepBet } from '../domain/betRules.js';
 import { casinoChoiceLabel, casinoGameLabel } from '../domain/labels.js';
 import { DURATIONS, prefersReducedMotion, scaled, wait } from '../animation/timing.js';
 import { flashScreen } from '../animation/effects.js';
+import { createDie } from './diceView.js';
 
 export const CASINO_MODAL_ID = 'casino';
 
@@ -38,8 +39,11 @@ function createReel() {
   return { element: el('div', { class: 'reel' }, [symbol]), symbol };
 }
 
-function createCasinoDie() {
-  return el('div', { class: 'casino-die', text: '?' });
+/** 카지노 주사위도 보드와 같은 컴포넌트를 쓴다(눈 + 숫자 배지가 함께 보인다). */
+function createCasinoDie(index) {
+  const die = createDie(`카지노 주사위 ${index + 1}`);
+  die.element.classList.add('die--casino');
+  return die;
 }
 
 export function createCasinoView({ onBet, onLeave }) {
@@ -80,8 +84,8 @@ export function createCasinoView({ onBet, onLeave }) {
 
   const reels = [createReel(), createReel(), createReel()];
   const reelBox = el('div', { class: 'reel-box', 'aria-hidden': 'true' }, reels.map((reel) => reel.element));
-  const casinoDice = [createCasinoDie(), createCasinoDie()];
-  const diceBox = el('div', { class: 'casino-dice', 'aria-hidden': 'true' }, casinoDice);
+  const casinoDice = [createCasinoDie(0), createCasinoDie(1)];
+  const diceBox = el('div', { class: 'casino-dice' }, casinoDice.map((die) => die.element));
   const stageNode = el('div', { class: 'casino-stage' }, [reelBox, diceBox]);
   const bannerNode = el('div', { class: 'casino-banner', role: 'status', 'aria-live': 'polite' });
 
@@ -187,7 +191,8 @@ export function createCasinoView({ onBet, onLeave }) {
   function renderStage() {
     reelBox.hidden = activeGame !== 'SLOT';
     diceBox.hidden = activeGame === 'SLOT';
-    casinoDice[1].hidden = activeGame === 'ODD_EVEN';
+    // 홀짝은 주사위 한 개만 쓴다. (createCasinoDie는 요소가 아니라 래퍼를 돌려주므로 .element를 숨긴다.)
+    casinoDice[1].element.hidden = activeGame === 'ODD_EVEN';
   }
 
   function renderBet() {
@@ -299,17 +304,21 @@ export function createCasinoView({ onBet, onLeave }) {
     spinning = true;
     renderBet();
     const shown = casinoDice.slice(0, values.length);
+    // 홀짝은 주사위 한 개만 쓴다 — 쓰지 않는 주사위는 값을 비워 오해를 막는다.
+    for (const die of casinoDice.slice(values.length)) {
+      die.set(null);
+    }
     if (!prefersReducedMotion()) {
       for (const die of shown) {
-        die.classList.add('casino-die--rolling');
+        die.setRolling(true);
       }
       await wait(scaled(DURATIONS.dice));
       for (const die of shown) {
-        die.classList.remove('casino-die--rolling');
+        die.setRolling(false);
       }
     }
     for (const [index, die] of shown.entries()) {
-      setText(die, String(values[index]));
+      die.set(values[index]);
     }
     spinning = false;
     renderBet();
