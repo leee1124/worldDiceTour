@@ -39,13 +39,20 @@
   }
 }
 
+/*
+  말 오버레이(.board-tokens)가 보드와 **완전히 같은 격자**를 쓰도록 수치를 변수로 뽑는다.
+  이 둘이 어긋나면 말이 엉뚱한 칸 위에 뜬다.
+*/
 .board {
+  --board-gap: 0.28cqi;
+  --board-pad: 0.6cqi;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(11, 1fr);
   grid-template-rows: repeat(11, 1fr);
-  gap: 0.28cqi;
+  gap: var(--board-gap);
   aspect-ratio: 1;
-  padding: 0.6cqi;
+  padding: var(--board-pad);
   border: 1px solid rgba(239, 193, 101, 0.28);
   border-radius: clamp(10px, 1.6cqi, 22px);
   background:
@@ -126,12 +133,43 @@
   --owner-color: var(--seat-jade);
 }
 
+/* 소유자 색을 칸 전체에 옅게 깐다(띠만으로는 누구 땅인지 빨리 안 읽힌다). */
 .cell--owned {
-  background: linear-gradient(170deg, #fffaf0, var(--paper-200));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--owner-color, #ffffff) 22%, #fffaf0),
+    var(--paper-200) 76%
+  );
+}
+
+/* 색맹 대비: 소유자 띠에 좌석 모양별 무늬를 겹친다(색 + 무늬 + 말 모양). */
+.cell--owned[data-owner-shape='square'] .cell-band {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.6) 0 0.22em,
+    transparent 0.22em 0.44em
+  );
+}
+
+.cell--owned[data-owner-shape='diamond'] .cell-band {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.6) 0 0.16em,
+    transparent 0.16em 0.36em
+  );
+}
+
+.cell--owned[data-owner-shape='hexagon'] .cell-band {
+  background-image: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.75) 0.09em, transparent 0.1em);
+  background-size: 0.42em 0.42em;
 }
 
 .cell--landmark {
-  box-shadow: inset 0 0 0 0.16em var(--gold-500);
+  box-shadow: inset 0 0 0 0.16em var(--gold-500), 0 0 0.6em rgba(216, 161, 58, 0.45);
+}
+
+.cell--landmark .cell-band {
+  background: linear-gradient(90deg, var(--gold-400), var(--owner-color, var(--gold-500)) 55%, var(--gold-400));
 }
 
 .cell-body {
@@ -186,6 +224,56 @@
   }
 }
 
+/*
+  폰 폭(보드 32rem 이하, 칸 ≈ 33~40px): 칸에 이름과 건물만 남긴다.
+  - 종류 아이콘·가격/통행료 글자는 뺀다(겹치고 잘린다) → 칸을 누르면 상세 시트가 전부 보여 준다.
+  - 건물은 글자를 접고 굵은 점 세 개 + 랜드마크 별로 줄인다.
+*/
+@container (max-width: 32rem) {
+  .cell-kind,
+  .cell-hint {
+    display: none;
+  }
+
+  .cell-body {
+    justify-content: center;
+    padding: 0.12em 0.05em;
+  }
+
+  .cell-builds {
+    --badge: clamp(8px, 2.9cqi, 12px);
+    gap: 1.5px;
+  }
+
+  .build-slot {
+    border-radius: 50%;
+    color: transparent !important;
+  }
+
+  .build-slot-text {
+    display: none;
+  }
+
+  .build-landmark {
+    padding: 0;
+    border-radius: 50%;
+    width: clamp(11px, 3.6cqi, 15px);
+    height: clamp(11px, 3.6cqi, 15px);
+    justify-content: center;
+    font-size: clamp(8px, 2.6cqi, 11px);
+  }
+
+  .build-landmark-text {
+    display: none;
+  }
+
+  /* 소유 칸은 띠만으로는 약하다 — 칸 전체에 옅은 소유자 색을 깐다. */
+  .cell--owned {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--owner-color, #fff) 34%, #fffaf0), #fffaf0 70%);
+  }
+}
+
 .cell-hint {
   color: var(--ink-700);
   font-family: var(--font-num);
@@ -198,16 +286,88 @@
   color: var(--gold-700);
 }
 
+/* ── 건물 배지 ──────────────────────────────────────────────── */
+
+/*
+  예전에는 지은 건물만 이모지로 찍었고 크기가 `0.78em`(= 칸 글꼴의 78%)이라
+  폰에서 8px 남짓이 되어 "무엇이 지어졌는지" 알 수 없었다.
+  이제는 별장·빌딩·호텔 **세 자리를 늘 그려 두고**(빈 자리는 옅은 윤곽) 지은 것만 채우며,
+  크기는 칸 글꼴이 아니라 보드 폭(cqi)에 직접 묶어 어떤 화면에서도 최소 크기를 지킨다.
+*/
 .cell-builds {
+  --badge: clamp(9px, 2.5cqi, 15px);
   display: flex;
-  gap: 0.05em;
-  font-size: 0.78em;
+  gap: clamp(1px, 0.3cqi, 3px);
+  align-items: center;
+  justify-content: center;
+  margin-top: auto;
+  padding-bottom: 0.1em;
   line-height: 1;
 }
 
-.build-icon--landmark {
-  font-size: 1.25em;
-  filter: drop-shadow(0 0 0.2em rgba(216, 161, 58, 0.8));
+.build-slot {
+  display: grid;
+  place-items: center;
+  width: var(--badge);
+  height: var(--badge);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: calc(var(--badge) * 0.68);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.build-slot--off {
+  border: 1px dashed rgba(20, 34, 45, 0.34);
+  background: rgba(255, 255, 255, 0.35);
+  color: transparent;
+}
+
+/* 아직 주인이 없는 칸의 빈 자리는 더 옅게(소유된 칸의 "아직 안 지음"과 구분된다). */
+.cell:not(.cell--owned) .build-slot--off {
+  opacity: 0.4;
+}
+
+.build-slot--on {
+  border: 1px solid rgba(0, 0, 0, 0.32);
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* 건물마다 색을 달리해 색·글자·자리 세 가지로 구분된다. */
+.build-slot--villa.build-slot--on {
+  background: linear-gradient(160deg, #46c08a, #1f8a5e);
+}
+
+.build-slot--building.build-slot--on {
+  background: linear-gradient(160deg, #5aa0ef, #2b62b4);
+}
+
+.build-slot--hotel.build-slot--on {
+  background: linear-gradient(160deg, #f0757f, #c0303f);
+}
+
+/* 랜드마크는 세 자리를 대신하는 금색 리본이다. */
+.build-landmark {
+  display: flex;
+  align-items: center;
+  gap: 0.15em;
+  max-width: 100%;
+  padding: 0 clamp(2px, 0.6cqi, 5px);
+  border: 1px solid #7a5310;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-300), var(--gold-500) 70%, #b1801f);
+  color: #2a1c00;
+  font-size: clamp(7px, 2.1cqi, 12px);
+  font-weight: 900;
+  line-height: 1.45;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.build-landmark-star {
+  font-size: 1.15em;
 }
 
 /* 모서리 칸 */
@@ -284,6 +444,24 @@
   animation: cell-landing 420ms ease-out;
 }
 
+/* 지금 차례인 사람이 서 있는 칸(멀리서도 찾을 수 있는 강한 테두리). */
+.cell--turn-here {
+  z-index: 2;
+  animation: cell-turn-glow 1.8s ease-in-out infinite;
+}
+
+/* 막 도착한 칸을 잠깐 비춘다. */
+.cell--spotlight {
+  z-index: 3;
+  animation: cell-spotlight 400ms ease-in-out 3;
+}
+
+/* 플레이어 카드를 눌러 찾는 중인 칸. */
+.cell--found {
+  z-index: 3;
+  animation: cell-spotlight 500ms ease-in-out infinite;
+}
+
 .board-stage--picking .cell--selectable {
   filter: saturate(1.15);
   box-shadow: inset 0 0 0 0.18em var(--neon-cyan);
@@ -305,42 +483,56 @@
 
 /* ── 말(토큰) ───────────────────────────────────────────────── */
 
-.cell-tokens {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.1em;
-  justify-content: center;
-  align-items: flex-end;
-  min-height: 1.4em;
-  padding: 0 0.1em 0.15em;
+/*
+  말은 **칸 안이 아니라 보드 위 오버레이**에 산다.
+  (버그 기록: 예전에는 `.cell > .cell-tokens`에 넣었는데, 칸이 `overflow: hidden`인 데다
+  폰에서 칸이 35px라 이름·통행료 줄에 밀려 말이 잘려 나갔다 — "지도에 말이 없다"의 원인.)
+  오버레이는 보드와 똑같은 11×11 격자라, 칸과 같은 grid-area에 놓기만 하면 정확히 겹친다.
+*/
+.board-tokens {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  grid-template-rows: repeat(11, 1fr);
+  gap: var(--board-gap);
+  padding: var(--board-pad);
+  pointer-events: none; /* 칸 버튼의 탭·호버를 막지 않는다 */
+}
+
+.token-slot {
+  position: relative;
 }
 
 .token {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.35em;
-  height: 1.35em;
+  --token-size: clamp(22px, 5.6cqi, 34px);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--token-size);
+  height: var(--token-size);
+  /* transform은 이동 연출(FLIP)이 쓰므로 가운데 맞추기는 margin으로, 겹침 분산은 translate로 한다. */
+  margin: calc(var(--token-size) / -2) 0 0 calc(var(--token-size) / -2);
+  translate: var(--fan-x, 0) var(--fan-y, 0);
   color: #fff;
-  font-size: 0.9em;
+  font-size: var(--token-size);
   will-change: transform;
 }
 
-.token::before {
-  content: '';
+.token-bob {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.token-body {
   position: absolute;
   inset: 0;
   background: var(--token-color);
-  border: 0.1em solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0.12em 0.3em rgba(0, 0, 0, 0.5);
-}
-
-.token::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.55;
+  border: 2px solid #fff;
+  box-shadow: 0 0.09em 0.22em rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .token--ruby {
@@ -356,73 +548,102 @@
   --token-color: var(--seat-jade);
 }
 
-/* 색만으로 구분하지 않도록 모양과 무늬를 함께 쓴다. */
-.token[data-shape='circle']::before {
+/* 색만으로 구분하지 않도록 모양을 함께 쓴다. */
+.token[data-shape='circle'] .token-body {
   border-radius: 50%;
 }
 
-.token[data-shape='square']::before {
-  border-radius: 0.2em;
+.token[data-shape='square'] .token-body {
+  border-radius: 0.16em;
 }
 
-.token[data-shape='diamond']::before {
-  border-radius: 0.12em;
-  transform: rotate(45deg) scale(0.82);
+.token[data-shape='diamond'] .token-body {
+  border-radius: 0.1em;
+  transform: rotate(45deg) scale(0.8);
 }
 
-.token[data-shape='hexagon']::before {
-  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
+.token[data-shape='hexagon'] .token-body {
+  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
   border: 0;
-  box-shadow: none;
-  outline: 0.08em solid rgba(255, 255, 255, 0.8);
-}
-
-.token[data-shape='diamond']::after {
-  border-radius: 0.12em;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.55) 0 0.08em,
-    transparent 0.08em 0.2em
-  );
-  transform: rotate(45deg) scale(0.82);
-}
-
-.token[data-shape='hexagon']::after {
-  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8) 0.08em, transparent 0.09em),
-    radial-gradient(circle at 70% 65%, rgba(255, 255, 255, 0.8) 0.08em, transparent 0.09em);
+  outline: 2px solid #fff;
+  outline-offset: -2px;
 }
 
 .token-label {
   position: relative;
   z-index: 1;
-  font-size: 0.72em;
-  font-weight: 800;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  font-size: 0.5em;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 3px rgba(0, 0, 0, 0.6);
 }
 
-.token--turn {
+/* 이 기기의 좌석임을 못 박는 "나" 배지. */
+.token-mine {
+  position: absolute;
+  right: -0.14em;
+  bottom: -0.16em;
   z-index: 2;
+  padding: 0 0.12em;
+  border: 1px solid #06202e;
+  border-radius: 999px;
+  background: var(--neon-cyan);
+  color: #06202e;
+  font-size: 0.29em;
+  font-weight: 900;
+  line-height: 1.5;
+}
+
+.token:not(.token--mine) .token-mine {
+  display: none;
+}
+
+/* 지금 차례인 말: 제자리에서 통통 튀고 고리가 퍼진다. */
+.token--turn {
+  z-index: 30;
+}
+
+.token--turn .token-bob {
+  animation: token-bounce 900ms ease-in-out infinite;
+}
+
+.token--turn .token-body {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 0 2px rgba(47, 243, 224, 0.85), 0 0.12em 0.3em rgba(0, 0, 0, 0.7);
   animation: pulse-ring 1.4s ease-out infinite;
-  border-radius: 50%;
 }
 
 .token--island {
-  filter: grayscale(0.4);
+  filter: grayscale(0.45);
 }
 
 .token--hopping {
   animation: token-hop 150ms ease-out;
 }
 
+/* 플레이어 카드를 눌러 "여기 있다"를 알려 줄 때. */
+.token--found {
+  z-index: 40;
+}
+
+.token--found .token-body {
+  animation: token-spotlight 500ms ease-out infinite;
+}
+
 .token--vanish {
   opacity: 0;
-  transform: scale(0.4);
+  transform: scale(0.35);
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
 .token--appear {
   animation: die-settle 220ms ease-out;
+}
+
+/* 모션 축소: 튀는 대신 칸 사이를 짧게 페이드한다(순간이동처럼 보이지 않게). */
+.token--fade {
+  opacity: 0.15;
+  transition: opacity 90ms linear;
 }
 
 /* ── 보드 안쪽 장식(엠블럼) ─────────────────────────────────── */
@@ -647,6 +868,22 @@
   color: var(--neon-cyan);
 }
 
+/* "지금 어느 칸에 있는지"를 글자로도 못 박는 줄. */
+.core-location {
+  margin: 0.1rem auto 0;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid rgba(239, 193, 101, 0.35);
+  border-radius: 999px;
+  background: rgba(239, 193, 101, 0.1);
+  color: var(--gold-300);
+  font-size: clamp(0.75rem, 2cqi, 0.95rem);
+  font-weight: 800;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .prompt-title {
   font-size: clamp(0.85rem, 2.2cqi, 1.02rem);
   font-weight: 700;
@@ -679,29 +916,78 @@
 
 /* ── 주사위 ─────────────────────────────────────────────────── */
 
+/*
+  크기는 `--die-size` 하나로만 정한다.
+  (버그 기록: 예전에는 `.die`에 `padding: 11%`·`gap: 6%`를 썼다. 퍼센트 padding/gap은 자기 크기가
+  아니라 **담긴 블록(.dice-row)의 가로폭** 기준이라, 폰에서 padding 한쪽이 38px가 되어
+  32px짜리 주사위를 넘어섰고 `box-sizing: border-box` 탓에 내용 상자가 0×0으로 찌그러졌다.
+  3×3 격자의 `1fr` 트랙이 모두 0px가 되면서 눈(pip)이 배경만 가진 0×0 요소가 되어
+  "굴려도 눈이 안 보이는" 증상이 났다. 그래서 퍼센트를 전부 `calc(var(--die-size) * n)`으로 바꿨다.)
+*/
 .dice-row {
+  --die-size: clamp(2.5rem, 9cqi, 3.4rem);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
+  padding-top: calc(var(--die-size) * 0.18); /* 숫자 배지가 위로 삐져나올 자리 */
 }
 
 .die {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--die-size);
+  height: var(--die-size);
+  border-radius: calc(var(--die-size) * 0.2);
+  background: linear-gradient(160deg, #fffdf6, var(--paper-200) 72%, var(--paper-300));
+  box-shadow:
+    0 0.35rem 0.7rem rgba(0, 0, 0, 0.5),
+    inset 0 -0.12rem 0.28rem rgba(20, 34, 45, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.75);
+}
+
+.die-pips {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: 6%;
-  width: clamp(2rem, 7cqi, 3.1rem);
-  aspect-ratio: 1;
-  padding: 11%;
-  border-radius: 22%;
-  background: linear-gradient(160deg, var(--paper-100), var(--paper-300));
-  box-shadow: 0 0.35rem 0.7rem rgba(0, 0, 0, 0.45), inset 0 -0.15rem 0.3rem rgba(20, 34, 45, 0.25);
+  gap: calc(var(--die-size) * 0.05);
+  width: calc(var(--die-size) * 0.74);
+  height: calc(var(--die-size) * 0.74);
 }
 
 .pip {
   border-radius: 50%;
   background: transparent;
+}
+
+/* 숫자 배지: 눈과 겹치지 않도록 주사위 모서리 바깥에 건다. */
+.die-num {
+  position: absolute;
+  top: calc(var(--die-size) * -0.17);
+  right: calc(var(--die-size) * -0.14);
+  min-width: calc(var(--die-size) * 0.46);
+  padding: 0 0.2em;
+  border: 1px solid rgba(239, 193, 101, 0.6);
+  border-radius: 999px;
+  background: #081924;
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: calc(var(--die-size) * 0.29);
+  font-weight: 800;
+  line-height: 1.55;
+  text-align: center;
+}
+
+/* 아직 굴리지 않은 주사위는 한눈에 "값 없음"으로 보이게 한다. */
+.die--idle {
+  filter: saturate(0.5) brightness(0.92);
+}
+
+.die--idle .die-num {
+  border-color: var(--line);
+  color: var(--text-500);
 }
 
 .die--rolling {
@@ -734,14 +1020,35 @@
 .die[data-face='6'] .pip:nth-child(6),
 .die[data-face='6'] .pip:nth-child(7),
 .die[data-face='6'] .pip:nth-child(9) {
-  background: radial-gradient(circle at 35% 30%, #46606f, var(--ink-900));
+  background: radial-gradient(circle at 34% 28%, #3c5a6b, var(--ink-900) 76%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 0.5px 0 rgba(255, 255, 255, 0.5);
 }
 
 .dice-sum {
   color: var(--gold-300);
   font-family: var(--font-num);
-  font-size: clamp(0.85rem, 2.4cqi, 1.1rem);
+  font-size: calc(var(--die-size) * 0.42);
   font-weight: 800;
-  min-width: 2.5em;
+  min-width: 2.2em;
   text-align: left;
+}
+
+.dice-double {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid rgba(239, 193, 101, 0.6);
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--gold-400), var(--gold-500));
+  color: #2a1c00;
+  font-size: calc(var(--die-size) * 0.26);
+  font-weight: 800;
+  white-space: nowrap;
+  animation: double-pop 620ms ease-out;
+}
+
+/* 폰에서는 주사위를 크게 — "숫자가 안 보인다"는 지적의 절반은 크기 문제였다. */
+@media (max-width: 68rem) {
+  .dice-row {
+    --die-size: 3.5rem;
+    gap: 0.7rem;
+  }
 }

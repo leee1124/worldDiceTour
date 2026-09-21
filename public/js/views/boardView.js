@@ -2,13 +2,21 @@
  * 정사각 보드(11×11 그리드 외곽 40칸). 칸·건물·말(토큰)을 그리고 한 칸씩 이동 연출을 한다.
  *
  * 칸 정보는 모두 서버 `view.board`에서 온다(클라이언트에 보드 데이터 사본을 두지 않는다).
+ *
+ * **말은 칸 안에 넣지 않는다.** 폰에서 칸은 35px 남짓이라 칸 안에 말을 넣으면 이름·통행료에
+ * 밀려 잘려 나가고, `overflow: hidden`에 먹혀 아예 보이지 않았다. 그래서 보드와 **똑같은
+ * 11×11 격자**를 가진 오버레이 층(`.board-tokens`)을 보드 위에 깔고, 말은 그 층의
+ * 같은 grid-area에 놓는다 — 칸보다 커도 잘리지 않고, 칸 글자를 덮지도 않는다.
+ * 격자 수치를 복제하지 않고 같은 grid 설정을 쓰기 때문에 어떤 화면 폭에서도 자동으로 맞는다.
  */
 
 import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatCompactWon, formatWon } from '../format.js';
 import { cornerOf, gridArea, groupOf, sideOf } from '../domain/boardLayout.js';
-import { BUILDING_ORDER, boardCellShortName, buildingIcon, buildingLabel, spaceKindIcon, spaceKindLabel } from '../domain/labels.js';
-import { slotOf } from '../store.js';
+import { boardCellShortName, buildingLabel, spaceKindIcon, spaceKindLabel } from '../domain/labels.js';
+import { buildingSlotView } from '../domain/buildingSlots.js';
+import { fanOutTokens } from '../domain/tokenLayout.js';
+import { isMySeat, slotOf } from '../store.js';
 import { centerOf } from '../animation/effects.js';
 import { DURATIONS, nextFrame, prefersReducedMotion, scaled, wait } from '../animation/timing.js';
 
@@ -19,6 +27,11 @@ const CORNER_ART = Object.freeze({
   CASINO: { emoji: '🎰', caption: '카지노', note: '최대 3판' },
   AIRPORT: { emoji: '✈️', caption: '공항', note: '다음 턴 이동' },
 });
+
+/** 도착한 칸을 비추는 시간. */
+const SPOTLIGHT_MS = 1200;
+/** 플레이어 카드를 눌러 말을 찾을 때 강조하는 시간. */
+const FIND_MS = 2000;
 
 function nameSizeClass(name) {
   const length = String(name ?? '').length;
@@ -33,6 +46,9 @@ function nameSizeClass(name) {
 
 export function createBoardView({ onCellActivate }) {
   const boardNode = el('div', { class: 'board', role: 'grid', 'aria-label': '월드 다이스 투어 보드' });
+  // 말 전용 오버레이. 보드와 같은 11×11 격자라 grid-area만 맞추면 칸 위에 정확히 겹친다.
+  // 읽어 주는 정보는 칸의 aria-label과 플레이어 카드가 이미 담고 있으므로 여기서는 숨긴다.
+  const tokenLayer = el('div', { class: 'board-tokens', 'aria-hidden': 'true' });
   const emblem = el('div', { class: 'board-emblem', 'aria-hidden': 'true' }, [
     el('div', { class: 'emblem-ring' }, [
       el('span', { class: 'emblem-title', text: 'WORLD' }),
@@ -50,6 +66,8 @@ export function createBoardView({ onCellActivate }) {
   const cells = new Map();
   /** @type {Map<string, HTMLElement>} */
   const tokens = new Map();
+  /** 강조 타이머(중복 실행 시 이전 것을 취소한다). */
+  const highlightTimers = new Map();
   let boardBuilt = false;
   let travelMode = { active: false, forbidden: [], locked: false };
   let selectedIndex = null;
@@ -64,7 +82,6 @@ export function createBoardView({ onCellActivate }) {
     const name = el('span', { class: ['cell-name', nameSizeClass(shortName)], text: shortName });
     const hint = el('span', { class: 'cell-hint' });
     const builds = el('span', { class: 'cell-builds', 'aria-hidden': 'true' });
-    const tokenLayer = el('span', { class: 'cell-tokens' });
 
     const body = corner
       ? el('span', { class: 'cell-body cell-body--corner' }, [
@@ -87,25 +104,37 @@ export function createBoardView({ onCellActivate }) {
         style: { gridArea: gridArea(index) },
         on: { click: () => onCellActivate(index) },
       },
-      [band, body, tokenLayer],
+      [band, body],
     );
 
-    cells.set(index, { root, band, name, hint, builds, tokens: tokenLayer });
+    // 이 칸의 말이 놓일 오버레이 자리(같은 grid-area).
+    const slot = el('div', {
+      class: 'token-slot',
+      dataset: { index: String(index) },
+      style: { gridArea: gridArea(index) },
+    });
+    tokenLayer.appendChild(slot);
+
+    cells.set(index, { root, band, name, hint, builds, tokens: slot });
     return root;
   }
 
   function buildBoard(view) {
     clear(boardNode);
+    clear(tokenLayer);
     cells.clear();
     boardNode.appendChild(emblem);
     for (const space of view.board) {
       boardNode.appendChild(buildCell(space));
     }
+    boardNode.appendChild(tokenLayer);
     boardBuilt = true;
   }
 
   function buildToken(state, player) {
     const slot = slotOf(state, player.seatId);
+    // 바깥 `.token`은 위치·이동(FLIP의 transform) 전용이고, 안쪽 `.token-bob`이 통통 튄다.
+    // (둘을 한 요소에 두면 CSS 애니메이션이 인라인 transform을 덮어써 이동 연출이 깨진다.)
     const token = el(
       'span',
       {
@@ -113,7 +142,13 @@ export function createBoardView({ onCellActivate }) {
         dataset: { seat: player.seatId, shape: slot.shape },
         title: player.name,
       },
-      [el('span', { class: 'token-label', text: player.name.slice(0, 1) })],
+      [
+        el('span', { class: 'token-bob' }, [
+          el('span', { class: 'token-body' }),
+          el('span', { class: 'token-label', text: player.name.slice(0, 1) }),
+          el('span', { class: 'token-mine', text: '나' }),
+        ]),
+      ],
     );
     tokens.set(player.seatId, token);
     return token;
@@ -130,8 +165,10 @@ export function createBoardView({ onCellActivate }) {
       parts.push(`소유 ${ownerName}`, `통행료 ${formatWon(space.toll)}`);
       if (space.landmark) {
         parts.push('랜드마크');
-      } else if (space.buildings?.length) {
-        parts.push(space.buildings.map((type) => buildingLabel(type)).join(' '));
+      } else {
+        const view = buildingSlotView(space);
+        const built = view.slots.filter((item) => item.built);
+        parts.push(built.length > 0 ? built.map((item) => buildingLabel(item.type)).join(' ') : '건물 없음');
       }
     } else if (space.price) {
       parts.push('주인 없음');
@@ -145,16 +182,36 @@ export function createBoardView({ onCellActivate }) {
     return parts.join(', ');
   }
 
+  /**
+   * 건물 배지. 별장·빌딩·호텔 세 자리를 **늘 그려 두고** 지은 것만 채운다.
+   * 좁은 폭에서는 CSS가 글자를 접고 점 세 개로 줄인다(구조는 그대로라 아무것도 사라지지 않는다).
+   */
   function renderBuildings(node, space) {
     clear(node);
-    if (space.landmark) {
-      node.appendChild(el('span', { class: 'build-icon build-icon--landmark', text: buildingIcon('LANDMARK') }));
+    const view = buildingSlotView(space);
+    if (view.landmark) {
+      node.appendChild(
+        el('span', { class: 'build-landmark' }, [
+          el('span', { class: 'build-landmark-star', text: '★' }),
+          el('span', { class: 'build-landmark-text', text: '랜드마크' }),
+        ]),
+      );
       return;
     }
-    for (const type of BUILDING_ORDER) {
-      if (space.buildings?.includes(type)) {
-        node.appendChild(el('span', { class: ['build-icon', `build-icon--${type.toLowerCase()}`], text: buildingIcon(type) }));
-      }
+    if (view.slots.length === 0) {
+      return;
+    }
+    for (const slot of view.slots) {
+      node.appendChild(
+        el(
+          'span',
+          {
+            class: ['build-slot', `build-slot--${slot.type.toLowerCase()}`, slot.built ? 'build-slot--on' : 'build-slot--off'],
+            title: `${slot.label} ${slot.built ? '지음' : '없음'}`,
+          },
+          [el('span', { class: 'build-slot-text', text: slot.short })],
+        ),
+      );
     }
   }
 
@@ -169,6 +226,8 @@ export function createBoardView({ onCellActivate }) {
     toggleClass(cell.root, 'cell--owned', owned);
     toggleClass(cell.root, 'cell--landmark', Boolean(space.landmark));
     cell.root.dataset.ownerSlot = slot ? slot.color : '';
+    // 색맹 대비: 소유자 띠에 좌석 모양별 무늬도 넣는다.
+    cell.root.dataset.ownerShape = slot ? slot.shape : '';
     setText(cell.hint, owned ? `통행료 ${formatCompactWon(space.toll)}` : space.price ? formatCompactWon(space.price) : '');
     toggleClass(cell.hint, 'cell-hint--toll', owned);
     renderBuildings(cell.builds, space);
@@ -180,25 +239,70 @@ export function createBoardView({ onCellActivate }) {
     toggleClass(cell.root, 'cell--selected', selectedIndex === space.index);
   }
 
+  /** 한 칸에 겹친 말들을 서로 가리지 않게 흩어 놓는다(`translate`만 쓴다 — 이동 연출은 `transform`을 쓴다). */
+  function layoutTokensIn(slotNode) {
+    const items = [...slotNode.children];
+    const layout = fanOutTokens(items.length);
+    for (const [index, token] of items.entries()) {
+      const place = layout[index] ?? { x: 0, y: 0 };
+      token.style.setProperty('--fan-x', `${place.x}em`);
+      token.style.setProperty('--fan-y', `${place.y}em`);
+      token.style.zIndex = String(index + 1);
+    }
+  }
+
   function placeTokens(state) {
     const view = state.view;
     for (const cell of cells.values()) {
       clear(cell.tokens);
+      toggleClass(cell.root, 'cell--turn-here', false);
     }
     for (const player of view.players) {
       let token = tokens.get(player.seatId);
       if (!token) {
         token = buildToken(state, player);
       }
+      const isCurrent = player.seatId === view.currentSeatId && !view.isOver;
       toggleClass(token, 'token--eliminated', player.eliminated);
-      toggleClass(token, 'token--turn', player.seatId === view.currentSeatId);
+      toggleClass(token, 'token--turn', isCurrent);
+      toggleClass(token, 'token--mine', isMySeat(state, player.seatId));
       toggleClass(token, 'token--island', player.islandRemainingTurns > 0);
       if (player.eliminated) {
         token.remove();
         continue;
       }
-      cells.get(player.position)?.tokens.appendChild(token);
+      const cell = cells.get(player.position);
+      if (!cell) {
+        continue;
+      }
+      cell.tokens.appendChild(token);
+      if (isCurrent) {
+        // 지금 차례인 사람이 선 칸은 테두리가 숨을 쉬어서 멀리서도 찾을 수 있다.
+        toggleClass(cell.root, 'cell--turn-here', true);
+      }
     }
+    for (const cell of cells.values()) {
+      layoutTokensIn(cell.tokens);
+    }
+  }
+
+  /** 클래스를 잠깐 붙였다 뗀다(같은 대상에 다시 걸면 타이머를 새로 시작한다). */
+  function flash(node, className, duration, key) {
+    if (!node) {
+      return;
+    }
+    const timerKey = key ?? className;
+    const previous = highlightTimers.get(timerKey);
+    if (previous) {
+      window.clearTimeout(previous.timer);
+      previous.node.classList.remove(className);
+    }
+    node.classList.add(className);
+    const timer = window.setTimeout(() => {
+      node.classList.remove(className);
+      highlightTimers.delete(timerKey);
+    }, duration);
+    highlightTimers.set(timerKey, { timer, node });
   }
 
   return {
@@ -237,6 +341,11 @@ export function createBoardView({ onCellActivate }) {
       }
     },
 
+    /** 보드를 크게 보는 모드(폰에서 칸을 누르기 쉽게 한다). */
+    setZoom(zoomed) {
+      toggleClass(stage, 'board-stage--zoom', zoomed);
+    },
+
     /** 말을 목표 칸으로 옮긴다. FLIP 방식으로 한 칸 이동을 보여 준다. */
     async moveToken(seatId, index, { animate = true } = {}) {
       const token = tokens.get(seatId);
@@ -244,12 +353,21 @@ export function createBoardView({ onCellActivate }) {
       if (!token || !cell) {
         return;
       }
+      const previousSlot = token.parentElement;
       if (!animate || prefersReducedMotion()) {
         cell.tokens.appendChild(token);
+        layoutTokensIn(cell.tokens);
+        if (previousSlot && previousSlot !== cell.tokens) {
+          layoutTokensIn(previousSlot);
+        }
         return;
       }
       const before = token.getBoundingClientRect();
       cell.tokens.appendChild(token);
+      layoutTokensIn(cell.tokens);
+      if (previousSlot && previousSlot !== cell.tokens) {
+        layoutTokensIn(previousSlot);
+      }
       const after = token.getBoundingClientRect();
       const dx = before.left - after.left;
       const dy = before.top - after.top;
@@ -274,9 +392,17 @@ export function createBoardView({ onCellActivate }) {
       if (!token) {
         return;
       }
+      const previousSlot = token.parentElement;
       token.classList.add('token--vanish');
       await wait(scaled(DURATIONS.teleport / 2));
-      cells.get(index)?.tokens.appendChild(token);
+      const cell = cells.get(index);
+      if (cell) {
+        cell.tokens.appendChild(token);
+        layoutTokensIn(cell.tokens);
+        if (previousSlot && previousSlot !== cell.tokens) {
+          layoutTokensIn(previousSlot);
+        }
+      }
       token.classList.remove('token--vanish');
       token.classList.add('token--appear');
       await wait(scaled(DURATIONS.teleport / 2));
@@ -291,6 +417,20 @@ export function createBoardView({ onCellActivate }) {
       cell.root.classList.add('cell--landing');
       await wait(scaled(DURATIONS.flash));
       cell.root.classList.remove('cell--landing');
+    },
+
+    /** 이동이 끝난 칸을 잠깐 비춘다(어디에 내렸는지 놓치지 않게). */
+    spotlightCell(index) {
+      flash(cells.get(index)?.root, 'cell--spotlight', SPOTLIGHT_MS, 'spotlight-cell');
+    },
+
+    /** 플레이어 카드를 눌렀을 때: 그 사람의 말과 칸을 2초 동안 강조한다. */
+    findSeat(seatId, index) {
+      flash(tokens.get(seatId) ?? null, 'token--found', FIND_MS, 'find-token');
+      if (Number.isInteger(index)) {
+        flash(cells.get(index)?.root ?? null, 'cell--found', FIND_MS, 'find-cell');
+        cells.get(index)?.root.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
     },
 
     tokenCenter(seatId) {

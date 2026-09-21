@@ -81,7 +81,7 @@ export function createPlaybackEngine({
       }
 
       case 'DICE_ROLLED':
-        await center.rollDice(event.die1, event.die2);
+        await center.rollDice(event.die1, event.die2, { isDouble: event.isDouble });
         break;
 
       case 'MOVED':
@@ -221,7 +221,12 @@ export function createPlaybackEngine({
             break;
           }
           if (queue.fastForward) {
-            continue; // 밀렸으면 연출을 버리고 최신 상태로 달려간다.
+            // 밀렸으면 연출은 버리지만, **주사위 눈은 상태**라서 버리면 안 된다.
+            // (이 값이 화면에서 사라지면 보는 기기마다 다른 눈이 남는다.)
+            if (event.type === 'DICE_ROLLED') {
+              center.showDice(event.die1, event.die2, { isDouble: event.isDouble });
+            }
+            continue; // 그 밖의 연출은 버리고 최신 상태로 달려간다.
           }
           try {
             await playEvent(event);
