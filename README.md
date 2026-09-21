@@ -132,6 +132,33 @@ npm run coverage      # node --test --experimental-test-coverage
 - 난수는 `RandomSource` 인터페이스로 주입하므로 테스트는 결정적(`FakeRandomSource`, `SeededRandomSource`)이다.
 - E2E는 모든 커맨드 후 **돈의 보존 불변식**(`총현금 + 잭팟 = 초기총액 + 은행순유입`)을 검증한다.
 
+### Windows용 Node로 테스트 실행하기
+
+실제 게임은 Windows 네이티브 Node(`node.exe`)로 구동하므로, WSL에서 작업했더라도 배포 전에는
+Windows 네이티브 Node로도 전체 스위트를 돌려봐야 한다. `chmod`처럼 Windows에서 효과가 없는
+POSIX 전용 동작에 기대는 테스트가 없는지, 소켓 종료 순서가 OS마다 달라 생기는 차이를 잘
+견디는지는 Linux 통과만으로는 보장되지 않는다.
+
+```bash
+# WSL에서, Windows용 Node 실행 파일을 직접 지정해 실행한다
+/mnt/c/경로/to/node.exe --test "tests/unit/*.test.js" "tests/integration/*.test.js" "tests/e2e/*.test.js"
+```
+
+```powershell
+# 또는 Windows 쪽 PowerShell/cmd에서 그대로
+npm test
+```
+
+주의:
+- `chmod`로 파일/디렉터리 권한을 바꿔 실패를 흉내 내는 방식은 Windows에서는 무시되므로 쓰지
+  않는다. 대신 `FileRoomRepository`의 `unlink`, `readStaticFile`의 `stat`처럼 실패를 주입할 수
+  있는 선택적 시드(옵션 파라미터)를 통해 `EACCES`/`EPERM`을 플랫폼과 무관하게 재현한다.
+- 본문 크기 한도를 넘는 요청을 끊는 테스트처럼 소켓 동작이 OS마다 달라지는 경우, 정확한 오류
+  종류(413 응답 vs. 클라이언트 쓰기 중 `ECONNRESET`/`EPIPE`)를 하나로 못 박지 않고, 두 결과
+  모두 "한도를 넘는 즉시 멈춘다"는 같은 계약의 정상적인 두 얼굴로 보고 함께 허용한다. 다만
+  어느 쪽이든 서버가 본문을 끝까지 읽지 않고 멈췄는지, 그리고 서버가 계속 살아 있는지(새 연결의
+  후속 요청이 200을 받는지)는 반드시 함께 검증한다.
+
 ## 프로젝트 구조
 
 ```
