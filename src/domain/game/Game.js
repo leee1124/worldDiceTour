@@ -19,6 +19,11 @@ import {
   startBuildCandidates,
 } from './PendingDecision.js';
 import { RoundClock, TURN_OUTCOMES } from './RoundClock.js';
+import { BoardNudges } from '../market/BoardNudges.js';
+import { Market } from '../market/Market.js';
+import { TRADING_CLOSE_REASONS } from '../market/events.js';
+import { MatchRecorder } from '../report/MatchRecorder.js';
+import { DEFAULT_FINANCE_OPTIONS, INVESTMENT_MODES } from '../room/FinanceOptions.js';
 import { TICKET_ACTIONS, TicketEffects } from './TicketEffects.js';
 import { TicketDeck } from './TicketDeck.js';
 import { Treasury } from './Treasury.js';
@@ -59,6 +64,18 @@ const EMPTY_TURN = Object.freeze({
   casinoRoundsLeft: 0,
   buildIndex: null,
   acquireIndex: null,
+  /**
+   * 거래 창구를 닫은 뒤 돌아갈 원래 흐름(`ROLL` | `ISLAND` | `TRAVEL`).
+   * 창구가 열려 있지 않으면 null이다.
+   */
+  afterTrade: null,
+});
+
+/** 턴이 시작될 때 들어갈 원래 흐름. 거래 창구는 이 앞에 끼어든다. */
+export const TURN_ENTRIES = Object.freeze({
+  ROLL: 'ROLL',
+  ISLAND: 'ISLAND',
+  TRAVEL: 'TRAVEL',
 });
 
 /**
@@ -87,6 +104,9 @@ export class Game {
   /** @type {PaymentFlow} */ #payment;
   /** @type {Bankruptcy} */ #bankruptcy;
   /** @type {LapIncome} */ #lapIncome;
+  /** @type {Market|null} */ #market;
+  /** @type {BoardNudges|null} */ #nudges;
+  /** @type {MatchRecorder} */ #recorder;
   /** @type {TicketEffects} */ #ticketEffects = new TicketEffects();
   /** @type {CityTrade} */ #cityTrade;
   /** @type {Readonly<Record<string, (payload: object) => void>>} */ #handlers;
@@ -110,6 +130,8 @@ export class Game {
     options = { roundLimit: null },
     initialTotal,
     turn = { ...EMPTY_TURN },
+    market = null,
+    report = null,
   }) {
     this.#board = board;
     this.#players = players;
@@ -122,7 +144,10 @@ export class Game {
     this.#clock = new RoundClock({ round, turnIndex, roundLimit: options.roundLimit ?? null });
     this.#version = version;
     this.#initialTotal = initialTotal;
-    this.#treasury = new Treasury({ players, ledger, casino, initialTotal });
+    this.#market = market;
+    // 성적표 수집은 Phase 1부터 가동한다(설계서 §9.1 항목 7) — 나중에 켜면 지난 판의 자료가 없다.
+    this.#recorder = new MatchRecorder(report ?? {});
+    this.#treasury = new Treasury({ players, ledger, casino, initialTotal, observer: this.#recorder });
 
     // 자산군 레지스트리 — 지금은 부동산 하나뿐이다. 주식·예금·파생은 `registerAssetProvider`
     // 한 줄로 총자산·정리 목록·자동매각 순서·파산 청산에 함께 들어온다(Game은 안 바뀐다).
@@ -131,11 +156,32 @@ export class Game {
     this.#liquidator = new Liquidator({ registry: this.#assets });
     this.#netWorth = new NetWorth({ registry: this.#assets });
     this.#bankruptcy = new Bankruptcy({ registry: this.#assets });
-    this.#lapIncome = new LapIncome();
+    this.#lapIncome = new LapIncome({ market });
     this.#cityTrade = new CityTrade({ findPlayer: (id) => this.playerById(id) });
     this.#payment = new PaymentFlow({
       treasury: this.#treasury,
       findPlayer: (id) => this.playerById(id),
+    });
+
+    if (market) {
+      // R3: 등록 한 줄로 총자산·정리 목록·자동매각 순서·파산 청산에 동시에 들어온다.
+      for (const provider of market.assetProviders()) {
+        this.#assets.register(provider);
+      }
+      this.#nudges = new BoardNudges({
+        market,
+        isResort: (index) => this.#board.spaceAt(index).kind === SPACE_KINDS.RESORT,
+      });
+      this.#clock.registerTick({
+        name: 'market',
+        run: ({ round, players: living }) =>
+          market.roundTick({ round, random: this.#random, players: living }),
+      });
+    }
+    // 라운드별 자산 스냅샷은 **틱의 돈이 반영된 뒤**에 찍어야 정확하다.
+    this.#clock.registerPostTick({
+      name: 'recorder',
+      run: ({ round }) => this.#recorder.recordRound({ round, players: this.#players, netWorth: this.#netWorth }),
     });
 
     this.#handlers = this.#buildHandlers();
@@ -154,7 +200,8 @@ export class Game {
       throw DomainError.notEnoughSeats(`플레이어 수는 ${MIN_PLAYERS}~${MAX_PLAYERS}명이어야 합니다`);
     }
     const entities = players.map((seat) => new Player({ id: seat.id, name: seat.name }));
-    return new Game({
+    const finance = options.finance ?? DEFAULT_FINANCE_OPTIONS;
+    const game = new Game({
       board: Board.createDefault(),
       players: entities,
       deck: TicketDeck.createDefault(),
@@ -163,7 +210,14 @@ export class Game {
       random,
       options,
       initialTotal: entities.length * STARTING_CASH,
+      market: finance.investmentMode === INVESTMENT_MODES.STOCKS ? Market.create() : null,
     });
+    // 첫 좌석의 턴도 규칙대로 시작한다(투자 모드면 여기서 거래 창구가 열린다).
+    // 이때의 이벤트는 받을 곳이 없으므로 버린다 — START 직후의 SSE는 전체 뷰를 통째로 보내므로
+    // 화면은 `phase`와 `pending`만 보고 그릴 수 있다.
+    game.#beginTurn();
+    game.#events = [];
+    return game;
   }
 
   /**
@@ -174,13 +228,17 @@ export class Game {
    *   `ticketCatalog`는 **테스트 전용** 티켓 목록이다. 배포 데이터로는 만들 수 없는 상황
    *   (예: 티켓이 연달아 나오는 연쇄)을 실제로 재현해 검증하기 위한 seam이며,
    *   운영 경로에서는 언제나 생략해 배포 티켓 20장을 쓴다.
+   *
+   *   `beginTurn`도 **테스트 전용** seam이다. 복원은 저장된 페이즈를 그대로 되살리는 것이 옳지만,
+   *   거래 창구처럼 "턴이 시작될 때" 열리는 것을 검증하려면 복원한 상태에서 실제 턴 시작 경로를
+   *   한 번 태워야 한다. 운영 경로에서는 언제나 생략한다.
    */
-  static restore(snapshot, random, { ticketCatalog } = {}) {
+  static restore(snapshot, random, { ticketCatalog, beginTurn = false } = {}) {
     if (!snapshot || !Array.isArray(snapshot.players)) {
       throw DomainError.invalidArgument('게임 스냅샷 구조가 올바르지 않습니다');
     }
     const players = snapshot.players.map((player) => new Player({ ...player }));
-    return new Game({
+    const game = new Game({
       board: Board.restore(snapshot.board ?? []),
       players,
       deck: ticketCatalog
@@ -199,7 +257,14 @@ export class Game {
       // (단순히 현재 총액으로 두면 그 방은 복원 직후부터 불변식이 거짓이 되어 첫 커맨드에서 멈춘다.)
       initialTotal: snapshot.initialTotal ?? Game.#inferInitialTotal(snapshot, players),
       turn: { ...EMPTY_TURN, ...(snapshot.turn ?? {}) },
+      market: snapshot.market ? Market.restore(snapshot.market) : null,
+      report: snapshot.report ?? null,
     });
+    if (beginTurn) {
+      game.#beginTurn();
+      game.#events = [];
+    }
+    return game;
   }
 
   /**
@@ -300,6 +365,7 @@ export class Game {
       casino: this.#casino,
       payment: this.#payment,
       liquidator: this.#liquidator,
+      market: this.#market,
     });
   }
 
@@ -315,6 +381,34 @@ export class Game {
   netWorthOf(playerId) {
     const player = this.playerById(playerId);
     return player ? this.#netWorth.of(player) : 0;
+  }
+
+  /**
+   * 시장 공개 스냅샷(투자 모드가 꺼지면 null). DTO가 그대로 싣는다.
+   * @param {{actingSeatId: string|null}} params
+   */
+  marketView({ actingSeatId = null } = {}) {
+    if (!this.#market) {
+      return null;
+    }
+    return this.#market.viewModel({
+      seatIds: this.#players.map((player) => player.id),
+      actingSeatId,
+    });
+  }
+
+  /**
+   * 총자산 내역(화면의 "현금 / 부동산 / 주식 / 예금 / −대출" 분해).
+   * 합계는 `netWorthOf`와 **같은 값**이다 — 계산 지점이 하나이기 때문이다.
+   */
+  netWorthBreakdownOf(playerId) {
+    const player = this.playerById(playerId);
+    return this.#netWorth.breakdownOf(player);
+  }
+
+  /** 최종 성적표 수집 자료(뷰에는 싣지 않는다 — Phase 5가 조립한다). */
+  get matchRecord() {
+    return this.#recorder.snapshotView();
   }
 
   /**
@@ -360,12 +454,22 @@ export class Game {
     }
 
     this.#events = [];
-    handler(payload ?? {});
+    const jackpotBefore = this.#casino.jackpot;
+    handler(payload ?? {}, seatId);
+    // 보드에서 벌어진 일이 섹터에 남기는 압력. 표는 `BoardNudges`가 알고 Game은 사건만 넘긴다(R1).
+    this.#nudges?.observe(this.#events, { jackpotBefore, jackpotAfter: this.#casino.jackpot });
+    this.#recorder.observeEvents({ round: this.#clock.round, events: this.#events });
     this.#version += 1;
     return [...this.#events];
   }
 
-  /** 커맨드 종류 → 처리기. `COMMAND_PHASES`/`COMMAND_OWNERSHIP`과 짝을 이룬다. */
+  /**
+   * 커맨드 종류 → 처리기. `COMMAND_PHASES`/`COMMAND_OWNERSHIP`과 짝을 이룬다.
+   *
+   * 두 번째 인자 `seatId`는 **이미 인증·소유권 검증을 통과한** 좌석이다. 대부분의 처리기는
+   * 현재 턴 좌석만 다루므로 쓰지 않지만, 예약 주문처럼 `OWN_SEAT_ANYTIME`인 커맨드는
+   * "보낸 좌석"이 곧 행동 주체이므로 이 값을 쓴다.
+   */
   #buildHandlers() {
     return Object.freeze({
       [COMMAND_TYPES.ROLL]: () => this.#roll(),
@@ -386,6 +490,15 @@ export class Game {
       [COMMAND_TYPES.AUTO_SELL]: () => this.#autoSell(),
       [COMMAND_TYPES.TAKE_LOAN]: () => this.#takeLoan(),
       [COMMAND_TYPES.DECLARE_BANKRUPTCY]: () => this.#declareBankruptcy(),
+      [COMMAND_TYPES.SELL_ASSET]: (payload) => this.#sellAsset(payload),
+      [COMMAND_TYPES.BUY_STOCK]: (payload) => this.#buyStock(payload),
+      [COMMAND_TYPES.SELL_STOCK]: (payload) => this.#sellStock(payload),
+      [COMMAND_TYPES.DEPOSIT]: (payload) => this.#deposit(payload),
+      [COMMAND_TYPES.WITHDRAW]: (payload) => this.#withdraw(payload),
+      [COMMAND_TYPES.CLOSE_TRADING]: () => this.#closeTrading(TRADING_CLOSE_REASONS.PLAYER),
+      [COMMAND_TYPES.QUEUE_ORDER]: (payload, seatId) => this.#queueOrder(payload, seatId),
+      [COMMAND_TYPES.CANCEL_QUEUED_ORDER]: (payload, seatId) =>
+        this.#cancelQueuedOrder(payload, seatId),
     });
   }
 
@@ -396,6 +509,13 @@ export class Game {
    */
   #assertOwnership(type, seatId) {
     const ownership = COMMAND_OWNERSHIP[type];
+    if (ownership === COMMAND_OWNERSHIPS.OWN_SEAT_ANYTIME) {
+      const player = this.playerById(seatId);
+      if (!player || player.eliminated) {
+        throw DomainError.forbidden(`살아 있는 자기 좌석만 보낼 수 있습니다: ${seatId}`);
+      }
+      return;
+    }
     if (ownership !== COMMAND_OWNERSHIPS.CURRENT_PLAYER) {
       throw DomainError.invalidArgument(`알 수 없는 행동 주체 규칙입니다: ${ownership}`);
     }
@@ -990,6 +1110,10 @@ export class Game {
       this.#gameOver(result.reason);
       return;
     }
+    // 사후 훅은 틱의 돈이 반영된 **뒤**에 돌린다(라운드별 자산 스냅샷이 정확해야 한다).
+    if (result.ticked) {
+      this.#clock.runPostTick({ round: this.#clock.round, players: this.#players });
+    }
     this.#beginTurn();
   }
 
@@ -1003,16 +1127,154 @@ export class Game {
     player.resetDoubles();
     this.#emit(EVENT_TYPES.TURN_STARTED, { playerId: player.id, round: this.#clock.round });
 
+    const entry = this.#turnEntryOf(player);
+    if (this.#openTradingWindow(player, entry)) {
+      return;
+    }
+    this.#enterTurnPhase(player, entry);
+  }
+
+  /** 거래 창구를 빼면 이 턴이 들어갈 원래 흐름. */
+  #turnEntryOf(player) {
     if (player.isStranded()) {
+      return TURN_ENTRIES.ISLAND;
+    }
+    if (player.airportPending) {
+      return TURN_ENTRIES.TRAVEL;
+    }
+    return TURN_ENTRIES.ROLL;
+  }
+
+  /** 원래 흐름으로 들어간다(창구를 닫은 뒤에도 같은 경로를 쓴다). */
+  #enterTurnPhase(player, entry) {
+    if (entry === TURN_ENTRIES.ISLAND) {
       this.#phase = PHASES.AWAIT_ISLAND_CHOICE;
       return;
     }
-    if (player.airportPending) {
+    if (entry === TURN_ENTRIES.TRAVEL) {
       this.#phase = PHASES.AWAIT_TRAVEL;
       this.#emit(EVENT_TYPES.AIRPORT_READY, { playerId: player.id });
       return;
     }
     this.#phase = PHASES.AWAIT_ROLL;
+  }
+
+  /**
+   * 거래 창구를 연다(턴 시작 1회). 열었으면 true.
+   *
+   * **조난 중에도 연다**(죽은 턴을 만들지 않는다). 거래할 것이 전혀 없으면 열지 않는다.
+   * 더블 추가 턴은 `#endTurn`이 `#beginTurn`을 부르지 않으므로 구조적으로 창구가 없다.
+   * 창구가 열리면 예약 주문이 **먼저** 자동 체결되고, 그것만으로 예산이 소진되면 곧바로 닫힌다.
+   */
+  #openTradingWindow(player, entry) {
+    if (!this.#market || !this.#market.hasTradableAssets({ playerId: player.id, cash: player.cash })) {
+      return false;
+    }
+    this.#market.openWindow(player.id);
+    this.#turn.afterTrade = entry;
+    this.#phase = PHASES.AWAIT_TRADE;
+    const budget = this.#market.budgetOf(player.id);
+    this.#emit(EVENT_TYPES.TRADING_OPENED, {
+      playerId: player.id,
+      ordersLeft: budget.ordersLeft,
+      notionalLeft: budget.notionalLeft,
+      afterTrade: entry,
+    });
+    this.#applyMarket(this.#market.runQueuedOrders({ playerId: player.id, cash: player.cash }));
+    this.#autoCloseTradingIfExhausted();
+    return true;
+  }
+
+  /** 거래 창구를 닫고 원래 흐름으로 돌아간다. */
+  #closeTrading(reason) {
+    const player = this.#current;
+    const entry = this.#turn.afterTrade ?? TURN_ENTRIES.ROLL;
+    this.#market.closeWindow();
+    this.#turn.afterTrade = null;
+    this.#emit(EVENT_TYPES.TRADING_CLOSED, { playerId: player.id, reason });
+    this.#enterTurnPhase(player, entry);
+  }
+
+  /** 예산을 다 쓰면 서버가 창구를 닫는다(거래로 판이 늘어지지 않게). */
+  #autoCloseTradingIfExhausted() {
+    if (this.#phase === PHASES.AWAIT_TRADE && this.#market?.windowExhausted) {
+      this.#closeTrading(TRADING_CLOSE_REASONS.BUDGET_EXHAUSTED);
+    }
+  }
+
+  // ── 증권거래소 커맨드 (규칙은 Market이 안다 — Game은 위임과 상태기계만) ──
+
+  /** 시장이 돌려준 결과를 반영한다(돈은 Treasury 한 곳에서만 움직인다). */
+  #applyMarket({ intents, events }) {
+    if (intents.length > 0) {
+      this.#treasury.apply(intents);
+    }
+    this.#emitAll(events);
+  }
+
+  #buyStock({ instrumentId, quantity }) {
+    this.#applyMarket(
+      this.#requireMarket().buy({
+        playerId: this.#current.id,
+        instrumentId,
+        quantity,
+        cash: this.#current.cash,
+      }),
+    );
+    this.#autoCloseTradingIfExhausted();
+  }
+
+  #sellStock({ instrumentId, quantity }) {
+    this.#applyMarket(
+      this.#requireMarket().sell({ playerId: this.#current.id, instrumentId, quantity }),
+    );
+    this.#autoCloseTradingIfExhausted();
+  }
+
+  #deposit({ amount }) {
+    this.#applyMarket(
+      this.#requireMarket().deposit({ playerId: this.#current.id, amount, cash: this.#current.cash }),
+    );
+    this.#autoCloseTradingIfExhausted();
+  }
+
+  #withdraw({ amount }) {
+    this.#applyMarket(this.#requireMarket().withdraw({ playerId: this.#current.id, amount }));
+    this.#autoCloseTradingIfExhausted();
+  }
+
+  #queueOrder({ kind, instrumentId = null, quantity = null, amount = null }, seatId) {
+    this.#applyMarket(
+      this.#requireMarket().queueOrder({ seatId, kind, instrumentId, quantity, amount }),
+    );
+  }
+
+  #cancelQueuedOrder({ orderId }, seatId) {
+    this.#applyMarket(this.#requireMarket().cancelQueuedOrder({ seatId, orderId }));
+  }
+
+  /**
+   * 정리 페이즈의 자산군 무관 매각. 목록·순서·환급 규칙은 `Liquidator`/자산군 제공자가 안다.
+   * 기존 `SELL`(도시 전용)은 하위호환으로 남아 있고 같은 경로를 쓴다.
+   */
+  #sellAsset({ assetKind, assetId, quantity }) {
+    this.#payment.assertPendingDebt();
+    const { intents, events } = this.#liquidator.sell({
+      playerId: this.#current.id,
+      kind: assetKind,
+      assetId,
+      quantity,
+    });
+    this.#treasury.apply(intents);
+    this.#emitAll(events);
+    this.#afterLiquidationStep();
+  }
+
+  #requireMarket() {
+    if (!this.#market) {
+      throw DomainError.invalidPhase('이 방은 투자 모드가 꺼져 있습니다');
+    }
+    return this.#market;
   }
 
   #checkGameOver() {
@@ -1060,7 +1322,10 @@ export class Game {
         debt: this.#payment.toSnapshot(),
         buildIndex: this.#turn.buildIndex,
         acquireIndex: this.#turn.acquireIndex,
+        afterTrade: this.#turn.afterTrade,
       },
+      market: this.#market ? this.#market.toSnapshot() : null,
+      report: this.#recorder.toSnapshot(),
     };
   }
 }

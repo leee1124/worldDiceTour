@@ -20,12 +20,21 @@ export class Treasury {
   /** @type {import('./Casino.js').Casino} */
   #casino;
   #initialTotal;
+  /** @type {{onMoneyMoved: (intent: MoneyIntent) => void}|null} */
+  #observer;
 
-  constructor({ players, ledger, casino, initialTotal }) {
+  /**
+   * @param {{observer?: {onMoneyMoved: (intent: MoneyIntent) => void}}} params
+   *   `observer`는 **적용된 모든 돈 이동**을 관찰한다(성적표의 사유별 손익). 돈이 움직이는 길이
+   *   이 클래스 하나뿐이므로, 어떤 흐름도 이 관찰을 빠져나갈 수 없다 — 그것이 관찰자를 여기 둔 이유다.
+   *   관찰자는 상태를 바꾸지 않고 던지지도 않아야 한다(부가 기능이 게임을 멈추면 안 된다).
+   */
+  constructor({ players, ledger, casino, initialTotal, observer = null }) {
     this.#players = players;
     this.#ledger = ledger;
     this.#casino = casino;
     this.#initialTotal = assertAmount(initialTotal, '초기 총액');
+    this.#observer = observer;
   }
 
   get jackpot() {
@@ -50,6 +59,7 @@ export class Treasury {
         throw DomainError.invalidArgument('MoneyIntent가 아닌 값은 적용할 수 없습니다');
       }
       this.#move(intent);
+      this.#observer?.onMoneyMoved(intent);
       if (intent.affectsLedger) {
         ledgerNet.set(intent.reason, (ledgerNet.get(intent.reason) ?? 0) + intent.amount);
       }

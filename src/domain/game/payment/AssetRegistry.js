@@ -58,6 +58,18 @@ export class AssetRegistry {
     return this.#providers.reduce((sum, provider) => sum + provider.valueOf(playerId), 0);
   }
 
+  /**
+   * 자산군별 평가액 `{ kind: value }`.
+   * 화면의 총자산 내역이 쓰며, 합계는 언제나 `valueOf`와 같다(같은 제공자에게 묻기 때문이다).
+   */
+  breakdownOf(playerId) {
+    const byKind = {};
+    for (const provider of this.#providers) {
+      byKind[provider.kind] = provider.valueOf(playerId);
+    }
+    return byKind;
+  }
+
   /** 한 건 매각. */
   liquidate({ playerId, kind, assetId, quantity }) {
     return this.providerOf(kind).liquidate({ playerId, assetId, quantity });

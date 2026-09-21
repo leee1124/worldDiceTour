@@ -1,5 +1,10 @@
 /** 게임 페이즈 상태기계(명세 7장). */
 export const PHASES = Object.freeze({
+  /**
+   * 증권거래소 거래 창구(투자 모드 `STOCKS`에서만).
+   * 자기 턴이 시작된 직후, 조난 선택·공항 목적지·주사위 **앞**에 한 번 열린다.
+   */
+  AWAIT_TRADE: 'AWAIT_TRADE',
   /** 주사위를 굴려야 하는 상태 */
   AWAIT_ROLL: 'AWAIT_ROLL',
   /** 빈 도시 매입 여부 선택 */

@@ -18,11 +18,12 @@ export const MAX_SEATS = 4;
  *
  * - `1`: 필드가 없던 최초 버전(`options = { roundLimit }`)
  * - `2`: `options.finance`와 장부 사유별 내역(`ledger.byReason`) 도입
+ * - `3`: 증권거래소 — `investmentMode: "STOCKS"` 개방, `game.market`·`game.report` 도입
  *
  * 값이 올라갈 때마다 `RoomSerializer`의 마이그레이션 목록에 한 단계를 **추가**한다
  * (기존 단계는 고치지 않는다 — 옛 파일은 여전히 그 경로로 올라와야 한다).
  */
-export const ROOM_SCHEMA_VERSION = 2;
+export const ROOM_SCHEMA_VERSION = 3;
 
 /** 선택 가능한 라운드 제한(없음/20/30). */
 export const ALLOWED_ROUND_LIMITS = Object.freeze([null, 20, 30]);

@@ -74,8 +74,12 @@ describe('저장 스냅샷 왕복(검증 거짓 양성 방어)', () => {
 
     // Then
     assert.ok(validated > 500, `검증한 상태가 너무 적다: ${validated}`);
-    const missing = ALL_PHASES.filter((phase) => !seenPhases.has(phase));
+    // 이 대전은 투자 모드가 꺼진 방이므로 거래 창구 페이즈는 나올 수 없다.
+    // `AWAIT_TRADE`의 스냅샷 왕복·검증은 tests/integration/marketSnapshot.test.js가 덮는다.
+    const expected = ALL_PHASES.filter((phase) => phase !== PHASES.AWAIT_TRADE);
+    const missing = expected.filter((phase) => !seenPhases.has(phase));
     assert.deepEqual(missing, [], `대전에서 한 번도 등장하지 않은 페이즈: ${missing.join(', ')}`);
+    assert.ok(!seenPhases.has(PHASES.AWAIT_TRADE), '투자 모드가 꺼진 방에 거래 창구가 생겼다');
   });
 
   it('공항 이동권을 든 상태(AWAIT_TRAVEL)의 스냅샷도 통과한다', () => {

@@ -49,7 +49,7 @@ describe('FinanceOptions(구조화된 금융 옵션)', () => {
   it('아직 구현되지 않은 값은 거부한다(있는 척하는 옵션을 만들지 않는다)', () => {
     // Given (설계상 존재하지만 기능이 없는 값들)
     const notYet = [
-      { investmentMode: 'STOCKS' },
+      { investmentMode: 'STOCKS_CRYPTO' },
       { investmentMode: 'ADVANCED' },
       { financeSystem: 'ADVANCED' },
       { tradeTimerSec: 30 },
@@ -98,6 +98,25 @@ describe('Room.setOptions(금융 옵션)', () => {
 
     // Then
     assert.deepEqual(room.options.finance, DEFAULT_FINANCE_OPTIONS);
+  });
+
+  it('호스트가 투자 모드를 STOCKS로 켤 수 있다(증권거래소 개방)', () => {
+    // Given
+    const room = lobby();
+
+    // When
+    room.setOptions({
+      roundLimit: 30,
+      finance: { investmentMode: 'STOCKS' },
+      bySeatId: room.hostSeatId,
+      now: NOW,
+    });
+
+    // Then (보낸 키만 바뀌고 나머지는 기본값을 유지한다)
+    assert.deepEqual(room.options.finance, {
+      ...DEFAULT_FINANCE_OPTIONS,
+      investmentMode: 'STOCKS',
+    });
   });
 
   it('호스트가 대기실에서 금융 옵션을 바꿀 수 있다(기본값 범위 안에서)', () => {
@@ -229,7 +248,7 @@ describe('금융 옵션 입력 검증(컨트롤러)', () => {
   it('아직 없는 값·모르는 키·객체가 아닌 finance는 ERR001이다', () => {
     // Given
     const bad = [
-      { investmentMode: 'STOCKS' },
+      { investmentMode: 'STOCKS_CRYPTO' },
       { tradeTimerSec: 45 },
       { scenario: 'DEPRESSION' },
       { unknown: 1 },
@@ -262,10 +281,11 @@ describe('금융 옵션과 스키마 버전의 결합(다음 Phase를 위한 계
     // When / Then
     assert.equal(
       allowedCount,
-      FINANCE_OPTION_KEYS.length,
+      // investmentMode만 값이 둘(OFF·STOCKS)이고 나머지 세 키는 하나씩이다.
+      FINANCE_OPTION_KEYS.length + 1,
       '허용 값을 추가했다면 ROOM_SCHEMA_VERSION을 올리고 MIGRATIONS에 한 줄 추가한 뒤 이 숫자를 갱신할 것',
     );
-    assert.equal(ROOM_SCHEMA_VERSION, 2);
+    assert.equal(ROOM_SCHEMA_VERSION, 3);
   });
 });
 

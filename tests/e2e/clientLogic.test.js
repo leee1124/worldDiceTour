@@ -234,12 +234,84 @@ const EVENT_SAMPLES = {
     reason: 'LAST_SURVIVOR',
     rankings: [{ playerId: 'seat-1', name: '하나', rank: 1, totalAssets: 5_000_000 }],
   },
+
+  // ── 증권거래소(투자 모드 STOCKS) ────────────────────────────────────────
+  TRADING_OPENED: { playerId: 'seat-1', ordersLeft: 3, notionalLeft: 2_000_000, afterTrade: 'ROLL' },
+  TRADING_CLOSED: { playerId: 'seat-1', reason: 'PLAYER' },
+  ORDER_FILLED: {
+    playerId: 'seat-1',
+    kind: 'BUY',
+    instrumentId: 'AIR',
+    name: '한빛항공',
+    quantity: 40,
+    price: 12_800,
+    notional: 512_000,
+    fee: 5_120,
+    viaLiquidation: false,
+  },
+  ORDER_REJECTED: {
+    playerId: 'seat-1',
+    kind: 'BUY_STOCK',
+    instrumentId: 'AIR',
+    quantity: 10,
+    reasonCode: 'INSUFFICIENT_CASH',
+  },
+  DEPOSIT_MADE: { playerId: 'seat-1', amount: 500_000, balance: 500_000 },
+  DEPOSIT_WITHDRAWN: { playerId: 'seat-1', amount: 200_000, balance: 300_000, viaLiquidation: false },
+  DEPOSIT_INTEREST_PAID: { playerId: 'seat-1', amount: 5_000, balance: 1_000_000, baseRateBp: 50 },
+  DIVIDEND_PAID: {
+    playerId: 'seat-1',
+    instrumentId: 'AIR',
+    name: '한빛항공',
+    quantity: 40,
+    perShare: 192,
+    amount: 7_680,
+  },
+  CYCLE_CHANGED: { from: 'RECOVERY', to: 'EXPANSION', round: 5 },
+  NEWS_PUBLISHED: {
+    id: 'NE1',
+    headline: '국제선 좌석이 모자란다',
+    explanation: '여행 수요가 늘어난 좌석 공급을 앞질렀습니다.',
+    round: 5,
+    cyclePhase: 'EXPANSION',
+    effects: [
+      { target: 'SECTOR', sector: 'AIRLINE', bp: 600 },
+      { target: 'RATE', bp: 25 },
+    ],
+  },
+  BASE_RATE_CHANGED: { from: 50, to: 75, changeBp: 25 },
+  PRICES_UPDATED: {
+    round: 5,
+    changes: [
+      { instrumentId: 'AIR', from: 12_000, to: 12_800, changeBp: 666, state: 'LISTED' },
+      { instrumentId: 'ENT', from: 5_800, to: 5_300, changeBp: -862, state: 'LISTED' },
+    ],
+  },
+  INSTRUMENT_DELISTED: { instrumentId: 'ENT', name: '네온엔터카지노', price: 1_200 },
+  INSTRUMENT_LISTED: { instrumentId: 'SKY', name: '새벽항공운수', sector: 'AIRLINE', price: 9_000 },
+  HOLDINGS_WIPED: { playerId: 'seat-2', instrumentId: 'ENT', quantity: 80, costBasis: 480_000 },
+  QUEUED_ORDER_PLACED: {
+    playerId: 'seat-2',
+    orderId: 'ord-1',
+    kind: 'BUY_STOCK',
+    instrumentId: 'CON',
+    quantity: 20,
+    amount: null,
+  },
+  QUEUED_ORDER_CANCELLED: { playerId: 'seat-2', orderId: 'ord-1' },
+  QUEUED_ORDER_EXECUTED: { playerId: 'seat-2', orderId: 'ord-1', kind: 'BUY_STOCK' },
+  QUEUED_ORDER_REJECTED: {
+    playerId: 'seat-2',
+    orderId: 'ord-1',
+    kind: 'BUY_STOCK',
+    reasonCode: 'DELISTED',
+  },
 };
 
-test('게임 로그: 서버의 44종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
-  // Given 서버가 정의한 모든 이벤트 종류
+test('게임 로그: 서버의 63종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
+  // Given 서버가 정의한 모든 이벤트 종류(증권거래소 19종 포함)
   const types = Object.keys(EVENT_TYPES);
-  assert.equal(types.length, 44);
+  assert.equal(types.length, 63);
 
   // When 각 이벤트를 로그 문장으로 바꾸면
   for (const type of types) {
