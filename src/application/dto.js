@@ -98,9 +98,9 @@ export function toGameViewDto(game) {
       loanDebt: player.loanDebt,
       cityCount: board.cityCountOf(player.id),
       resortCount: board.resortCountOf(player.id),
-      totalAssets: player.eliminated
-        ? 0
-        : player.cash + board.totalAssetValueOf(player.id) - player.loanDebt,
+      // 순위와 같은 함수(`NetWorth`)를 쓴다 — 예전엔 같은 공식이 여기 복제돼 있어서
+      // 자산군이 늘어나면 화면과 순위가 어긋날 수밖에 없었다.
+      totalAssets: game.netWorthOf(player.id),
     })),
     board: Array.from({ length: board.size }, (_unused, index) => toSpaceDto(board, index)),
     pending: game.pendingDecision,

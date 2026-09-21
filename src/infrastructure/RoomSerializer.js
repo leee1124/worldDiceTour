@@ -2,7 +2,7 @@ import { ROOM_STATUS, MAX_SEATS, Room } from '../domain/room/Room.js';
 import { SEAT_KINDS } from '../domain/room/Seat.js';
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
 import { ALL_PHASES, PHASES } from '../domain/game/phases.js';
-import { CONTINUATIONS, SINKS } from '../domain/game/Game.js';
+import { CONTINUATIONS, SINKS } from '../domain/game/payment/DebtNote.js';
 import { Casino } from '../domain/game/Casino.js';
 import { EVENT_TYPES, MONEY_REASONS } from '../domain/game/events.js';
 import { BOARD_SIZE } from '../domain/game/data/board.js';

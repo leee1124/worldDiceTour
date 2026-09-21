@@ -11,12 +11,19 @@ import {
   LOAN_PRINCIPAL,
   MAX_CONSECUTIVE_DOUBLES,
   Player,
-  SALARY,
   STARTING_CASH,
 } from './Player.js';
+import { LapIncome } from './LapIncome.js';
 import { RoundClock, TURN_OUTCOMES } from './RoundClock.js';
 import { TicketDeck } from './TicketDeck.js';
 import { Treasury } from './Treasury.js';
+import { AssetRegistry } from './payment/AssetRegistry.js';
+import { Bankruptcy } from './payment/Bankruptcy.js';
+import { CONTINUATIONS, SINKS } from './payment/DebtNote.js';
+import { Liquidator } from './payment/Liquidator.js';
+import { NetWorth } from './payment/NetWorth.js';
+import { PAYMENT_OUTCOMES, PaymentFlow } from './payment/PaymentFlow.js';
+import { PROPERTY_ASSET_KIND, PropertyAssets } from './payment/PropertyAssets.js';
 import { COMMAND_PHASES, COMMAND_TYPES } from './commands.js';
 import { EVENT_TYPES, GAME_OVER_REASONS, MONEY_REASONS } from './events.js';
 import { PHASES } from './phases.js';
@@ -34,15 +41,13 @@ const CUSTOMS_TAX_RATE = 0.1;
  * 앞으로 티켓이 추가돼 연쇄가 생겨도 턴이 끝없이 이어지지 않도록 보장한다.
  */
 export const MAX_TICKET_CHAIN = 3;
-/** 돈이 향하는 곳. 저장 스냅샷 검증(RoomSerializer)도 이 목록을 쓴다. */
-export const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
-/** 지불이 끝난 뒤 이어질 흐름. 저장 스냅샷 검증도 이 목록을 쓴다. */
-export const CONTINUATIONS = Object.freeze({ TURN_END: 'TURN_END', ACQUIRE: 'ACQUIRE' });
-/** 턴 안에서만 쓰는 임시 상태의 초기값. */
+/**
+ * 턴 안에서만 쓰는 임시 상태의 초기값.
+ * `debt`(진행 중인 채무)는 `PaymentFlow`가 들고 있으며, 스냅샷에서만 이 자리에 실린다.
+ */
 const EMPTY_TURN = Object.freeze({
   rollWasDouble: false,
   casinoRoundsLeft: 0,
-  debt: null,
   buildIndex: null,
   acquireIndex: null,
 });
@@ -62,6 +67,12 @@ export class Game {
   /** @type {import('../shared/interfaces.js').RandomSource} */ #random;
   /** @type {Dice} */ #dice;
   /** @type {RoundClock} */ #clock;
+  /** @type {AssetRegistry} */ #assets;
+  /** @type {Liquidator} */ #liquidator;
+  /** @type {NetWorth} */ #netWorth;
+  /** @type {PaymentFlow} */ #payment;
+  /** @type {Bankruptcy} */ #bankruptcy;
+  /** @type {LapIncome} */ #lapIncome;
   #phase;
   #version;
   #initialTotal;
@@ -95,7 +106,23 @@ export class Game {
     this.#version = version;
     this.#initialTotal = initialTotal;
     this.#treasury = new Treasury({ players, ledger, casino, initialTotal });
-    this.#turn = { ...turn };
+
+    // 자산군 레지스트리 — 지금은 부동산 하나뿐이다. 주식·예금·파생은 `registerAssetProvider`
+    // 한 줄로 총자산·정리 목록·자동매각 순서·파산 청산에 함께 들어온다(Game은 안 바뀐다).
+    this.#assets = new AssetRegistry();
+    this.#assets.register(new PropertyAssets({ board }));
+    this.#liquidator = new Liquidator({ registry: this.#assets });
+    this.#netWorth = new NetWorth({ registry: this.#assets });
+    this.#bankruptcy = new Bankruptcy({ registry: this.#assets });
+    this.#lapIncome = new LapIncome();
+    this.#payment = new PaymentFlow({
+      treasury: this.#treasury,
+      findPlayer: (id) => this.playerById(id),
+    });
+
+    const { debt = null, ...turnRest } = turn ?? {};
+    this.#turn = { ...EMPTY_TURN, ...turnRest };
+    this.#payment.restore(debt);
   }
 
   /**
@@ -270,18 +297,15 @@ export class Game {
       case PHASES.AWAIT_TRAVEL:
         return { kind: 'TRAVEL', forbiddenIndexes: this.#forbiddenTravelIndexes(player) };
       case PHASES.AWAIT_LIQUIDATION: {
-        const sellable = this.#board.ownedBy(player.id).map((city) => ({
-          index: city.index,
-          name: city.name,
-          refund: city.liquidationValue(),
-        }));
+        // 자산군이 늘어나도 Game은 바뀌지 않는다 — 목록과 순서는 AssetRegistry가 정한다.
+        const sellable = this.#liquidator.sellableOf(player.id);
         return {
           kind: 'LIQUIDATION',
-          amountDue: this.#debtTotal(),
-          creditorId: this.#primaryCreditorId(),
+          amountDue: this.#payment.amountDue,
+          creditorId: this.#payment.primaryCreditorId,
           canSell: sellable.length > 0,
           canLoan: player.canTakeLoan(),
-          sellable,
+          sellable: sellable.map((asset) => asset.view),
         };
       }
       default:
@@ -289,33 +313,28 @@ export class Game {
     }
   }
 
-  /** 총자산 순위. 생존자 우선, 그다음 총자산 내림차순. */
+  /** 총자산 순위(단일 출처 `NetWorth`). 생존자 우선, 그다음 총자산 내림차순. */
   rankings() {
-    const scored = this.#players.map((player) => ({
-      playerId: player.id,
-      name: player.name,
-      eliminated: player.eliminated,
-      cash: player.cash,
-      loanDebt: player.loanDebt,
-      totalAssets: player.eliminated
-        ? 0
-        : player.cash + this.#board.totalAssetValueOf(player.id) - player.loanDebt,
-    }));
-    // 동점이면 현금이 많은 쪽, 그마저 같으면 좌석 순서(입력 순서)를 따른다 — 항상 같은 결과가 나온다.
-    const seatOrder = new Map(this.#players.map((player, order) => [player.id, order]));
-    scored.sort((a, b) => {
-      if (a.eliminated !== b.eliminated) {
-        return a.eliminated ? 1 : -1;
-      }
-      if (b.totalAssets !== a.totalAssets) {
-        return b.totalAssets - a.totalAssets;
-      }
-      if (b.cash !== a.cash) {
-        return b.cash - a.cash;
-      }
-      return seatOrder.get(a.playerId) - seatOrder.get(b.playerId);
-    });
-    return scored.map((entry, order) => ({ ...entry, rank: order + 1 }));
+    return this.#netWorth.rankings(this.#players);
+  }
+
+  /**
+   * 한 좌석의 총자산. `application/dto.js`도 이 메서드를 쓴다 — 순위와 화면의 총자산이
+   * 어긋나지 않도록 계산 지점을 하나로 유지한다.
+   */
+  netWorthOf(playerId) {
+    const player = this.playerById(playerId);
+    return player ? this.#netWorth.of(player) : 0;
+  }
+
+  /**
+   * 자산군을 등록한다(R3: 확장은 포트 등록으로).
+   * 등록 한 줄로 총자산·정리 매각 목록·자동매각 순서·파산 청산에 동시에 반영된다.
+   * @param {import('../shared/AssetProvider.js').AssetProvider} provider
+   */
+  registerAssetProvider(provider) {
+    this.#assets.register(provider);
+    return this;
   }
 
   /**
@@ -758,27 +777,18 @@ export class Game {
     this.#moveBy(player, steps, 0);
   }
 
-  /**
-   * 정리 페이즈 커맨드의 공통 전제: 메워야 할 채무가 실제로 있어야 한다.
-   * 스냅샷이 손상되면 AWAIT_LIQUIDATION인데 채무가 비어 있을 수 있는데, 그때
-   * 원시 TypeError가 클라이언트 경로까지 올라가면 ERR010(500)이 된다.
-   */
-  #assertPendingDebt() {
-    if (!this.#turn.debt) {
-      throw DomainError.invalidState('메워야 할 채무가 없습니다(정리 페이즈 상태가 손상됨)');
-    }
-  }
-
   #sell({ cityIndex }) {
-    const player = this.#current;
-    this.#assertPendingDebt();
+    this.#payment.assertPendingDebt();
     if (!Number.isInteger(cityIndex)) {
       throw DomainError.invalidArgument(`매각할 칸이 올바르지 않습니다: ${cityIndex}`);
     }
-    if (!this.#board.isOwnable(cityIndex) || !this.#board.cityAt(cityIndex).isOwnedBy(player.id)) {
-      throw DomainError.invalidArgument(`내 소유가 아닌 칸은 매각할 수 없습니다: ${cityIndex}`);
-    }
-    this.#sellCity(player, this.#board.cityAt(cityIndex));
+    const { intents, events } = this.#liquidator.sell({
+      playerId: this.#current.id,
+      kind: PROPERTY_ASSET_KIND,
+      assetId: String(cityIndex),
+    });
+    this.#treasury.apply(intents);
+    this.#emitAll(events);
     this.#afterLiquidationStep();
   }
 
@@ -790,32 +800,19 @@ export class Game {
     player.moveTo(index);
     this.#emit(EVENT_TYPES.MOVED, { playerId: player.id, from, to: index, steps, passedStart });
     if (passedStart) {
-      this.#paySalary(player);
+      this.#collectLapIncome(player);
     }
     this.#resolveLanding(player, index, depth);
   }
 
-  /** 월급 지급. 대출 채무가 남아 있으면 먼저 압류된다. */
-  #paySalary(player) {
-    const { seized, received } = player.seizeSalary(SALARY);
-    if (seized > 0) {
-      this.#emit(EVENT_TYPES.SALARY_SEIZED, {
-        playerId: player.id,
-        amount: seized,
-        remainingDebt: player.loanDebt,
-      });
-      if (player.loanDebt === 0) {
-        this.#emit(EVENT_TYPES.LOAN_REPAID, { playerId: player.id });
-      }
-    }
-    if (received > 0) {
-      this.#treasury.receiveFromBank({
-        playerId: player.id,
-        amount: received,
-        reason: MONEY_REASONS.SALARY,
-      });
-      this.#emit(EVENT_TYPES.SALARY_PAID, { playerId: player.id, amount: received });
-    }
+  /**
+   * 출발 칸 통과 1회 정산(월급 → 대출 압류). 앞으로 배당·분할상환이 붙는 지점은
+   * `LapIncome`이며 Game은 결과를 적용만 한다.
+   */
+  #collectLapIncome(player) {
+    const { intents, events } = this.#lapIncome.collect({ player });
+    this.#treasury.apply(intents);
+    this.#emitAll(events);
   }
 
   #resolveLanding(player, index, depth) {
@@ -1104,42 +1101,44 @@ export class Game {
     });
   }
 
-  // ── 지불/정리/파산 ──────────────────────────────────────────────────────
-
-  #debtTotal() {
-    return (this.#turn.debt?.items ?? []).reduce((sum, item) => sum + item.amount, 0);
-  }
-
-  #primaryCreditorId() {
-    return this.#turn.debt?.items.find((item) => item.sink === SINKS.PLAYER)?.toPlayerId ?? null;
-  }
+  // ── 지불/정리/파산 (payment 서브시스템에 위임) ──────────────────────────
 
   /**
    * 강제 지불. 현금이 부족하면 정리(AWAIT_LIQUIDATION) 페이즈로 들어간다.
    * 현금 부족 자체가 파산은 아니며, 파산은 플레이어가 직접 선언해야 한다.
    */
   #charge({ items, reason, event, next = { kind: CONTINUATIONS.TURN_END } }) {
-    const player = this.#current;
-    const total = items.reduce((sum, item) => sum + item.amount, 0);
-    if (total <= 0) {
-      this.#continueAfterPayment(next);
-      return;
-    }
+    this.#applyPayment(
+      this.#payment.charge({
+        payer: this.#current,
+        items,
+        reason,
+        event,
+        next,
+        inLiquidation: this.#phase === PHASES.AWAIT_LIQUIDATION,
+      }),
+    );
+  }
 
-    this.#turn.debt = { reason, items, event, next };
-
-    if (player.canPay(total)) {
-      this.#settleDebt();
-      return;
-    }
-
-    this.#phase = PHASES.AWAIT_LIQUIDATION;
-    this.#emit(EVENT_TYPES.LIQUIDATION_REQUIRED, {
-      playerId: player.id,
-      amountDue: total,
-      creditorId: this.#primaryCreditorId(),
-      reason,
+  /** 정리 페이즈에서 한 걸음 진행한 뒤, 채무를 덮을 수 있으면 자동 정산한다. */
+  #afterLiquidationStep() {
+    const result = this.#payment.settleIfAffordable({
+      payer: this.#current,
+      inLiquidation: this.#phase === PHASES.AWAIT_LIQUIDATION,
     });
+    if (result) {
+      this.#applyPayment(result);
+    }
+  }
+
+  /** 결제 흐름의 결과를 상태기계에 반영한다(이벤트 발행 → 페이즈 전이 또는 이어하기). */
+  #applyPayment(result) {
+    this.#emitAll(result.events);
+    if (result.outcome === PAYMENT_OUTCOMES.LIQUIDATION_REQUIRED) {
+      this.#phase = PHASES.AWAIT_LIQUIDATION;
+      return;
+    }
+    this.#continueAfterPayment(result.next);
   }
 
   /** 지불이 끝난 뒤 흐름을 이어간다. */
@@ -1151,171 +1150,73 @@ export class Game {
     this.#endTurn();
   }
 
-  #settleDebt() {
-    const player = this.#current;
-    const { items, event, reason } = this.#turn.debt;
-    const wasLiquidation = this.#phase === PHASES.AWAIT_LIQUIDATION;
-
-    const { jackpotChanged } = this.#treasury.apply(
-      items.map((item) => this.#debtIntent(player, item, reason)),
-    );
-
-    this.#emit(event.type, event.payload);
-    if (jackpotChanged) {
-      this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
-    }
-    if (wasLiquidation) {
-      this.#emit(EVENT_TYPES.DEBT_SETTLED, {
-        playerId: player.id,
-        amount: items.reduce((sum, item) => sum + item.amount, 0),
-      });
-    }
-    // 인수는 "보유 현금으로만" 가능하다(명세 4장). 정리 페이즈를 거쳐 매각·대출로 돈을
-    // 마련한 통행료였다면 그 돈으로 인수하는 셈이 되므로, 제안 없이 턴을 끝낸다.
-    const next = wasLiquidation ? { kind: CONTINUATIONS.TURN_END } : this.#turn.debt.next;
-    this.#turn.debt = null;
-    this.#continueAfterPayment(next);
-  }
-
-  /** 채무 항목 하나를 돈 이동 의사로 바꾼다(받을 사람이 없으면 은행이 받는다). */
-  #debtIntent(player, item, reason) {
-    if (item.sink === SINKS.JACKPOT) {
-      return MoneyIntent.toJackpot({ playerId: player.id, amount: item.amount, reason });
-    }
-    if (item.sink === SINKS.PLAYER) {
-      const creditor = this.playerById(item.toPlayerId);
-      if (creditor && !creditor.eliminated) {
-        return MoneyIntent.transfer({
-          fromId: player.id,
-          toId: creditor.id,
-          amount: item.amount,
-          reason,
-        });
-      }
-    }
-    return MoneyIntent.toBank({ playerId: player.id, amount: item.amount, reason });
-  }
-
-  /** 정리 페이즈에서 한 걸음 진행한 뒤, 채무를 덮을 수 있으면 자동 정산한다. */
-  #afterLiquidationStep() {
-    if (this.#current.canPay(this.#debtTotal())) {
-      this.#settleDebt();
-    }
-  }
-
-  #sellCity(player, city) {
-    const refund = city.liquidationValue();
-    const index = city.index;
-    const name = city.name;
-    city.reset();
-    this.#treasury.receiveFromBank({
-      playerId: player.id,
-      amount: refund,
-      reason: MONEY_REASONS.LIQUIDATION,
-      meta: { cityIndex: index },
-    });
-    this.#emit(EVENT_TYPES.PROPERTY_SOLD, { playerId: player.id, index, name, refund });
-  }
-
   #autoSell() {
     const player = this.#current;
-    this.#assertPendingDebt();
-    const owned = this.#board
-      .ownedBy(player.id)
-      .sort((a, b) => a.liquidationValue() - b.liquidationValue() || a.index - b.index);
-    if (owned.length === 0) {
-      throw DomainError.invalidState('매각할 자산이 없습니다');
-    }
-    const amountDue = this.#debtTotal();
-    for (const city of owned) {
-      if (player.canPay(amountDue)) {
-        break;
-      }
-      this.#sellCity(player, city);
-    }
+    const note = this.#payment.assertPendingDebt();
+    const { intents, events } = this.#liquidator.autoSell({
+      playerId: player.id,
+      cash: player.cash,
+      amountDue: note.total,
+    });
+    this.#treasury.apply(intents);
+    this.#emitAll(events);
     this.#afterLiquidationStep();
   }
 
   #takeLoan() {
     const player = this.#current;
-    this.#assertPendingDebt();
+    this.#payment.assertPendingDebt();
     if (!player.canTakeLoan()) {
       throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
     }
-    const { principal } = player.takeLoan(LOAN_PRINCIPAL, LOAN_DEBT);
+    const { principal, debt } = player.takeLoan(LOAN_PRINCIPAL, LOAN_DEBT);
     this.#treasury.receiveFromBank({
       playerId: player.id,
       amount: principal,
       reason: MONEY_REASONS.LOAN,
     });
-    this.#emit(EVENT_TYPES.LOAN_TAKEN, {
-      playerId: player.id,
-      principal: LOAN_PRINCIPAL,
-      debt: LOAN_DEBT,
-    });
+    this.#emit(EVENT_TYPES.LOAN_TAKEN, { playerId: player.id, principal, debt });
     this.#afterLiquidationStep();
   }
 
   #declareBankruptcy() {
-    this.#assertPendingDebt();
+    this.#payment.assertPendingDebt();
     this.#bankrupt(this.#current);
-  }
-
-  /**
-   * 파산 시 남은 현금을 받을 살아 있는 채권자들(좌석 순서).
-   * `PAY_TO_ALL`처럼 채권자가 여러 명일 수 있으므로 목록으로 다룬다.
-   * 파산자 자신은 제외한다 — 자기에게 돌려주면 그 돈이 `eliminate()`에서 사라져
-   * 돈의 보존 불변식이 깨진다(손상된 스냅샷에 대한 방어).
-   */
-  #bankruptcyCreditors(debt, bankruptId) {
-    const ids = new Set(
-      (debt?.items ?? [])
-        .filter((item) => item.sink === SINKS.PLAYER && item.toPlayerId)
-        .map((item) => item.toPlayerId),
-    );
-    return this.#players.filter(
-      (candidate) => ids.has(candidate.id) && !candidate.eliminated && candidate.id !== bankruptId,
-    );
   }
 
   /** 파산: 남은 현금을 채권자에게 넘기고 모든 자산을 초기화한 뒤 탈락한다. */
   #bankrupt(player) {
-    const debt = this.#turn.debt;
-    const toJackpot = Boolean(debt?.items.some((item) => item.sink === SINKS.JACKPOT));
-    const creditors = this.#bankruptcyCreditors(debt, player.id);
-    const creditorId = creditors[0]?.id ?? null;
-    const remaining = player.cash;
+    const plan = this.#bankruptcy.plan({
+      player,
+      note: this.#payment.note,
+      players: this.#players,
+    });
 
-    if (remaining > 0) {
-      if (creditors.length > 0) {
-        this.#splitAmongCreditors(player, creditors, remaining);
-      } else if (toJackpot) {
-        this.#treasury.apply([
-          MoneyIntent.toJackpot({
-            playerId: player.id,
-            amount: remaining,
-            reason: MONEY_REASONS.BANKRUPTCY,
-          }),
-        ]);
-        this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
-      } else {
-        this.#treasury.payToBank({
-          playerId: player.id,
-          amount: remaining,
+    if (plan.intents.length > 0) {
+      const { jackpotChanged } = this.#treasury.apply(plan.intents);
+      for (const { creditor, amount } of plan.transfers) {
+        this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
+          fromId: player.id,
+          toId: creditor.id,
+          amount,
           reason: MONEY_REASONS.BANKRUPTCY,
         });
       }
+      if (jackpotChanged) {
+        this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
+      }
     }
-    const releasedIndexes = this.#board.releaseAllOf(player.id);
+
+    const { releasedIndexes } = this.#bankruptcy.liquidateAll(player.id);
     player.eliminate();
-    this.#turn.debt = null;
+    this.#payment.clear();
     this.#phase = PHASES.AWAIT_ROLL;
     this.#emit(EVENT_TYPES.BANKRUPT, {
       playerId: player.id,
       // 대표 채권자(기존 계약). 여러 명일 수 있으므로 전원은 creditorIds로 함께 알린다.
-      creditorId,
-      creditorIds: creditors.map((creditor) => creditor.id),
-      paidAmount: remaining,
+      creditorId: plan.creditors[0]?.id ?? null,
+      creditorIds: plan.creditors.map((creditor) => creditor.id),
+      paidAmount: plan.remaining,
       releasedIndexes,
     });
 
@@ -1323,42 +1224,6 @@ export class Game {
       return;
     }
     this.#endTurn({ allowExtra: false });
-  }
-
-  /**
-   * 남은 현금을 채권자들에게 고르게(내림) 나누고, 나머지는 좌석 순서가 앞선 채권자에게 준다.
-   * 나눠 준 합계는 항상 남은 현금과 정확히 같아야 한다(돈의 보존 불변식).
-   */
-  #splitAmongCreditors(player, creditors, remaining) {
-    const share = Math.floor(remaining / creditors.length);
-    let leftover = remaining - share * creditors.length;
-    const shares = [];
-    for (const creditor of creditors) {
-      const amount = share + (leftover > 0 ? 1 : 0);
-      leftover = Math.max(0, leftover - 1);
-      if (amount > 0) {
-        shares.push({ creditor, amount });
-      }
-    }
-
-    this.#treasury.apply(
-      shares.map(({ creditor, amount }) =>
-        MoneyIntent.transfer({
-          fromId: player.id,
-          toId: creditor.id,
-          amount,
-          reason: MONEY_REASONS.BANKRUPTCY,
-        }),
-      ),
-    );
-    for (const { creditor, amount } of shares) {
-      this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
-        fromId: player.id,
-        toId: creditor.id,
-        amount,
-        reason: MONEY_REASONS.BANKRUPTCY,
-      });
-    }
   }
 
   // ── 턴 전이 ─────────────────────────────────────────────────────────────
@@ -1433,6 +1298,13 @@ export class Game {
     this.#events.push({ type, ...payload });
   }
 
+  /** 서브시스템이 돌려준 이벤트 목록을 순서대로 발행한다. */
+  #emitAll(events) {
+    for (const event of events) {
+      this.#emit(event.type, event.payload);
+    }
+  }
+
   // ── 영속화 ──────────────────────────────────────────────────────────────
 
   toSnapshot() {
@@ -1451,7 +1323,7 @@ export class Game {
       turn: {
         rollWasDouble: this.#turn.rollWasDouble,
         casinoRoundsLeft: this.#turn.casinoRoundsLeft,
-        debt: this.#turn.debt ? JSON.parse(JSON.stringify(this.#turn.debt)) : null,
+        debt: this.#payment.toSnapshot(),
         buildIndex: this.#turn.buildIndex,
         acquireIndex: this.#turn.acquireIndex,
       },
