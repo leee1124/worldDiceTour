@@ -92,6 +92,81 @@ describe('RoomController(컨트롤러 레이어)', () => {
     sseHub.closeAll();
   });
 
+  it('구독자 상한을 넘으면 이벤트 스트림이 아니라 규격 에러를 던진다', async () => {
+    // Given
+    const fixture = createAppFixture({ random: codeRandom() });
+    const started = await startedRoom(fixture, { guestCount: 1 });
+    const sseHub = new SseHub({ logger: { error: () => {} }, maxPerRoom: 1, maxTotal: 10 });
+    const controller = controllerWithoutRepository(fixture, sseHub);
+    await controller.subscribe(started.code, new URLSearchParams(), new EventEmitter(), new FakeResponse());
+
+    // When
+    const rejected = new FakeResponse();
+
+    // Then (스트림 헤더를 쓰기 전에 거부한다)
+    await assert.rejects(
+      () => controller.subscribe(started.code, new URLSearchParams(), new EventEmitter(), rejected),
+      { code: 'ERR016' },
+    );
+    assert.equal(rejected.head, null);
+    assert.deepEqual(rejected.frames, []);
+    sseHub.closeAll();
+  });
+
+  it('SSE 응답에도 공통 보안 헤더를 붙인다', async () => {
+    // Given
+    const fixture = createAppFixture({ random: codeRandom() });
+    const started = await startedRoom(fixture, { guestCount: 1 });
+    const sseHub = new SseHub({ logger: { error: () => {} } });
+    const controller = controllerWithoutRepository(fixture, sseHub);
+    const response = new FakeResponse();
+
+    // When
+    await controller.subscribe(started.code, new URLSearchParams(), new EventEmitter(), response);
+
+    // Then
+    assert.equal(response.head.headers['x-content-type-options'], 'nosniff');
+    assert.equal(response.head.headers['x-frame-options'], 'DENY');
+    assert.match(response.head.headers['content-security-policy'], /default-src 'self'/);
+    sseHub.closeAll();
+  });
+
+  it('presence 방송은 디바운스로 합쳐진다', async () => {
+    // Given (같은 방에 여러 구독이 연달아 붙어도 방송은 한 번)
+    const fixture = createAppFixture({ random: codeRandom() });
+    const started = await startedRoom(fixture, { guestCount: 1 });
+    const sseHub = new SseHub({ logger: { error: () => {} } });
+    const broadcasts = [];
+    const recordingHub = {
+      assertCapacity: (code) => sseHub.assertCapacity(code),
+      subscribe: (code, response, options) => sseHub.subscribe(code, response, options),
+      send: () => {},
+      onlineSeatIds: (code) => sseHub.onlineSeatIds(code),
+      publishRoom: (code) => broadcasts.push(code),
+    };
+    const controller = new RoomController({
+      roomService: fixture.roomService,
+      gameService: fixture.gameService,
+      sseHub: recordingHub,
+      networkInfo: () => ({ port: 0, urls: [], localUrl: '' }),
+      logger: { error: () => {} },
+      presenceDebounceMs: 20,
+    });
+    const query = () =>
+      new URLSearchParams({ presence: `${started.host.seatId}:${started.host.seatToken}` });
+
+    // When (연달아 3번 붙는다)
+    await controller.subscribe(started.code, query(), new EventEmitter(), new FakeResponse());
+    await controller.subscribe(started.code, query(), new EventEmitter(), new FakeResponse());
+    await controller.subscribe(started.code, query(), new EventEmitter(), new FakeResponse());
+    assert.deepEqual(broadcasts, [], '디바운스 전에는 방송하지 않는다');
+
+    // Then
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.deepEqual(broadcasts, [started.code]);
+    sseHub.closeAll();
+  });
+
   it('토큰이 틀린 presence 쌍은 온라인으로 인정하지 않는다', async () => {
     // Given
     const fixture = createAppFixture({ random: codeRandom() });

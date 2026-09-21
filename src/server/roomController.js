@@ -1,3 +1,4 @@
+import { SECURITY_HEADERS } from './securityHeaders.js';
 import {
   extractToken,
   parseCommandBody,
@@ -7,6 +8,9 @@ import {
   parsePresenceParam,
   requireSeatId,
 } from './validation.js';
+
+/** presence 방송을 모으는 시간(ms). */
+const PRESENCE_DEBOUNCE_MS = 200;
 
 /**
  * Controller 레이어.
@@ -19,13 +23,27 @@ export class RoomController {
   #sseHub;
   #networkInfo;
   #logger;
+  #presenceDebounceMs;
+  #timers;
+  /** @type {Map<string, any>} */
+  #presenceTimers = new Map();
 
-  constructor({ roomService, gameService, sseHub, networkInfo, logger }) {
+  constructor({
+    roomService,
+    gameService,
+    sseHub,
+    networkInfo,
+    logger,
+    presenceDebounceMs = PRESENCE_DEBOUNCE_MS,
+    timers = { setTimeout, clearTimeout },
+  }) {
     this.#roomService = roomService;
     this.#gameService = gameService;
     this.#sseHub = sseHub;
     this.#networkInfo = networkInfo;
     this.#logger = logger ?? console;
+    this.#presenceDebounceMs = presenceDebounceMs;
+    this.#timers = timers;
   }
 
   serverInfo() {
@@ -87,8 +105,11 @@ export class RoomController {
       code,
       pairs: parsePresenceParam(query.get('presence')),
     });
+    // 상한 검사는 스트림 헤더를 쓰기 전에 — 초과 시 규격 JSON 에러로 응답해야 한다.
+    this.#sseHub.assertCapacity(code);
 
     response.writeHead(200, {
+      ...SECURITY_HEADERS,
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-cache, no-transform',
       connection: 'keep-alive',
@@ -98,7 +119,7 @@ export class RoomController {
 
     this.#sseHub.subscribe(code, response, {
       seatIds,
-      onClose: () => this.#publishPresence(code),
+      onClose: () => this.#schedulePresenceBroadcast(code),
     });
 
     const state = await this.#roomService.getRoomState({ code });
@@ -107,11 +128,31 @@ export class RoomController {
       this.#sseHub.send(response, 'game', { view: state.game, events: [] });
     }
     if (seatIds.length > 0) {
-      this.#publishPresence(code);
+      this.#schedulePresenceBroadcast(code);
     }
     request.on('close', () => {
       response.end();
     });
+  }
+
+  /**
+   * presence 방송을 모아서 한 번만 보낸다.
+   * 핫시트 기기가 여러 좌석으로 붙거나 새로고침으로 여러 스트림이 동시에 끊길 때,
+   * 방 전체 스냅샷을 그만큼 반복 방송하지 않도록 방마다 디바운스한다.
+   */
+  #schedulePresenceBroadcast(code) {
+    const existing = this.#presenceTimers.get(code);
+    if (existing !== undefined) {
+      this.#timers.clearTimeout(existing);
+    }
+    const handle = this.#timers.setTimeout(() => {
+      this.#presenceTimers.delete(code);
+      void this.#publishPresence(code);
+    }, this.#presenceDebounceMs);
+    if (typeof handle?.unref === 'function') {
+      handle.unref();
+    }
+    this.#presenceTimers.set(code, handle);
   }
 
   async #publishPresence(code) {

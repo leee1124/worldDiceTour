@@ -754,6 +754,41 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.body.code, 'ERR004');
     });
 
+    it('구독자 상한을 넘으면 이벤트 스트림이 아니라 503 JSON을 돌려준다', async () => {
+      // Given (상한을 낮춘 별도 서버)
+      const random = new SeededRandomSource(777);
+      const small = createApp({
+        repository: new InMemoryRoomRepository({ random, logger: silentLogger }),
+        random,
+        tokenFactory: new TokenFactory(),
+        publicDir,
+        autoPlayDelayMs: 0,
+        logger: silentLogger,
+        sseLimits: { maxPerRoom: 1, maxTotal: 4 },
+      });
+      await new Promise((resolve) => small.server.listen(0, '127.0.0.1', resolve));
+      const smallUrl = `http://127.0.0.1:${small.server.address().port}`;
+      const created = await request(smallUrl, {
+        method: 'POST',
+        path: '/api/rooms',
+        body: { hostName: '하나' },
+      });
+      const code = created.body.room.code;
+      const first = openSse(smallUrl, `/api/rooms/${code}/events`);
+      await first.ready;
+      await first.waitFor((event) => event.event === 'room');
+
+      // When
+      const response = await request(smallUrl, { path: `/api/rooms/${code}/events` });
+
+      // Then
+      assert.equal(response.status, 503);
+      assert.equal(response.body.code, 'ERR016');
+      assert.match(response.headers['content-type'], /application\/json/);
+      first.close();
+      await small.close();
+    });
+
     it('방이 삭제되면 열려 있던 스트림이 끝난다', async () => {
       // Given (혼자 있는 대기실에 스트림을 연다)
       const created = await request(baseUrl, {

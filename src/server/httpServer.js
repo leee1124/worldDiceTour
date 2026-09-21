@@ -2,6 +2,7 @@ import http from 'node:http';
 
 import { AppError } from '../application/errors.js';
 import { isAllowedHost } from './hostGuard.js';
+import { SECURITY_HEADERS } from './securityHeaders.js';
 import { readStaticFile } from './staticFiles.js';
 
 /** 요청 본문 최대 크기. */
@@ -10,16 +11,6 @@ export const MAX_BODY_BYTES = 16 * 1024;
 export const MAX_CONNECTIONS = 256;
 /** 헤더 수신 제한(느린 헤더 공격 방지). */
 export const HEADERS_TIMEOUT_MS = 10_000;
-
-/** 모든 응답에 붙이는 기본 보안 헤더. */
-const SECURITY_HEADERS = Object.freeze({
-  'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
-  'x-frame-options': 'DENY',
-  'content-security-policy':
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-});
 
 /**
  * 라우팅 + 정적 파일 + 본문 크기 제한 + 규격 에러 응답.
