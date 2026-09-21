@@ -413,6 +413,86 @@ describe('Game(세계일주 공항)', () => {
       code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
     });
   });
+
+  it('지금 서 있는 칸을 목적지로 고를 수 없다(0칸 이동으로 같은 칸 효과 재발동 금지)', () => {
+    // Given (공항이 아닌 칸에서 이동권을 쓰는 상황: 조난 이송 등으로 위치가 바뀔 수 있다)
+    const game = buildGame({
+      positions: { s1: 17 },
+      airportPending: ['s1'],
+      phase: PHASES.AWAIT_TRAVEL,
+      random: new FakeRandomSource([]),
+    });
+
+    // When / Then
+    assert.throws(() => game.execute('s1', COMMAND_TYPES.TRAVEL, { destination: 17 }), {
+      code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
+    });
+    assert.equal(game.phase, PHASES.AWAIT_TRAVEL);
+    assert.equal(game.playerById('s1').airportPending, true);
+    assert.equal(game.version, 0);
+  });
+
+  it('pending은 공항 칸과 현재 칸을 모두 금지 목적지로 알려준다', () => {
+    // Given
+    const game = buildGame({
+      positions: { s1: 17 },
+      airportPending: ['s1'],
+      phase: PHASES.AWAIT_TRAVEL,
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const pending = game.pendingDecision;
+
+    // Then
+    assert.equal(pending.kind, 'TRAVEL');
+    assert.deepEqual([...pending.forbiddenIndexes].sort((a, b) => a - b), [17, 30]);
+  });
+
+  it('공항 칸에 서서 이동권을 쓸 때 금지 목적지는 공항 하나로 합쳐진다', () => {
+    // Given
+    const game = buildGame({
+      positions: { s1: 30 },
+      airportPending: ['s1'],
+      phase: PHASES.AWAIT_TRAVEL,
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const pending = game.pendingDecision;
+
+    // Then
+    assert.deepEqual(pending.forbiddenIndexes, [30]);
+  });
+
+  it('더블로 공항에 도착해도 추가 턴 없이 턴이 끝난다(이동권은 다음 자기 턴에 쓴다)', () => {
+    // Given (28에서 1+1 더블 → 30 공항)
+    const game = buildGame({ positions: { s1: 28 }, random: new FakeRandomSource([1, 1]) });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then
+    assert.equal(findEvent(events, EVENT_TYPES.AIRPORT_TICKET_GRANTED)?.playerId, 's1');
+    assert.equal(findEvent(events, EVENT_TYPES.EXTRA_TURN), undefined);
+    assert.equal(game.currentPlayerId, 's2');
+    assert.equal(game.playerById('s1').position, 30);
+  });
+
+  it('공항 도착 다음 자기 턴은 30번 칸에서 시작하는 AWAIT_TRAVEL이다', () => {
+    // Given (더블로 공항 도착 → s2가 한 턴 진행)
+    const game = buildGame({ positions: { s1: 28 }, random: new FakeRandomSource([1, 1, 1, 2]) });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    game.execute('s2', COMMAND_TYPES.ROLL);
+    game.execute('s2', COMMAND_TYPES.SKIP_BUY);
+
+    // Then
+    assert.equal(game.currentPlayerId, 's1');
+    assert.equal(game.phase, PHASES.AWAIT_TRAVEL);
+    assert.equal(game.playerById('s1').position, 30);
+  });
 });
 
 describe('Game(라스베이거스 카지노)', () => {

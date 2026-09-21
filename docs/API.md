@@ -7,6 +7,8 @@
 | # | 종류 | 변경 내용 | 영향 |
 |---|---|---|---|
 | 1 | 동작 | `DELETE /api/rooms/:code/seats/:seatId`는 **대기실에서만** 가능. 게임 중/종료 후에는 `409 ERR005` | 게임 중 "나가기" 버튼은 좌석 삭제 대신 **연결만 끊기**로 구현. 호스트가 그 좌석을 자동 진행으로 돌릴 수 있다 |
+| 2 | 동작 | `TRAVEL`의 `destination`이 **현재 칸**이면 `400 ERR001`. `pending.forbiddenIndexes`가 이제 `[30]`이 아니라 `[30, <현재 칸>]`을 담는다(공항 칸에 서 있으면 `[30]`) | 공항 목적지 선택 UI는 `forbiddenIndexes`에 든 칸을 **모두** 비활성화할 것 |
+| 3 | 동작 | 공항 칸(30)에 더블로 도착해도 `EXTRA_TURN` 이벤트가 없다 | 더블 연출 후 곧바로 턴이 넘어간다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -283,7 +285,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `AWAIT_ACQUIRE` | `ACQUIRE`, `SKIP_ACQUIRE` | 없음 |
 | `AWAIT_CASINO` | `CASINO_BET`, `CASINO_LEAVE` | `CASINO_BET`: `{ game, bet, choice }` |
 | `AWAIT_ISLAND_CHOICE` | `ISLAND_PAY`, `ISLAND_ROLL` | 없음 |
-| `AWAIT_TRAVEL` | `TRAVEL` | `{ destination: 0~39 }` (공항 칸 30은 불가) |
+| `AWAIT_TRAVEL` | `TRAVEL` | `{ destination: 0~39 }` (공항 칸 30과 현재 칸은 불가) |
 | `AWAIT_LIQUIDATION` | `SELL`, `AUTO_SELL`, `TAKE_LOAN`, `DECLARE_BANKRUPTCY` | `SELL`: `{ cityIndex: 0~39 }` |
 | `GAME_OVER` | 없음(모든 커맨드 `ERR005`) | — |
 
@@ -304,7 +306,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `CASINO_LEAVE` | 카지노에서 나가 턴 종료 |
 | `ISLAND_PAY` | 구조비 200,000원 지불 후 즉시 `AWAIT_ROLL`(같은 턴에 정상 굴림). 현금 부족 시 `ERR008` |
 | `ISLAND_ROLL` | 더블이면 탈출해 그 눈만큼 이동(추가 턴 없음), 아니면 남은 턴 −1 후 턴 종료 |
-| `TRAVEL` | 공항 이동권 사용. 앞 방향으로 이동하므로 출발 칸을 지나면 월급. 도착 칸 효과 정상 적용 |
+| `TRAVEL` | 공항 이동권 사용. 앞 방향으로 이동하므로 출발 칸을 지나면 월급. 도착 칸 효과 정상 적용. `pending.forbiddenIndexes`의 칸(공항 칸·현재 칸)을 고르면 `ERR001` |
 | `SELL` | 정리 페이즈에서 고른 자산 하나를 `invested × 0.5`에 은행 매각(건물 포함 초기화) |
 | `AUTO_SELL` | 환급액이 낮은 자산부터 필요한 만큼 자동 매각. 팔 자산이 없으면 `ERR005` |
 | `TAKE_LOAN` | 게임당 1회. 현금 +1,000,000, 채무 1,200,000. 이후 월급이 채무 상환에 압류된다. 이미 썼으면 `ERR005` |
@@ -324,7 +326,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `ACQUIRE` | `index`, `name`, `ownerId`, `price` |
 | `CASINO` | `roundsLeft`, `limits: { min, max, unit }`, `jackpot` |
 | `ISLAND` | `remainingTurns`, `fee`(200000), `canPayFee` |
-| `TRAVEL` | `forbiddenIndexes: [30]` |
+| `TRAVEL` | `forbiddenIndexes: number[]` — 공항 칸(30)과 현재 칸. 공항 칸에 서 있으면 한 칸으로 합쳐져 `[30]` |
 | `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ index, name, refund }]` |
 
 `AWAIT_ROLL`과 `GAME_OVER`에서는 `pending`이 `null`이다.
@@ -385,7 +387,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `ISLAND_RESCUE_PAID` | `playerId`, `amount` | 구조비 지불 |
 | `ISLAND_ESCAPED` | `playerId`, `by`(`PAY` \| `DOUBLE`) | 탈출 |
 | `ISLAND_STAY` | `playerId`, `remainingTurns` | 탈출 실패 |
-| `AIRPORT_TICKET_GRANTED` | `playerId` | 공항 도착(다음 턴에 이동권) |
+| `AIRPORT_TICKET_GRANTED` | `playerId` | 공항 도착(다음 턴에 이동권). 더블이어도 이 턴은 여기서 끝난다 |
 | `AIRPORT_READY` | `playerId` | 이동권을 쓸 턴이 시작됨 |
 | `TRAVELED` | `playerId`, `from`, `to` | 목적지 선택 완료 |
 | `CASINO_ENTERED` | `playerId`, `roundsLeft`, `jackpot` | 카지노 입장 |

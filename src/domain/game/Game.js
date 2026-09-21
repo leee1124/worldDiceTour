@@ -242,7 +242,7 @@ export class Game {
           canPayFee: player.canPay(ISLAND_RESCUE_FEE),
         };
       case PHASES.AWAIT_TRAVEL:
-        return { kind: 'TRAVEL', forbiddenIndexes: [this.#board.indexOfKind(SPACE_KINDS.AIRPORT)] };
+        return { kind: 'TRAVEL', forbiddenIndexes: this.#forbiddenTravelIndexes(player) };
       case PHASES.AWAIT_LIQUIDATION: {
         const sellable = this.#board.ownedBy(player.id).map((city) => ({
           index: city.index,
@@ -660,13 +660,22 @@ export class Game {
     this.#endTurn();
   }
 
+  /**
+   * 공항 이동권으로 고를 수 없는 칸.
+   * 공항 칸 자신과 **지금 서 있는 칸**(0칸 이동은 이동이 아니라 같은 칸 효과의 재발동이다).
+   */
+  #forbiddenTravelIndexes(player) {
+    const airportIndex = this.#board.indexOfKind(SPACE_KINDS.AIRPORT);
+    return airportIndex === player.position ? [airportIndex] : [airportIndex, player.position];
+  }
+
   #travel({ destination }) {
     const player = this.#current;
     if (!Number.isInteger(destination) || destination < 0 || destination >= this.#board.size) {
       throw DomainError.invalidArgument(`목적지 칸이 올바르지 않습니다: ${destination}`);
     }
-    if (destination === this.#board.indexOfKind(SPACE_KINDS.AIRPORT)) {
-      throw DomainError.invalidArgument('공항 칸은 목적지로 고를 수 없습니다');
+    if (this.#forbiddenTravelIndexes(player).includes(destination)) {
+      throw DomainError.invalidArgument(`목적지로 고를 수 없는 칸입니다: ${destination}`);
     }
     player.consumeAirportTicket();
     const from = player.position;
@@ -746,7 +755,9 @@ export class Game {
       case SPACE_KINDS.AIRPORT:
         player.grantAirportTicket();
         this.#emit(EVENT_TYPES.AIRPORT_TICKET_GRANTED, { playerId: player.id });
-        return this.#endTurn();
+        // 조난과 같은 취급: 더블이어도 추가 턴이 없다. 그래야 이동권은 언제나
+        // "다음 자기 턴에 30번 칸에서" 쓰이고, 다른 칸에서 쓰이는 일이 없다.
+        return this.#endTurn({ allowExtra: false });
       default:
         return this.#endTurn();
     }

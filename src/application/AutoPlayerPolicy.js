@@ -120,18 +120,25 @@ export class AutoPlayerPolicy {
     };
   }
 
-  /** 공항: 주인 없는 도시 중 가장 비싼 칸으로 이동. */
+  /**
+   * 공항: 주인 없는 도시 중 가장 비싼 칸으로 이동.
+   * 금지 칸(공항 칸과 **지금 서 있는 칸**)은 절대 고르지 않는다 — 도메인이 거부하므로
+   * 여기서 걸러야 자동 진행이 막히지 않는다. 빈 도시가 없으면 금지 칸이 아닌 아무 칸이나 고른다.
+   */
   #pickDestination(view) {
-    const airportIndex = view.board.find((space) => space.kind === SPACE_KINDS.AIRPORT)?.index ?? 30;
-    const candidates = view.board
+    const forbidden = new Set(view.pending?.forbiddenIndexes ?? []);
+    const best = view.board
       .filter(
         (space) =>
           (space.kind === SPACE_KINDS.CITY || space.kind === SPACE_KINDS.RESORT) &&
           !space.ownerId &&
-          space.index !== airportIndex,
+          !forbidden.has(space.index),
       )
-      .sort((a, b) => b.price - a.price);
-    return candidates[0]?.index ?? 0;
+      .sort((a, b) => b.price - a.price)[0];
+    if (best) {
+      return best.index;
+    }
+    return view.board.find((space) => !forbidden.has(space.index))?.index ?? 0;
   }
 
   /** 지불 불능: 자동매각 → 대출 → 파산. */

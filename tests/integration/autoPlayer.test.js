@@ -201,6 +201,63 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     assert.equal(decision.payload.destination, 38);
   });
 
+  it('가장 비싼 빈 도시가 지금 서 있는 칸이면 그다음 후보를 고른다', () => {
+    // Given (서울 39에 서 있고 서울이 최고가 빈 도시)
+    const game = buildGame({
+      positions: { s1: 39 },
+      airportPending: ['s1'],
+      phase: PHASES.AWAIT_TRAVEL,
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const decision = decideFor(game);
+
+    // Then (뉴욕 600,000원)
+    assert.equal(decision.type, COMMAND_TYPES.TRAVEL);
+    assert.equal(decision.payload.destination, 38);
+  });
+
+  it('빈 도시가 하나도 없으면 금지 칸이 아닌 아무 칸이나 고른다', () => {
+    // Given (모든 소유 가능 칸을 s2가 가진 상태에서 0번 칸에 서 있다)
+    const ownableIndexes = [
+      1, 3, 4, 5, 6, 8, 9, 11, 13, 14, 15, 16, 17, 19, 21, 23, 24, 25, 26, 28, 29, 31, 33, 34, 35,
+      36, 37, 38, 39,
+    ];
+    const game = buildGame({
+      positions: { s1: 0 },
+      airportPending: ['s1'],
+      phase: PHASES.AWAIT_TRAVEL,
+      cities: ownableIndexes.map((index) => ({ index, ownerId: 's2' })),
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const decision = decideFor(game);
+
+    // Then (현재 칸 0과 공항 칸 30은 고르지 않는다)
+    assert.equal(decision.type, COMMAND_TYPES.TRAVEL);
+    assert.notEqual(decision.payload.destination, 0);
+    assert.notEqual(decision.payload.destination, 30);
+    assert.ok(Number.isInteger(decision.payload.destination));
+  });
+
+  it('고른 목적지는 도메인이 실제로 받아준다', () => {
+    // Given (금지 칸을 고르면 도메인이 거부하므로 결정과 도메인이 어긋나면 안 된다)
+    const game = buildGame({
+      positions: { s1: 39 },
+      airportPending: ['s1'],
+      phase: PHASES.AWAIT_TRAVEL,
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const decision = decideFor(game);
+
+    // Then
+    assert.doesNotThrow(() => game.execute('s1', decision.type, decision.payload));
+  });
+
   it('지불 불능이면 자동매각 → 대출 → 파산 순서로 판단한다', () => {
     // Given
     const withAssets = buildGame({
