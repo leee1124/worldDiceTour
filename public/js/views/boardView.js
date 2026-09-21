@@ -15,6 +15,7 @@ import { formatCompactWon, formatWon } from '../format.js';
 import { cornerOf, gridArea, groupOf, sideOf } from '../domain/boardLayout.js';
 import { boardCellShortName, buildingLabel, spaceKindIcon, spaceKindLabel } from '../domain/labels.js';
 import { buildingSlotView } from '../domain/buildingSlots.js';
+import { MOVE_TIMING } from '../domain/movePlan.js';
 import { fanOutTokens } from '../domain/tokenLayout.js';
 import { isMySeat, slotOf } from '../store.js';
 import { centerOf } from '../animation/effects.js';
@@ -346,55 +347,79 @@ export function createBoardView({ onCellActivate }) {
       toggleClass(stage, 'board-stage--zoom', zoomed);
     },
 
-    /** 말을 목표 칸으로 옮긴다. FLIP 방식으로 한 칸 이동을 보여 준다. */
-    async moveToken(seatId, index, { animate = true } = {}) {
+    /**
+     * 말을 **한 칸** 옮긴다. FLIP(먼저 옮기고, 원래 자리에서 출발한 것처럼 되돌린 뒤 풀기)으로
+     * 실제로 칸과 칸 사이를 지나가는 모습을 만든다.
+     *
+     * @param {string} seatId
+     * @param {number} index 목표 칸
+     * @param {{animate?: boolean, stepMs?: number, style?: 'hop'|'fade'}} [options]
+     */
+    async moveToken(seatId, index, { animate = true, stepMs = DURATIONS.hop, style = 'hop' } = {}) {
       const token = tokens.get(seatId);
       const cell = cells.get(index);
       if (!token || !cell) {
         return;
       }
       const previousSlot = token.parentElement;
-      if (!animate || prefersReducedMotion()) {
+      const reseat = () => {
         cell.tokens.appendChild(token);
         layoutTokensIn(cell.tokens);
         if (previousSlot && previousSlot !== cell.tokens) {
           layoutTokensIn(previousSlot);
         }
+      };
+
+      if (!animate) {
+        reseat();
         return;
       }
-      const before = token.getBoundingClientRect();
-      cell.tokens.appendChild(token);
-      layoutTokensIn(cell.tokens);
-      if (previousSlot && previousSlot !== cell.tokens) {
-        layoutTokensIn(previousSlot);
+
+      // 모션 축소: 튀는 대신 칸마다 짧게 사라졌다 나타난다(칸을 건너뛰지는 않는다).
+      if (style === 'fade' || prefersReducedMotion()) {
+        token.classList.add('token--fade');
+        await wait(Math.max(20, Math.round(stepMs / 2)));
+        reseat();
+        token.classList.remove('token--fade');
+        await wait(Math.max(20, Math.round(stepMs / 2)));
+        return;
       }
+
+      const before = token.getBoundingClientRect();
+      reseat();
       const after = token.getBoundingClientRect();
       const dx = before.left - after.left;
       const dy = before.top - after.top;
       if (dx === 0 && dy === 0) {
+        await wait(stepMs);
         return;
       }
       token.style.transition = 'none';
       token.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
       await nextFrame();
-      token.style.transition = `transform ${DURATIONS.hop}ms cubic-bezier(0.3, 1.4, 0.5, 1)`;
+      token.style.transition = `transform ${stepMs}ms cubic-bezier(0.3, 1.5, 0.5, 1)`;
       token.style.transform = 'translate3d(0, 0, 0)';
+      token.style.setProperty('--hop-ms', `${stepMs}ms`);
       token.classList.add('token--hopping');
-      await wait(DURATIONS.hop);
+      await wait(stepMs);
       token.classList.remove('token--hopping');
       token.style.transition = '';
       token.style.transform = '';
     },
 
-    /** 순간이동(조난 이송 등): 사라지고 나타난다. */
+    /**
+     * 순간이동(공항 이동 · 조난 이송 · 지정 칸 티켓): 30칸을 걷는 대신 전용 연출을 쓴다.
+     * 들어 올렸다가(lift) 사라지고, 목적지에서 내려앉는다(drop) — 걷기와 확실히 구분된다.
+     */
     async teleportToken(seatId, index) {
       const token = tokens.get(seatId);
       if (!token) {
         return;
       }
       const previousSlot = token.parentElement;
-      token.classList.add('token--vanish');
-      await wait(scaled(DURATIONS.teleport / 2));
+      const half = scaled(MOVE_TIMING.teleportMs / 2);
+      token.classList.add('token--lift');
+      await wait(half);
       const cell = cells.get(index);
       if (cell) {
         cell.tokens.appendChild(token);
@@ -403,10 +428,10 @@ export function createBoardView({ onCellActivate }) {
           layoutTokensIn(previousSlot);
         }
       }
-      token.classList.remove('token--vanish');
-      token.classList.add('token--appear');
-      await wait(scaled(DURATIONS.teleport / 2));
-      token.classList.remove('token--appear');
+      token.classList.remove('token--lift');
+      token.classList.add('token--drop');
+      await wait(half);
+      token.classList.remove('token--drop');
     },
 
     async flashCell(index) {

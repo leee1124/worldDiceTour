@@ -617,8 +617,13 @@
   filter: grayscale(0.45);
 }
 
+/* 한 칸 건너뛰는 동안 살짝 들렸다 눌린다(칸 사이를 "지나간다"는 느낌). */
 .token--hopping {
-  animation: token-hop 150ms ease-out;
+  animation: token-hop var(--hop-ms, 150ms) ease-out;
+}
+
+.token--hopping .token-bob {
+  animation: token-arc var(--hop-ms, 150ms) cubic-bezier(0.34, 0, 0.32, 1);
 }
 
 /* 플레이어 카드를 눌러 "여기 있다"를 알려 줄 때. */
@@ -630,14 +635,13 @@
   animation: token-spotlight 500ms ease-out infinite;
 }
 
-.token--vanish {
-  opacity: 0;
-  transform: scale(0.35);
-  transition: opacity 180ms ease, transform 180ms ease;
+/* 순간이동: 걷기와 확실히 구분되도록 들어 올렸다가 내려앉는다. */
+.token--lift .token-bob {
+  animation: token-lift 280ms ease-in forwards;
 }
 
-.token--appear {
-  animation: die-settle 220ms ease-out;
+.token--drop .token-bob {
+  animation: token-drop 280ms cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 
 /* 모션 축소: 튀는 대신 칸 사이를 짧게 페이드한다(순간이동처럼 보이지 않게). */

@@ -7,7 +7,7 @@
  * - 밀리면(컴퓨터 좌석이 0.8초마다 커맨드를 보낸다) 큐가 빨리 감기로 바뀌어 연출을 생략한다.
  */
 
-import { hopPath } from '../domain/boardLayout.js';
+import { planMove } from '../domain/movePlan.js';
 import { formatSignedWon, formatWon } from '../format.js';
 import { formatEventLine } from '../domain/eventLog.js';
 import { gameOverReasonLabel } from '../domain/labels.js';
@@ -15,10 +15,7 @@ import { createTurnAnnouncer } from '../domain/announceThrottle.js';
 import { playTicketCard } from '../views/modals/ticketOverlay.js';
 import { playTollNotice } from '../views/modals/tollOverlay.js';
 import { flashScreen, floatAmount, flyCoin } from './effects.js';
-import { DURATIONS, scaled, wait } from './timing.js';
-
-/** 이 길이를 넘는 이동은 한 칸씩 밟지 않고 순간이동으로 보여 준다(공항 이동 등). */
-const MAX_HOPS = 12;
+import { DURATIONS, prefersReducedMotion, scaled, wait } from './timing.js';
 
 export function createPlaybackEngine({
   queue,
@@ -44,17 +41,28 @@ export function createPlaybackEngine({
   const tokenPoint = (seatId) => board.tokenCenter(seatId) ?? players.cardCenter(seatId);
   const cardPoint = (seatId) => players.cardCenter(seatId) ?? board.tokenCenter(seatId);
 
+  /**
+   * 이동 연출. 주사위 이동은 **반드시 한 칸씩 밟아서** 보여 주고(뒤로 가는 티켓도 마찬가지),
+   * 칸 수를 모르는 이동(공항·조난 이송)만 순간이동으로 보여 준다.
+   */
   async function playMove(event) {
-    const path = hopPath(event);
-    if (path.length === 0) {
+    const plan = planMove({
+      from: event.from,
+      to: event.to,
+      steps: event.steps,
+      reducedMotion: prefersReducedMotion(),
+      // 컴퓨터/자동 진행 좌석은 같은 경로를 더 빠르게 지나간다(기다림을 줄이되 걷는 모습은 남긴다).
+      fast: !isLocalSeat(event.playerId),
+    });
+    if (plan.kind === 'none') {
       return;
     }
-    if (!Number.isInteger(event.steps) || path.length > MAX_HOPS) {
-      await board.teleportToken(event.playerId, event.to);
+    if (plan.kind === 'teleport') {
+      await board.teleportToken(event.playerId, plan.path[0]);
       return;
     }
-    for (const index of path) {
-      await board.moveToken(event.playerId, index);
+    for (const index of plan.path) {
+      await board.moveToken(event.playerId, index, { stepMs: plan.stepMs, style: plan.style });
     }
   }
 
@@ -89,6 +97,8 @@ export function createPlaybackEngine({
         break;
 
       case 'LANDED':
+        // 도착 칸은 한 번 튕기고(flashCell) 잠깐 더 비춘다(spotlight) — 어디 내렸는지 놓치지 않게.
+        board.spotlightCell(event.index);
         await board.flashCell(event.index);
         break;
 
