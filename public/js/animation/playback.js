@@ -14,6 +14,9 @@ import { gameOverReasonLabel } from '../domain/labels.js';
 import { createTurnAnnouncer } from '../domain/announceThrottle.js';
 import { playTicketCard } from '../views/modals/ticketOverlay.js';
 import { playTollNotice } from '../views/modals/tollOverlay.js';
+import { playInfoNotice } from '../views/modals/noticeCard.js';
+import { NOTICE_KINDS } from '../domain/noticeTiming.js';
+import { lapLabel, unlockNotice } from '../domain/buildRules.js';
 import { flashScreen, floatAmount, flyCoin } from './effects.js';
 import { DURATIONS, prefersReducedMotion, scaled, wait } from './timing.js';
 
@@ -31,6 +34,8 @@ export function createPlaybackEngine({
   spaceNameOf,
   isLocalSeat = () => false,
   onGameOver = () => {},
+  /** 메시지가 도착한 즉시(연출 전에) 최신 뷰를 알린다 — 어긋난 결정 모달을 닫기 위한 안전망. */
+  onViewArrived = () => {},
 }) {
   let running = false;
   const turnAnnouncer = createTurnAnnouncer();
@@ -102,8 +107,30 @@ export function createPlaybackEngine({
         await board.flashCell(event.index);
         break;
 
+      case 'LAP_ADVANCED':
+        // 바퀴가 오르면 지을 수 있는 건물이 늘어난다 — 놓치면 안 되는 정보라 안내를 남긴다.
+        await playInfoNotice({
+          kind: NOTICE_KINDS.LAP,
+          mine: isLocalSeat(event.playerId),
+          tone: 'lap',
+          eyebrow: '🔄 새 바퀴',
+          headline: `${nameOf(event.playerId)} · ${lapLabel(event.lap)}`,
+          note: unlockNotice(event.lap),
+        });
+        break;
+
       case 'SALARY_PAID':
-        await playMoneyIn(event.playerId, event.amount);
+        await Promise.all([
+          playMoneyIn(event.playerId, event.amount),
+          playInfoNotice({
+            kind: NOTICE_KINDS.SALARY,
+            mine: isLocalSeat(event.playerId),
+            tone: 'plus',
+            eyebrow: '💰 월급',
+            headline: `${nameOf(event.playerId)} 월급 수령`,
+            amount: formatSignedWon(event.amount),
+          }),
+        ]);
         break;
 
       case 'SALARY_SEIZED':
@@ -118,6 +145,8 @@ export function createPlaybackEngine({
             ownerName: nameOf(event.ownerId),
             spaceName: spaceNameOf(event.index),
             amount: event.amount,
+            // 내가 내거나 내가 받는 통행료는 더 오래 보여 준다(내 돈이 오간 일).
+            mine: isLocalSeat(event.payerId) || isLocalSeat(event.ownerId),
           }),
         ]);
         break;
@@ -165,7 +194,13 @@ export function createPlaybackEngine({
         break;
 
       case 'TICKET_DRAWN':
-        await playTicketCard({ playerName: nameOf(event.playerId), text: event.text, effect: event.effect });
+        await playTicketCard({
+          playerName: nameOf(event.playerId),
+          text: event.text,
+          effect: event.effect,
+          // 내 티켓은 3.5초 이상, 남의 티켓은 2.5초 이상 보여 준다(noticeTiming).
+          mine: isLocalSeat(event.playerId),
+        });
         break;
 
       case 'STRANDED':
@@ -174,19 +209,59 @@ export function createPlaybackEngine({
         break;
 
       case 'ISLAND_RESCUE_PAID':
-        await playMoneyOut(event.playerId, event.amount);
+        await Promise.all([
+          playMoneyOut(event.playerId, event.amount),
+          playInfoNotice({
+            kind: NOTICE_KINDS.ISLAND,
+            mine: isLocalSeat(event.playerId),
+            tone: 'minus',
+            eyebrow: '🏝 조난 섬',
+            headline: `${nameOf(event.playerId)} 구조비 지불`,
+            amount: formatSignedWon(-Math.abs(event.amount)),
+            note: '같은 턴에 바로 주사위를 굴립니다.',
+          }),
+        ]);
         break;
 
       case 'ISLAND_ESCAPED':
         players.pulse(event.playerId);
-        await wait(scaled(180));
+        await playInfoNotice({
+          kind: NOTICE_KINDS.ISLAND,
+          mine: isLocalSeat(event.playerId),
+          tone: 'win',
+          eyebrow: '🏝 조난 탈출',
+          headline: `${nameOf(event.playerId)} 조난 섬을 벗어났습니다`,
+          note: event.by === 'PAY' ? '구조비 지불' : '더블 성공',
+        });
+        break;
+
+      case 'ISLAND_STAY':
+        await playInfoNotice({
+          kind: NOTICE_KINDS.ISLAND,
+          mine: isLocalSeat(event.playerId),
+          tone: 'lose',
+          eyebrow: '🏝 탈출 실패',
+          headline: `${nameOf(event.playerId)} 더블이 나오지 않았습니다`,
+          note: `남은 조난 ${event.remainingTurns}턴`,
+        });
         break;
 
       case 'CASINO_RESULT':
         if (isCasinoOpen()) {
           await casino.playResult(event);
         } else if (event.jackpotWon > 0) {
-          await flashScreen('neon');
+          // 카지노 화면을 보고 있지 않은 사람에게도 잭팟은 알려 준다(섬광만으로는 무슨 일인지 모른다).
+          await Promise.all([
+            flashScreen('neon'),
+            playInfoNotice({
+              kind: NOTICE_KINDS.JACKPOT,
+              mine: isLocalSeat(event.playerId),
+              tone: 'jackpot',
+              eyebrow: '🎉 잭팟',
+              headline: `${nameOf(event.playerId)} 잭팟 당첨!`,
+              amount: formatSignedWon(event.jackpotWon),
+            }),
+          ]);
         }
         break;
 
@@ -218,6 +293,48 @@ export function createPlaybackEngine({
     }
   }
 
+  /**
+   * 빨리 감기 중에도 **정보는 버리지 않는다** — 전체 화면 카드 대신 한 줄 안내만 남긴다.
+   * 기다리지 않는다(빨리 감기의 목적이 "최신 상태로 달려가기"이므로).
+   */
+  function noteWhileFastForward(event) {
+    switch (event.type) {
+      case 'TICKET_DRAWN':
+        void playTicketCard({
+          playerName: nameOf(event.playerId),
+          text: event.text,
+          effect: event.effect,
+          mine: isLocalSeat(event.playerId),
+          fastForward: true,
+        });
+        break;
+
+      case 'TOLL_PAID':
+        void playTollNotice({
+          payerName: nameOf(event.payerId),
+          ownerName: nameOf(event.ownerId),
+          spaceName: spaceNameOf(event.index),
+          amount: event.amount,
+          mine: isLocalSeat(event.payerId) || isLocalSeat(event.ownerId),
+          fastForward: true,
+        });
+        break;
+
+      case 'ISLAND_ESCAPED':
+        void playInfoNotice({
+          kind: NOTICE_KINDS.ISLAND,
+          mine: isLocalSeat(event.playerId),
+          fastForward: true,
+          eyebrow: '🏝 조난 탈출',
+          headline: nameOf(event.playerId),
+        });
+        break;
+
+      default:
+        break;
+    }
+  }
+
   async function pump() {
     if (running) {
       return;
@@ -235,7 +352,10 @@ export function createPlaybackEngine({
             // (이 값이 화면에서 사라지면 보는 기기마다 다른 눈이 남는다.)
             if (event.type === 'DICE_ROLLED') {
               center.showDice(event.die1, event.die2, { isDouble: event.isDouble });
+              continue;
             }
+            // 연출은 버리지만 큰 사건은 한 줄 안내로 남긴다(정보를 버리지 않는다).
+            noteWhileFastForward(event);
             continue; // 그 밖의 연출은 버리고 최신 상태로 달려간다.
           }
           try {
@@ -259,6 +379,9 @@ export function createPlaybackEngine({
       if (!queue.accept(message)) {
         return false;
       }
+      // 연출보다 먼저 "서버는 이미 여기까지 왔다"를 알린다.
+      // 연출이 멈춰도 어긋난 결정 모달이 화면에 남지 않게 하는 안전망이다.
+      onViewArrived(queue.targetView);
       const events = Array.isArray(message.events) ? message.events : [];
       if (events.length > 0) {
         log.append(events.map((event) => formatEventLine(event, logContext)));
@@ -271,6 +394,7 @@ export function createPlaybackEngine({
     resetTo(view) {
       queue.reset(view);
       if (queue.targetView) {
+        onViewArrived(queue.targetView);
         applyView(queue.targetView);
       }
     },

@@ -322,6 +322,37 @@
   }
 }
 
+/* 일시 안내 카드: 페이드만 쓴다(움직임이 없어 모션 축소에서도 어색하지 않다). */
+@keyframes notice-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 남은 시간을 보여 주는 얇은 진행 바. 길이는 `--notice-ms`가 정한다(읽는 시간과 항상 같다). */
+@keyframes notice-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* 🔎 소유 도시 강조. 움직임은 장식이고, 테두리·색은 정적이라 모션 축소에서도 그대로 보인다. */
+@keyframes owned-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(3, 9, 15, 0.55), 0 0 0.6em var(--owned-color, var(--gold-400));
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(3, 9, 15, 0.55), 0 0 1.4em var(--owned-color, var(--gold-400));
+  }
+}
+
 /* ── 화면 위 효과 레이어 ───────────────────────────────────── */
 
 .fx-layer {
