@@ -17,8 +17,9 @@ import {
 } from '../../public/js/domain/boardLayout.js';
 import { formatEventLine } from '../../public/js/domain/eventLog.js';
 import { canBet, clampBet, quickChips, stepBet } from '../../public/js/domain/betRules.js';
-import { comboCost, predictToll, validateSelection } from '../../public/js/domain/buildRules.js';
+import { buildCostOf, comboCost, predictToll, validateSelection } from '../../public/js/domain/buildRules.js';
 import { EventPlaybackQueue } from '../../public/js/animation/EventQueue.js';
+import { direction, object, subject, topic } from '../../public/js/domain/particles.js';
 
 /* ------------------------------------------------------------------ */
 /* 금액 표기                                                            */
@@ -390,6 +391,20 @@ test('건설 미리보기: 랜드마크 통행료는 가격의 3.5배로 고정�
   assert.equal(predictToll({ price, buildings: [], landmark: true, selected: [] }), 700_000);
 });
 
+test('건설 미리보기: 정가 기준 건설비가 서버 도메인과 같다', () => {
+  // Given 서버가 옵션을 주지 않는 화면(칸 상세 시트)에서 보여 줄 건설비
+  const price = 300_000;
+  const city = new City({ index: 28, name: '시카고', kind: SPACE_KINDS.CITY, price, ownerId: 'seat-1' });
+
+  // When 정가 기준 건설비를 계산하면
+  // Then 서버 City.buildCost()와 같다
+  for (const type of ['VILLA', 'BUILDING', 'HOTEL']) {
+    assert.equal(buildCostOf(price, type), city.buildCost(type), type);
+  }
+  assert.equal(buildCostOf(price, 'UNKNOWN'), 0);
+  assert.equal(buildCostOf(undefined, 'VILLA'), 0);
+});
+
 test('건설 미리보기: 랜드마크는 단독 선택만 허용한다', () => {
   // Given 랜드마크만 제안된 건설 기회
   const landmarkOnly = [{ type: BUILDING_TYPES.LANDMARK, cost: 200_000 }];
@@ -513,4 +528,64 @@ test('이벤트 큐: 뷰가 없는 메시지도 이벤트만 받아 재생한다
   assert.equal(queue.size, 1);
   assert.equal(queue.targetView, null);
   assert.equal(queue.accept(null), false);
+});
+
+/* ------------------------------------------------------------------ */
+/* 한국어 조사                                                          */
+/* ------------------------------------------------------------------ */
+
+test('한국어 조사: 받침 유무에 따라 조사를 골라 붙인다', () => {
+  // Given 받침이 있는 말과 없는 말
+  // When 조사를 붙이면
+  // Then 자연스러운 한국어가 된다
+  assert.equal(subject('하나'), '하나가');
+  assert.equal(subject('두리'), '두리가');
+  assert.equal(subject('서울'), '서울이');
+  assert.equal(object('방콕'), '방콕을');
+  assert.equal(object('파리'), '파리를');
+  assert.equal(direction('방콕'), '방콕으로');
+  assert.equal(direction('서울'), '서울로', 'ㄹ 받침 뒤에는 "로"를 쓴다');
+  assert.equal(direction('파리'), '파리로');
+  assert.equal(topic('서울'), '서울은');
+});
+
+test('한국어 조사: 숫자로 끝나는 이름은 숫자의 읽는 소리를 따른다', () => {
+  // Given 컴퓨터 좌석 이름처럼 숫자로 끝나는 이름
+  // When 주격 조사를 붙이면
+  // Then 숫자를 읽은 소리(일·이·삼…)의 받침을 따른다
+  assert.equal(subject('컴퓨터1'), '컴퓨터1이');
+  assert.equal(subject('컴퓨터2'), '컴퓨터2가');
+  assert.equal(subject('컴퓨터3'), '컴퓨터3이');
+  assert.equal(subject('컴퓨터4'), '컴퓨터4가');
+  assert.equal(subject('컴퓨터5'), '컴퓨터5가');
+  assert.equal(subject('컴퓨터6'), '컴퓨터6이');
+  assert.equal(direction('컴퓨터1'), '컴퓨터1로', '"일"은 ㄹ 받침');
+});
+
+test('게임 로그: 돈 이동 사유에도 조사를 붙여 문장을 다듬는다', () => {
+  // Given 행운 티켓으로 현금을 받은 이벤트
+  const line = formatEventLine(
+    { type: 'MONEY_GAINED', playerId: 'seat-1', amount: 60_000, reason: 'TICKET' },
+    LOG_CONTEXT,
+  );
+  // When 로그 문장을 만들면
+  // Then "(으)로" 같은 표기 없이 자연스럽게 읽힌다
+  assert.ok(line.text.includes('행운 티켓으로'), line.text);
+  assert.ok(!line.text.includes('(으)로'));
+  assert.ok(
+    formatEventLine({ type: 'MONEY_LOST', playerId: 'seat-1', amount: 1, reason: 'CASINO' }, LOG_CONTEXT).text.includes(
+      '카지노로',
+    ),
+  );
+});
+
+test('게임 로그: 지은 건물은 별장 · 빌딩 · 호텔 순서로 정리해 보여 준다', () => {
+  // Given 서버가 임의 순서로 보낸 건설 목록
+  const line = formatEventLine(
+    { type: 'BUILT', playerId: 'seat-1', index: 19, name: '바르셀로나', buildings: ['HOTEL', 'BUILDING', 'VILLA'], cost: 396_000 },
+    LOG_CONTEXT,
+  );
+  // When 로그 문장을 만들면
+  // Then 항상 같은 순서로 읽힌다
+  assert.ok(line.text.includes('별장 · 빌딩 · 호텔'), line.text);
 });

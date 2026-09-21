@@ -3,6 +3,23 @@
  * 한글 음절의 종성 유무로 조사를 고르고, 한글이 아닌 이름(영문·숫자)은 종성이 있는 것으로 본다.
  */
 
+/**
+ * 숫자로 끝나는 이름(예: "컴퓨터1")은 숫자를 읽은 소리의 받침을 따른다.
+ * 영(ㅇ) 일(ㄹ) 이(-) 삼(ㅁ) 사(-) 오(-) 육(ㄱ) 칠(ㄹ) 팔(ㄹ) 구(-)
+ */
+const DIGIT_FINALS = Object.freeze({
+  0: { hasFinal: true, isRieul: false },
+  1: { hasFinal: true, isRieul: true },
+  2: { hasFinal: false, isRieul: false },
+  3: { hasFinal: true, isRieul: false },
+  4: { hasFinal: false, isRieul: false },
+  5: { hasFinal: false, isRieul: false },
+  6: { hasFinal: true, isRieul: false },
+  7: { hasFinal: true, isRieul: true },
+  8: { hasFinal: true, isRieul: true },
+  9: { hasFinal: false, isRieul: false },
+});
+
 const HANGUL_START = 0xac00;
 const HANGUL_END = 0xd7a3;
 const JONGSEONG_COUNT = 28;
@@ -14,8 +31,13 @@ function finalConsonant(word) {
   if (text.length === 0) {
     return { hasFinal: true, isRieul: false };
   }
+  const last = text[text.length - 1];
+  if (DIGIT_FINALS[last]) {
+    return DIGIT_FINALS[last];
+  }
   const code = text.codePointAt(text.length - 1);
   if (code < HANGUL_START || code > HANGUL_END) {
+    // 영문 이름 등은 받침이 있는 것으로 본다("Tom이", "Ann이").
     return { hasFinal: true, isRieul: false };
   }
   const jongseong = (code - HANGUL_START) % JONGSEONG_COUNT;

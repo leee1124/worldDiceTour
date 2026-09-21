@@ -8,6 +8,7 @@
 
 import { formatWon } from '../format.js';
 import {
+  BUILDING_ORDER,
   ISLAND_ESCAPE_LABELS,
   buildingLabel,
   casinoChoiceLabel,
@@ -119,7 +120,7 @@ const FORMATTERS = {
   MONEY_GAINED: (event, ctx) =>
     line(
       LINE_KINDS.MONEY_IN,
-      `${subject(ctx.name(event.playerId))} ${moneyReasonLabel(event.reason)}(으)로 ${formatWon(
+      `${subject(ctx.name(event.playerId))} ${direction(moneyReasonLabel(event.reason))} ${formatWon(
         event.amount,
       )}을 받았습니다.`,
     ),
@@ -127,7 +128,7 @@ const FORMATTERS = {
   MONEY_LOST: (event, ctx) =>
     line(
       LINE_KINDS.MONEY_OUT,
-      `${subject(ctx.name(event.playerId))} ${moneyReasonLabel(event.reason)}(으)로 ${formatWon(
+      `${subject(ctx.name(event.playerId))} ${direction(moneyReasonLabel(event.reason))} ${formatWon(
         event.amount,
       )}을 냈습니다.`,
     ),
@@ -161,7 +162,14 @@ const FORMATTERS = {
     ),
 
   BUILT: (event, ctx) => {
-    const built = Array.isArray(event.buildings) ? event.buildings.map(buildingLabel).join(' · ') : '건물';
+    // 서버가 보낸 순서와 무관하게 별장 · 빌딩 · 호텔(· 랜드마크) 순으로 읽히게 정리한다.
+    const order = [...BUILDING_ORDER, 'LANDMARK'];
+    const built = Array.isArray(event.buildings)
+      ? [...event.buildings]
+          .sort((a, b) => order.indexOf(a) - order.indexOf(b))
+          .map(buildingLabel)
+          .join(' · ')
+      : '건물';
     return line(
       LINE_KINDS.MONEY_OUT,
       `${subject(ctx.name(event.playerId))} ${event.name ?? ctx.space(event.index)}에 ${built}을 지었습니다 (${formatWon(

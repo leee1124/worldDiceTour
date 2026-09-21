@@ -40,6 +40,16 @@ export function predictToll({ price, buildings = [], landmark = false, selected 
   return Math.floor((base * tenths) / 10);
 }
 
+/** 건설비 배율(10분의 n). 별장 0.3 / 빌딩 0.6 / 호텔 0.9 / 랜드마크 1.0 */
+const BUILD_COST_TENTHS = Object.freeze({ VILLA: 3, BUILDING: 6, HOTEL: 9, LANDMARK: 10 });
+
+/** 정가 기준 건설비(서버가 옵션을 주지 않는 화면 — 칸 상세 시트 — 에서만 쓴다). */
+export function buildCostOf(price, type) {
+  const base = typeof price === 'number' && Number.isFinite(price) ? price : 0;
+  const tenths = BUILD_COST_TENTHS[type] ?? 0;
+  return Math.floor((base * tenths) / 10);
+}
+
 /** 이 건설 기회가 랜드마크 업그레이드 전용인지. */
 export function isLandmarkOffer(options) {
   const types = toArray(options).map((option) => option.type);
