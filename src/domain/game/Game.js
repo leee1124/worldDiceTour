@@ -27,10 +27,10 @@ const MAX_PLAYERS = 4;
 const CUSTOMS_TAX_RATE = 0.1;
 /** 한 커맨드 안에서 티켓이 연쇄될 수 있는 최대 횟수(무한 루프 방지). */
 const MAX_TICKET_CHAIN = 3;
-/** 돈이 향하는 곳. */
-const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
-/** 지불이 끝난 뒤 이어질 흐름. */
-const CONTINUATIONS = Object.freeze({ TURN_END: 'TURN_END', ACQUIRE: 'ACQUIRE' });
+/** 돈이 향하는 곳. 저장 스냅샷 검증(RoomSerializer)도 이 목록을 쓴다. */
+export const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
+/** 지불이 끝난 뒤 이어질 흐름. 저장 스냅샷 검증도 이 목록을 쓴다. */
+export const CONTINUATIONS = Object.freeze({ TURN_END: 'TURN_END', ACQUIRE: 'ACQUIRE' });
 /** 턴 안에서만 쓰는 임시 상태의 초기값. */
 const EMPTY_TURN = Object.freeze({
   rollWasDouble: false,

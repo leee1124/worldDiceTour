@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { FileRoomRepository } from '../../src/infrastructure/FileRoomRepository.js';
-import { RoomSchemaError, validateRoomSnapshot } from '../../src/infrastructure/RoomSerializer.js';
+import {
+  RoomSchemaError,
+  deserializeRoom,
+  validateRoomSnapshot,
+} from '../../src/infrastructure/RoomSerializer.js';
 import { Room, ROOM_STATUS } from '../../src/domain/room/Room.js';
 import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
 import { FakeRandomSource } from '../support/FakeRandomSource.js';
@@ -252,6 +256,125 @@ describe('FileRoomRepository(파일 저장소)', () => {
 
       // When / Then
       assert.throws(() => validateRoomSnapshot(snapshot), RoomSchemaError);
+    });
+
+    describe('턴 상태(turn) 검증', () => {
+      /** 통행료를 못 내 정리 페이즈에 들어간 방(= turn.debt가 채워진 스냅샷). */
+      const liquidationSnapshot = () => {
+        const random = new FakeRandomSource([1, 2]);
+        const room = Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW });
+        room.join({ name: '두리', token: 'b'.repeat(64), now: NOW });
+        room.start({ bySeatId: room.hostSeatId, random, now: NOW });
+        const snapshot = room.toSnapshot();
+        // 3번 칸을 두리 소유(호텔·빌딩·별장)로 만들고 하나의 현금을 통행료 미달로 낮춘다.
+        snapshot.game.board = [
+          { index: 3, ownerId: 'seat-2', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: false },
+        ];
+        snapshot.game.players[0].cash = 5_000;
+        const restored = deserializeRoom(snapshot, new FakeRandomSource([1, 2]));
+        restored.executeCommand({ seatId: 'seat-1', type: COMMAND_TYPES.ROLL, now: NOW });
+        return restored.toSnapshot();
+      };
+
+      it('정상적인 정리 페이즈 스냅샷은 통과한다', () => {
+        // Given
+        const snapshot = liquidationSnapshot();
+
+        // Then
+        assert.equal(snapshot.game.phase, 'AWAIT_LIQUIDATION');
+        assert.notEqual(snapshot.game.turn.debt, null);
+        assert.doesNotThrow(() => validateRoomSnapshot(snapshot));
+      });
+
+      const corruptions = [
+        ['turn이 객체가 아니면', (game) => { game.turn = 'nope'; }],
+        ['rollWasDouble가 불리언이 아니면', (game) => { game.turn.rollWasDouble = 1; }],
+        ['casinoRoundsLeft가 정수가 아니면', (game) => { game.turn.casinoRoundsLeft = 1.5; }],
+        ['casinoRoundsLeft가 음수면', (game) => { game.turn.casinoRoundsLeft = -1; }],
+        ['casinoRoundsLeft가 방문 한도를 넘으면', (game) => { game.turn.casinoRoundsLeft = 9; }],
+        ['buildIndex가 칸 범위를 벗어나면', (game) => { game.turn.buildIndex = 40; }],
+        ['acquireIndex가 칸 범위를 벗어나면', (game) => { game.turn.acquireIndex = -2; }],
+        ['debt.items가 배열이 아니면', (game) => { game.turn.debt.items = {}; }],
+        ['debt.items가 비어 있으면', (game) => { game.turn.debt.items = []; }],
+        ['debt 금액이 정수가 아니면', (game) => { game.turn.debt.items[0].amount = 1.5; }],
+        ['debt 금액이 음수면', (game) => { game.turn.debt.items[0].amount = -1; }],
+        ['debt sink가 enum이 아니면', (game) => { game.turn.debt.items[0].sink = 'MARS'; }],
+        ['debt 채권자가 좌석에 없으면', (game) => { game.turn.debt.items[0].toPlayerId = 'ghost'; }],
+        ['debt reason이 enum이 아니면', (game) => { game.turn.debt.reason = 'BECAUSE'; }],
+        ['debt event 종류가 enum이 아니면', (game) => { game.turn.debt.event.type = 'HACKED'; }],
+        ['debt next.kind가 enum이 아니면', (game) => { game.turn.debt.next.kind = 'ELSEWHERE'; }],
+        [
+          '인수로 이어지는 debt에 칸 번호가 없으면',
+          (game) => { game.turn.debt.next = { kind: 'ACQUIRE' }; },
+        ],
+        [
+          '정리 페이즈인데 채무가 없으면',
+          (game) => { game.turn.debt = null; },
+        ],
+        [
+          '채무가 있는데 정리 페이즈가 아니면',
+          (game) => { game.phase = 'AWAIT_ROLL'; },
+        ],
+        ['잭팟이 음수면', (game) => { game.casino.jackpot = -1; }],
+        ['장부 값이 정수가 아니면', (game) => { game.ledger.fromBank = 1.5; }],
+        ['장부 값이 음수면', (game) => { game.ledger.toBank = -1; }],
+        ['initialTotal이 정수가 아니면', (game) => { game.initialTotal = 'many'; }],
+      ];
+
+      for (const [label, corrupt] of corruptions) {
+        it(`${label} 거부한다`, () => {
+          // Given
+          const snapshot = liquidationSnapshot();
+          corrupt(snapshot.game);
+
+          // When / Then
+          assert.throws(() => validateRoomSnapshot(snapshot), RoomSchemaError);
+        });
+      }
+
+      const phaseCoherence = [
+        ['AWAIT_BUILD', 'buildIndex'],
+        ['AWAIT_ACQUIRE', 'acquireIndex'],
+      ];
+
+      for (const [phase, field] of phaseCoherence) {
+        it(`${phase} 페이즈인데 ${field}가 비어 있으면 거부한다`, () => {
+          // Given
+          const snapshot = liquidationSnapshot();
+          snapshot.game.phase = phase;
+          snapshot.game.turn.debt = null;
+          snapshot.game.turn[field] = null;
+
+          // When / Then
+          assert.throws(() => validateRoomSnapshot(snapshot), RoomSchemaError);
+        });
+      }
+
+      it('AWAIT_CASINO 페이즈인데 남은 판이 0이면 거부한다', () => {
+        // Given
+        const snapshot = liquidationSnapshot();
+        snapshot.game.phase = 'AWAIT_CASINO';
+        snapshot.game.turn.debt = null;
+        snapshot.game.turn.casinoRoundsLeft = 0;
+
+        // When / Then
+        assert.throws(() => validateRoomSnapshot(snapshot), RoomSchemaError);
+      });
+
+      it('turn이 깨진 파일은 파일 저장소가 격리한다', async () => {
+        // Given
+        const repository = newRepository();
+        const snapshot = liquidationSnapshot();
+        snapshot.game.turn.debt.items[0].sink = 'MARS';
+        await writeFile(path.join(directory, 'AB2C.json'), JSON.stringify(snapshot), 'utf8');
+
+        // When
+        const room = await repository.findByCode('AB2C');
+
+        // Then
+        assert.equal(room, null);
+        assert.deepEqual(await readdir(directory), ['AB2C.json.corrupt']);
+      });
     });
 
     it('대기실 상태인데 게임이 들어 있으면 거부한다', () => {
