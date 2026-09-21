@@ -1,6 +1,7 @@
 import { AutoPlayerDriver } from './application/AutoPlayerDriver.js';
 import { AutoPlayerPolicy } from './application/AutoPlayerPolicy.js';
 import { GameService } from './application/GameService.js';
+import { KeyedMutex } from './application/KeyedMutex.js';
 import { RoomService } from './application/RoomService.js';
 import { SeatAuthenticator } from './infrastructure/SeatAuthenticator.js';
 import { RoomController } from './server/roomController.js';
@@ -25,6 +26,8 @@ export function createApp({
   const sseHub = new SseHub({ logger, ...(heartbeatMs ? { heartbeatMs } : {}) });
   const presence = { onlineSeatIds: (code) => sseHub.onlineSeatIds(code) };
   const authenticator = new SeatAuthenticator();
+  // 방 단위 "불러오기 → 변경 → 저장"을 직렬화한다(두 서비스가 같은 잠금을 공유해야 한다).
+  const mutex = new KeyedMutex();
 
   const gameService = new GameService({
     repository,
@@ -34,6 +37,7 @@ export function createApp({
     clock,
     logger,
     presence,
+    mutex,
   });
 
   const roomService = new RoomService({
@@ -45,6 +49,7 @@ export function createApp({
     tokenFactory,
     logger,
     presence,
+    mutex,
   });
 
   const driver = new AutoPlayerDriver({

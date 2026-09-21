@@ -1278,7 +1278,7 @@ export class Game {
       turn: {
         rollWasDouble: this.#turn.rollWasDouble,
         casinoRoundsLeft: this.#turn.casinoRoundsLeft,
-        debt: this.#turn.debt ? structuredClone(this.#turn.debt) : null,
+        debt: this.#turn.debt ? JSON.parse(JSON.stringify(this.#turn.debt)) : null,
         buildIndex: this.#turn.buildIndex,
         acquireIndex: this.#turn.acquireIndex,
       },

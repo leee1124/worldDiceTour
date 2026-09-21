@@ -2,6 +2,7 @@ import { GameService } from '../../src/application/GameService.js';
 import { RoomService } from '../../src/application/RoomService.js';
 import { AutoPlayerPolicy } from '../../src/application/AutoPlayerPolicy.js';
 import { AutoPlayerDriver } from '../../src/application/AutoPlayerDriver.js';
+import { KeyedMutex } from '../../src/application/KeyedMutex.js';
 import { InMemoryRoomRepository } from '../../src/infrastructure/InMemoryRoomRepository.js';
 import { SeatAuthenticator } from '../../src/infrastructure/SeatAuthenticator.js';
 import { FakeRandomSource } from './FakeRandomSource.js';
@@ -54,6 +55,7 @@ export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_
   const clock = { now: () => now };
   const policy = new AutoPlayerPolicy();
   const logger = { error: () => {}, warn: () => {}, info: () => {} };
+  const mutex = new KeyedMutex();
 
   const gameService = new GameService({
     repository,
@@ -62,6 +64,7 @@ export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_
     publisher,
     clock,
     logger,
+    mutex,
   });
 
   const driver = new AutoPlayerDriver({
@@ -81,6 +84,7 @@ export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_
     clock,
     tokenFactory,
     logger,
+    mutex,
   });
 
   gameService.attachAutoPlayerDriver(driver);

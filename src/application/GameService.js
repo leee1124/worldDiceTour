@@ -1,5 +1,6 @@
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
 import { AppError } from './errors.js';
+import { KeyedMutex } from './KeyedMutex.js';
 import { toGameViewDto, toRoomDto } from './dto.js';
 
 /**
@@ -15,8 +16,9 @@ export class GameService {
   #logger;
   #autoDriver = null;
   #presence;
+  #mutex;
 
-  constructor({ repository, random, authenticator, publisher, clock, logger, presence }) {
+  constructor({ repository, random, authenticator, publisher, clock, logger, presence, mutex }) {
     this.#repository = repository;
     this.#random = random;
     this.#authenticator = authenticator;
@@ -24,6 +26,7 @@ export class GameService {
     this.#clock = clock;
     this.#logger = logger ?? console;
     this.#presence = presence ?? { onlineSeatIds: () => [] };
+    this.#mutex = mutex ?? new KeyedMutex();
   }
 
   attachAutoPlayerDriver(driver) {
@@ -35,6 +38,10 @@ export class GameService {
    * @param {{code:string, token:string, seatId?:string, type:string, payload?:object}} params
    */
   async execute({ code, token, seatId, type, payload }) {
+    return this.#mutex.runExclusive(code, () => this.#executeLocked({ code, token, seatId, type, payload }));
+  }
+
+  async #executeLocked({ code, token, seatId, type, payload }) {
     const room = await this.#loadRoom(code);
     const resolvedSeatId = this.#authenticate(room, token);
     if (seatId && seatId !== resolvedSeatId) {
@@ -47,6 +54,10 @@ export class GameService {
    * 서버(컴퓨터/자동 진행 좌석) 대행 커맨드. 토큰 대신 좌석이 자동 진행 대상인지 확인한다.
    */
   async executeAsServer({ code, seatId, type, payload }) {
+    return this.#mutex.runExclusive(code, () => this.#executeAsServerLocked({ code, seatId, type, payload }));
+  }
+
+  async #executeAsServerLocked({ code, seatId, type, payload }) {
     const room = await this.#loadRoom(code);
     const seat = room.seatById(seatId);
     if (!seat?.isAutoControlled()) {

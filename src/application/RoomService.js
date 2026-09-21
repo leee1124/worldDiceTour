@@ -1,6 +1,7 @@
 import { Room } from '../domain/room/Room.js';
 import { generateRoomCode, isValidRoomCode } from '../domain/room/RoomCode.js';
 import { AppError } from './errors.js';
+import { KeyedMutex } from './KeyedMutex.js';
 import { toRoomDto, toRoomSummaryDto, toGameViewDto } from './dto.js';
 
 /** 호스트 전용 동작 종류. */
@@ -13,6 +14,8 @@ export const HOST_ACTIONS = Object.freeze({
 
 /** 방 코드 생성 재시도 횟수. */
 const CODE_ATTEMPTS = 20;
+/** 방 생성(코드 중복 확인 → 저장)을 직렬화하는 키. */
+const CREATE_LOCK_KEY = '@create';
 
 /**
  * 방 유스케이스. 저장소에서 방을 불러와 → 인증하고 → Aggregate에 위임하고 → 저장하고 → 발행한다.
@@ -28,8 +31,19 @@ export class RoomService {
   #logger;
   #autoDriver = null;
   #presence;
+  #mutex;
 
-  constructor({ repository, random, authenticator, publisher, clock, tokenFactory, logger, presence }) {
+  constructor({
+    repository,
+    random,
+    authenticator,
+    publisher,
+    clock,
+    tokenFactory,
+    logger,
+    presence,
+    mutex,
+  }) {
     this.#repository = repository;
     this.#random = random;
     this.#authenticator = authenticator;
@@ -38,6 +52,7 @@ export class RoomService {
     this.#tokenFactory = tokenFactory;
     this.#logger = logger ?? console;
     this.#presence = presence ?? { onlineSeatIds: () => [] };
+    this.#mutex = mutex ?? new KeyedMutex();
   }
 
   /** 컴퓨터/자동 진행 좌석을 대신 진행시키는 드라이버를 연결한다(순환 의존 방지). */
@@ -68,6 +83,10 @@ export class RoomService {
   }
 
   async createRoom({ hostName }) {
+    return this.#mutex.runExclusive(CREATE_LOCK_KEY, () => this.#createRoomLocked({ hostName }));
+  }
+
+  async #createRoomLocked({ hostName }) {
     const now = this.#clock.now();
     const code = await this.#generateUniqueCode();
     const token = this.#tokenFactory.create();
@@ -80,6 +99,10 @@ export class RoomService {
   }
 
   async joinSeat({ code, name }) {
+    return this.#mutex.runExclusive(code, () => this.#joinSeatLocked({ code, name }));
+  }
+
+  async #joinSeatLocked({ code, name }) {
     const room = await this.#loadRoom(code);
     const token = this.#tokenFactory.create();
     const seat = this.#guard(() => room.join({ name, token, now: this.#clock.now() }));
@@ -90,6 +113,10 @@ export class RoomService {
   }
 
   async leaveSeat({ code, seatId, token }) {
+    return this.#mutex.runExclusive(code, () => this.#leaveSeatLocked({ code, seatId, token }));
+  }
+
+  async #leaveSeatLocked({ code, seatId, token }) {
     const room = await this.#loadRoom(code);
     const bySeatId = this.#authenticate(room, token);
     this.#guard(() => room.removeSeat({ seatId, bySeatId, now: this.#clock.now() }));
@@ -109,6 +136,10 @@ export class RoomService {
    * @param {{code:string, token:string, action:{type:string}}} params
    */
   async hostAction({ code, token, action }) {
+    return this.#mutex.runExclusive(code, () => this.#hostActionLocked({ code, token, action }));
+  }
+
+  async #hostActionLocked({ code, token, action }) {
     const room = await this.#loadRoom(code);
     const bySeatId = this.#authenticate(room, token);
     const now = this.#clock.now();
