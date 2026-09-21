@@ -4,7 +4,8 @@
 
 import { button, el } from '../../dom.js';
 import { formatWon } from '../../format.js';
-import { BUILDING_ORDER, buildingIcon, buildingLabel, spaceKindLabel } from '../../domain/labels.js';
+import { spaceKindLabel } from '../../domain/labels.js';
+import { buildingSlotView } from '../../domain/buildingSlots.js';
 
 /** 라벨 + 금액 한 줄. */
 export function moneyRow(label, amount, { tone = '', note = '' } = {}) {
@@ -23,12 +24,29 @@ export function infoRow(label, value) {
   ]);
 }
 
-/** 도시 요약 카드(칸 이름 · 종류 · 건물 상태). */
+/**
+ * 도시 요약 카드(칸 이름 · 종류 · 건물 상태).
+ * 건물은 보드 칸과 **같은 배지 언어**(별·빌·호 세 자리 + 금색 랜드마크 리본)로 그려서
+ * 모달에서 본 표시와 보드에서 본 표시가 어긋나지 않게 한다.
+ */
 export function citySummary({ name, kind, buildings = [], landmark = false, ownerName = null }) {
-  const builtIcons = landmark
-    ? [el('span', { class: 'build-icon build-icon--landmark', text: buildingIcon('LANDMARK') })]
-    : BUILDING_ORDER.filter((type) => buildings.includes(type)).map((type) =>
-        el('span', { class: 'build-icon', title: buildingLabel(type), text: buildingIcon(type) }),
+  const view = buildingSlotView({ kind: kind ?? 'CITY', buildings, landmark });
+  const builds = view.landmark
+    ? [
+        el('span', { class: 'build-landmark' }, [
+          el('span', { class: 'build-landmark-star', text: '★' }),
+          el('span', { class: 'build-landmark-text', text: '랜드마크' }),
+        ]),
+      ]
+    : view.slots.map((slot) =>
+        el(
+          'span',
+          {
+            class: ['build-slot', `build-slot--${slot.type.toLowerCase()}`, slot.built ? 'build-slot--on' : 'build-slot--off'],
+            title: `${slot.label} ${slot.built ? '지음' : '아직 안 지음'}`,
+          },
+          [el('span', { class: 'build-slot-text', text: slot.short })],
+        ),
       );
 
   return el('div', { class: 'city-summary' }, [
@@ -37,7 +55,11 @@ export function citySummary({ name, kind, buildings = [], landmark = false, owne
       el('span', { class: 'city-summary-kind', text: spaceKindLabel(kind ?? 'CITY') }),
     ]),
     ownerName ? el('p', { class: 'city-summary-owner', text: `소유: ${ownerName}` }) : null,
-    el('div', { class: 'city-summary-builds' }, builtIcons.length > 0 ? builtIcons : [el('span', { class: 'city-summary-empty', text: '건물 없음' })]),
+    el(
+      'div',
+      { class: 'city-summary-builds' },
+      builds.length > 0 ? builds : [el('span', { class: 'city-summary-empty', text: '건물 없음' })],
+    ),
   ]);
 }
 

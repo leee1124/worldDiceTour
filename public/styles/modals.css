@@ -197,9 +197,23 @@
 
 .city-summary-builds {
   display: flex;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
-  font-size: 1.3rem;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+/* 모달 안 배지는 보드와 달리 항상 같은 크기로 읽힌다. */
+.city-summary-builds .build-slot {
+  --badge: 22px;
+  flex: 0 0 auto;
+}
+
+.city-summary-builds .build-slot-text {
+  display: inline;
+}
+
+.city-summary-builds .build-landmark {
+  font-size: 0.85rem;
 }
 
 .city-summary-empty {
