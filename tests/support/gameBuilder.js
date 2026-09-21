@@ -34,6 +34,7 @@ export function buildGame({
   rollWasDouble = false,
   debt = null,
   random = new FakeRandomSource(),
+  ticketCatalog,
 } = {}) {
   const players = seats.map((seat) => ({
     id: seat.id,
@@ -70,7 +71,7 @@ export function buildGame({
     turn: { rollWasDouble, casinoRoundsLeft, debt },
   };
 
-  return Game.restore(snapshot, random);
+  return Game.restore(snapshot, random, ticketCatalog ? { ticketCatalog } : {});
 }
 
 /** 이벤트 목록에서 특정 종류를 찾는다. */

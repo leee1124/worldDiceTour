@@ -43,8 +43,8 @@ describe('TicketDeck(행운 티켓 덱)', () => {
     assert.equal(deck.remaining, 19);
   });
 
-  it('같은 티켓을 연달아 뽑지 않는다', () => {
-    // Given
+  it('뽑은 티켓은 더미에서 빠지므로 같은 자리를 다시 뽑아도 다른 티켓이 나온다', () => {
+    // Given (같은 인덱스를 두 번 요청해도 더미가 줄어 다른 티켓이 나온다)
     const deck = TicketDeck.createDefault();
     const random = new FakeRandomSource([0, 0]);
 
@@ -53,24 +53,46 @@ describe('TicketDeck(행운 티켓 덱)', () => {
     const second = deck.draw(random);
 
     // Then
-    assert.notEqual(first.id, second.id);
+    assert.equal(first.id, TICKETS[0].id);
+    assert.equal(second.id, TICKETS[1].id);
     assert.equal(deck.remaining, 18);
   });
 
   it('덱을 모두 소진하면 다시 20장으로 채운다', () => {
-    // Given
+    // Given (항상 첫 자리를 뽑으면 정의된 순서대로 20장이 나온다)
     const deck = TicketDeck.createDefault();
     const random = new FakeRandomSource(new Array(21).fill(0));
 
     // When
-    for (let i = 0; i < 20; i += 1) {
+    const drawn = Array.from({ length: 20 }, () => deck.draw(random).id);
+    assert.equal(deck.remaining, 0, '20장을 다 써서 더미가 비었다');
+    const afterRefill = deck.draw(random);
+
+    // Then (20장이 겹치지 않게 모두 나왔고, 다시 채운 뒤 첫 장부터 다시 나온다)
+    assert.deepEqual(drawn, TICKETS.map((ticket) => ticket.id));
+    assert.equal(new Set(drawn).size, 20);
+    assert.equal(afterRefill.id, TICKETS[0].id);
+    assert.equal(deck.remaining, 19);
+  });
+
+  it('다시 채운 직후에는 직전에 뽑은 티켓도 다시 나올 수 있다(연속 금지 규칙은 없다)', () => {
+    // Given (19장을 버리고 마지막 한 장만 남긴다)
+    const deck = TicketDeck.createDefault();
+    const random = new FakeRandomSource(new Array(21).fill(0));
+    for (let index = 0; index < 19; index += 1) {
       deck.draw(random);
     }
-    const afterExhausted = deck.draw(random);
+    const last = deck.draw(random);
+
+    // When (더미가 비었으므로 다음 뽑기에서 20장을 다시 채운다)
+    assert.equal(deck.remaining, 0);
+    const refilled = TicketDeck.createDefault();
+    const sameAgain = refilled.draw(
+      new FakeRandomSource([TICKETS.findIndex((ticket) => ticket.id === last.id)]),
+    );
 
     // Then
-    assert.equal(afterExhausted !== null, true);
-    assert.equal(deck.remaining, 19);
+    assert.equal(sameAgain.id, last.id);
   });
 
   it('남은 덱 순서를 스냅샷으로 저장하고 복원한다', () => {

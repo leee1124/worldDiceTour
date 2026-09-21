@@ -5,26 +5,31 @@ import { SPACE_KINDS } from '../domain/game/data/board.js';
  * DTO 매퍼. 엔티티를 절대 그대로 내보내지 않으며 **좌석 토큰은 어떤 DTO에도 담지 않는다.**
  */
 
-/** 로비 목록용 요약. 좌석 상세는 넣지 않는다. */
-export function toRoomSummaryDto(room) {
-  const host = room.seatById(room.hostSeatId);
+/**
+ * 로비 목록용 요약 DTO. 좌석 상세는 넣지 않는다.
+ * 입력은 도메인이 만든 요약(`Room.toSummary()`)이며, 저장소가 색인해 둔 값을 그대로 쓸 수 있다.
+ * @param {{code:string, status:string, hostName:string|null, seatCount:number, roundLimit:number|null, updatedAt:number}} summary
+ */
+export function toRoomSummaryDto(summary) {
   return {
-    code: room.code,
-    status: room.status,
-    hostName: host?.name ?? null,
-    seatCount: room.seats.length,
+    code: summary.code,
+    status: summary.status,
+    hostName: summary.hostName ?? null,
+    seatCount: summary.seatCount,
     maxSeats: MAX_SEATS,
-    options: { roundLimit: room.options.roundLimit },
-    updatedAt: room.updatedAt,
+    options: { roundLimit: summary.roundLimit ?? null },
+    updatedAt: summary.updatedAt,
   };
 }
 
 /**
  * 방 상세.
  * @param {import('../domain/room/Room.js').Room} room
- * @param {{onlineSeatIds?: string[]}} presence SSE 연결로 파악한 접속 좌석
+ * @param {{onlineSeatIds?: string[], autoStalled?: boolean}} options
+ *   `onlineSeatIds`는 SSE 연결로 파악한 접속 좌석, `autoStalled`는 자동 진행이 재시도까지
+ *   실패해 멈췄다는 일회성 신호다(다음 `room` 이벤트에서는 다시 false).
  */
-export function toRoomDto(room, { onlineSeatIds = [] } = {}) {
+export function toRoomDto(room, { onlineSeatIds = [], autoStalled = false } = {}) {
   const online = new Set(onlineSeatIds);
   return {
     code: room.code,
@@ -42,6 +47,7 @@ export function toRoomDto(room, { onlineSeatIds = [] } = {}) {
     })),
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
+    autoStalled: Boolean(autoStalled),
   };
 }
 
@@ -99,13 +105,5 @@ export function toGameViewDto(game) {
     board: Array.from({ length: board.size }, (_unused, index) => toSpaceDto(board, index)),
     pending: game.pendingDecision,
     rankings: game.isOver() ? game.rankings() : null,
-  };
-}
-
-/** 방 + (진행 중이면) 게임 스냅샷을 함께 담은 응답. */
-export function toRoomStateDto(room, presence) {
-  return {
-    room: toRoomDto(room, presence),
-    game: room.game ? toGameViewDto(room.game) : null,
   };
 }

@@ -1,6 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
 import { City } from './City.js';
-import { BOARD_SPACES, BOARD_SIZE, OWNABLE_KINDS, SPACE_KINDS } from './data/board.js';
+import { BOARD_SPACES, OWNABLE_KINDS, SPACE_KINDS } from './data/board.js';
 
 /**
  * 40칸 보드. 칸 조회, 전진 계산, 소유 현황 집계를 담당한다.
@@ -146,10 +146,6 @@ export class Board {
       throw DomainError.invalidState(`보드에 ${kind} 칸이 없습니다`);
     }
     return found.index;
-  }
-
-  get startIndex() {
-    return this.indexOfKind(SPACE_KINDS.START);
   }
 
   toSnapshot() {

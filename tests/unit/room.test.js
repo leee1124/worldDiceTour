@@ -158,6 +158,88 @@ describe('Room(방 Aggregate)', () => {
         code: DOMAIN_ERROR_CODES.SEAT_NOT_FOUND,
       });
     });
+
+    it('게임이 시작된 뒤에는 스스로 나갈 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource(), now: NOW });
+
+      // When / Then
+      assert.throws(() => room.removeSeat({ seatId: guest.id, bySeatId: guest.id, now: NOW }), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(room.seats.length, 2);
+      assert.equal(room.game.players.length, 2);
+    });
+
+    it('게임이 시작된 뒤에는 호스트도 좌석을 강퇴할 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource(), now: NOW });
+
+      // When / Then
+      assert.throws(() => room.removeSeat({ seatId: guest.id, bySeatId: host.id, now: NOW }), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(room.seats.length, 2);
+    });
+
+    it('종료된 방에서도 좌석을 제거할 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource(), now: NOW });
+      room.finish(NOW);
+
+      // When / Then
+      assert.throws(() => room.removeSeat({ seatId: guest.id, bySeatId: guest.id, now: NOW }), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(room.seats.length, 2);
+    });
+  });
+
+  describe('방 요약(로비 목록용)', () => {
+    it('목록에 필요한 값만 담은 요약을 만든다', () => {
+      // Given
+      const { room, host } = roomWithTwoSeats();
+      room.setOptions({ roundLimit: 20, bySeatId: host.id, now: NOW });
+
+      // When
+      const summary = room.toSummary();
+
+      // Then
+      assert.deepEqual(summary, {
+        code: 'AB2C',
+        status: ROOM_STATUS.LOBBY,
+        hostName: '하나',
+        seatCount: 2,
+        roundLimit: 20,
+        updatedAt: NOW,
+      });
+    });
+
+    it('요약에는 좌석 토큰이나 게임 상태가 들어가지 않는다', () => {
+      // Given
+      const { room, host } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource([1, 2]), now: NOW });
+
+      // When
+      const serialized = JSON.stringify(room.toSummary());
+
+      // Then
+      assert.equal(serialized.includes('token'), false);
+      assert.equal(serialized.includes('game'), false);
+      assert.equal(serialized.includes('seats'), false);
+    });
+
+    it('빈 방의 호스트 이름은 null이다', () => {
+      // Given
+      const room = createRoom();
+      room.removeSeat({ seatId: room.hostSeatId, bySeatId: room.hostSeatId, now: NOW });
+
+      // When / Then
+      assert.equal(room.toSummary().hostName, null);
+    });
   });
 
   describe('호스트 권한', () => {
@@ -206,17 +288,163 @@ describe('Room(방 Aggregate)', () => {
       const { room, host, guest } = roomWithTwoSeats();
 
       // When
-      room.setAutopilot({ seatId: guest.id, enabled: true, bySeatId: host.id, now: NOW });
+      room.setAutopilot({ seatId: guest.id, enabled: true, bySeatId: host.id, onlineSeatIds: [], now: NOW });
 
       // Then
       assert.equal(room.seatById(guest.id).autopilot, true);
       assert.equal(room.seatById(guest.id).isAutoControlled(), true);
-      room.setAutopilot({ seatId: guest.id, enabled: false, bySeatId: host.id, now: NOW });
+      room.setAutopilot({ seatId: guest.id, enabled: false, bySeatId: host.id, onlineSeatIds: [], now: NOW });
       assert.equal(room.seatById(guest.id).isAutoControlled(), false);
       assert.throws(
-        () => room.setAutopilot({ seatId: host.id, enabled: true, bySeatId: guest.id, now: NOW }),
+        () =>
+          room.setAutopilot({
+            seatId: host.id,
+            enabled: true,
+            bySeatId: guest.id,
+            onlineSeatIds: [],
+            now: NOW,
+          }),
         { code: DOMAIN_ERROR_CODES.NOT_HOST },
       );
+    });
+  });
+
+  describe('자동 진행 전환(이중 조종 방지)', () => {
+    it('접속 중인 사람 좌석은 자동 진행으로 바꿀 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+
+      // When / Then
+      assert.throws(
+        () =>
+          room.setAutopilot({
+            seatId: guest.id,
+            enabled: true,
+            bySeatId: host.id,
+            onlineSeatIds: [guest.id],
+            now: NOW,
+          }),
+        { code: DOMAIN_ERROR_CODES.INVALID_STATE },
+      );
+      assert.equal(room.seatById(guest.id).autopilot, false);
+    });
+
+    it('오프라인 좌석은 자동 진행으로 바꿀 수 있다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+
+      // When
+      room.setAutopilot({
+        seatId: guest.id,
+        enabled: true,
+        bySeatId: host.id,
+        onlineSeatIds: [host.id],
+        now: NOW,
+      });
+
+      // Then
+      assert.equal(room.seatById(guest.id).autopilot, true);
+    });
+
+    it('자동 진행 해제는 그 좌석 본인도 할 수 있다(돌아왔을 때 스스로 조종권 회수)', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.setAutopilot({ seatId: guest.id, enabled: true, bySeatId: host.id, onlineSeatIds: [], now: NOW });
+
+      // When (돌아온 좌석은 온라인이지만 해제는 막지 않는다)
+      room.setAutopilot({
+        seatId: guest.id,
+        enabled: false,
+        bySeatId: guest.id,
+        onlineSeatIds: [guest.id],
+        now: NOW,
+      });
+
+      // Then
+      assert.equal(room.seatById(guest.id).autopilot, false);
+    });
+
+    it('남의 좌석 자동 진행을 해제하려면 호스트여야 한다', () => {
+      // Given (세 좌석: 호스트, 두리, 세찌)
+      const { room, host, guest } = roomWithTwoSeats();
+      const third = room.join({ name: '세찌', token: nextToken(), now: NOW });
+      room.setAutopilot({ seatId: third.id, enabled: true, bySeatId: host.id, onlineSeatIds: [], now: NOW });
+
+      // When / Then
+      assert.throws(
+        () =>
+          room.setAutopilot({
+            seatId: third.id,
+            enabled: false,
+            bySeatId: guest.id,
+            onlineSeatIds: [],
+            now: NOW,
+          }),
+        { code: DOMAIN_ERROR_CODES.NOT_HOST },
+      );
+      assert.equal(room.seatById(third.id).autopilot, true);
+    });
+
+    it('본인이라도 자기 좌석을 스스로 자동 진행으로 켤 수는 없다(호스트 전용)', () => {
+      // Given
+      const { room, guest } = roomWithTwoSeats();
+
+      // When / Then
+      assert.throws(
+        () =>
+          room.setAutopilot({
+            seatId: guest.id,
+            enabled: true,
+            bySeatId: guest.id,
+            onlineSeatIds: [],
+            now: NOW,
+          }),
+        { code: DOMAIN_ERROR_CODES.NOT_HOST },
+      );
+    });
+
+    it('컴퓨터 좌석의 자동 진행 설정은 바꿀 수 없다', () => {
+      // Given
+      const { room, host } = roomWithTwoSeats();
+      const computer = room.addComputer({ name: '컴퓨터1', token: nextToken(), bySeatId: host.id, now: NOW });
+
+      // When / Then
+      assert.throws(
+        () =>
+          room.setAutopilot({
+            seatId: computer.id,
+            enabled: false,
+            bySeatId: host.id,
+            onlineSeatIds: [],
+            now: NOW,
+          }),
+        { code: DOMAIN_ERROR_CODES.INVALID_STATE },
+      );
+    });
+
+    it('자동 진행 중인 좌석의 커맨드는 사람이 직접 보낼 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource([1, 2]), now: NOW });
+      room.setAutopilot({ seatId: guest.id, enabled: true, bySeatId: host.id, onlineSeatIds: [], now: NOW });
+
+      // When / Then
+      assert.throws(() => room.assertManualControl(guest.id), {
+        code: DOMAIN_ERROR_CODES.FORBIDDEN,
+      });
+      assert.doesNotThrow(() => room.assertManualControl(host.id));
+    });
+
+    it('현재 턴 좌석이 자동 진행 대상인지 알려준다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource([1, 2]), now: NOW });
+
+      // When / Then (첫 턴은 호스트)
+      assert.equal(room.currentSeatIsAutoControlled(), false);
+      room.setAutopilot({ seatId: host.id, enabled: true, bySeatId: host.id, onlineSeatIds: [], now: NOW });
+      assert.equal(room.currentSeatIsAutoControlled(), true);
+      assert.equal(room.seatById(guest.id).isAutoControlled(), false);
     });
   });
 

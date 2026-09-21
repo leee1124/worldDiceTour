@@ -39,12 +39,21 @@ describe('Casino(라스베이거스 카지노)', () => {
       assert.throws(() => casino.assertValidBet(510_000, 3_000_000), DomainError);
     });
 
-    it('단위·범위를 지키면 통과한다', () => {
+    it('단위·범위의 경계값은 모두 통과하고, 한 칸 벗어나면 거부한다', () => {
       // Given
       const casino = new Casino();
 
-      // When / Then
-      assert.doesNotThrow(() => casino.assertValidBet(500_000, 500_000));
+      // When / Then (최소·최대·중간 단위는 통과)
+      for (const bet of [10_000, 20_000, 250_000, 490_000, 500_000]) {
+        assert.doesNotThrow(() => casino.assertValidBet(bet, 500_000), `거부되면 안 됨: ${bet}`);
+      }
+      // 경계 바로 밖은 거부
+      assert.throws(() => casino.assertValidBet(9_999, 500_000), DomainError);
+      assert.throws(() => casino.assertValidBet(510_000, 600_000), DomainError);
+      assert.throws(() => casino.assertValidBet(10_001, 500_000), DomainError);
+      // 현금과 정확히 같은 금액은 통과하고, 1원 넘으면 현금 부족
+      assert.doesNotThrow(() => casino.assertValidBet(20_000, 20_000));
+      assert.throws(() => casino.assertValidBet(20_000, 19_999), DomainError);
     });
 
     it('현금과 상한 중 작은 값을 최대 베팅액으로 계산한다', () => {

@@ -25,12 +25,16 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 4;
 /** 세관 납부 비율. */
 const CUSTOMS_TAX_RATE = 0.1;
-/** 한 커맨드 안에서 티켓이 연쇄될 수 있는 최대 횟수(무한 루프 방지). */
-const MAX_TICKET_CHAIN = 3;
-/** 돈이 향하는 곳. */
-const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
-/** 지불이 끝난 뒤 이어질 흐름. */
-const CONTINUATIONS = Object.freeze({ TURN_END: 'TURN_END', ACQUIRE: 'ACQUIRE' });
+/**
+ * 한 커맨드 안에서 티켓이 연쇄될 수 있는 최대 횟수(무한 루프 방지).
+ * 배포 티켓 데이터로는 연쇄가 한 번도 일어나지 않으므로 지금은 **방어용**이며,
+ * 앞으로 티켓이 추가돼 연쇄가 생겨도 턴이 끝없이 이어지지 않도록 보장한다.
+ */
+export const MAX_TICKET_CHAIN = 3;
+/** 돈이 향하는 곳. 저장 스냅샷 검증(RoomSerializer)도 이 목록을 쓴다. */
+export const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
+/** 지불이 끝난 뒤 이어질 흐름. 저장 스냅샷 검증도 이 목록을 쓴다. */
+export const CONTINUATIONS = Object.freeze({ TURN_END: 'TURN_END', ACQUIRE: 'ACQUIRE' });
 /** 턴 안에서만 쓰는 임시 상태의 초기값. */
 const EMPTY_TURN = Object.freeze({
   rollWasDouble: false,
@@ -114,8 +118,16 @@ export class Game {
     });
   }
 
-  /** 스냅샷에서 복원한다. */
-  static restore(snapshot, random) {
+  /**
+   * 스냅샷에서 복원한다.
+   * @param {object} snapshot
+   * @param {import('../shared/interfaces.js').RandomSource} random
+   * @param {{ticketCatalog?: Record<string, object>}} [options]
+   *   `ticketCatalog`는 **테스트 전용** 티켓 목록이다. 배포 데이터로는 만들 수 없는 상황
+   *   (예: 티켓이 연달아 나오는 연쇄)을 실제로 재현해 검증하기 위한 seam이며,
+   *   운영 경로에서는 언제나 생략해 배포 티켓 20장을 쓴다.
+   */
+  static restore(snapshot, random, { ticketCatalog } = {}) {
     if (!snapshot || !Array.isArray(snapshot.players)) {
       throw DomainError.invalidArgument('게임 스냅샷 구조가 올바르지 않습니다');
     }
@@ -123,7 +135,9 @@ export class Game {
     return new Game({
       board: Board.restore(snapshot.board ?? []),
       players,
-      deck: TicketDeck.restore(snapshot.deck ?? {}),
+      deck: ticketCatalog
+        ? TicketDeck.restore(snapshot.deck ?? {}, ticketCatalog)
+        : TicketDeck.restore(snapshot.deck ?? {}),
       casino: new Casino(snapshot.casino ?? {}),
       ledger: new BankLedger(snapshot.ledger ?? {}),
       random,
@@ -242,7 +256,7 @@ export class Game {
           canPayFee: player.canPay(ISLAND_RESCUE_FEE),
         };
       case PHASES.AWAIT_TRAVEL:
-        return { kind: 'TRAVEL', forbiddenIndexes: [this.#board.indexOfKind(SPACE_KINDS.AIRPORT)] };
+        return { kind: 'TRAVEL', forbiddenIndexes: this.#forbiddenTravelIndexes(player) };
       case PHASES.AWAIT_LIQUIDATION: {
         const sellable = this.#board.ownedBy(player.id).map((city) => ({
           index: city.index,
@@ -275,11 +289,19 @@ export class Game {
         ? 0
         : player.cash + this.#board.totalAssetValueOf(player.id) - player.loanDebt,
     }));
+    // 동점이면 현금이 많은 쪽, 그마저 같으면 좌석 순서(입력 순서)를 따른다 — 항상 같은 결과가 나온다.
+    const seatOrder = new Map(this.#players.map((player, order) => [player.id, order]));
     scored.sort((a, b) => {
       if (a.eliminated !== b.eliminated) {
         return a.eliminated ? 1 : -1;
       }
-      return b.totalAssets - a.totalAssets;
+      if (b.totalAssets !== a.totalAssets) {
+        return b.totalAssets - a.totalAssets;
+      }
+      if (b.cash !== a.cash) {
+        return b.cash - a.cash;
+      }
+      return seatOrder.get(a.playerId) - seatOrder.get(b.playerId);
     });
     return scored.map((entry, order) => ({ ...entry, rank: order + 1 }));
   }
@@ -660,13 +682,22 @@ export class Game {
     this.#endTurn();
   }
 
+  /**
+   * 공항 이동권으로 고를 수 없는 칸.
+   * 공항 칸 자신과 **지금 서 있는 칸**(0칸 이동은 이동이 아니라 같은 칸 효과의 재발동이다).
+   */
+  #forbiddenTravelIndexes(player) {
+    const airportIndex = this.#board.indexOfKind(SPACE_KINDS.AIRPORT);
+    return airportIndex === player.position ? [airportIndex] : [airportIndex, player.position];
+  }
+
   #travel({ destination }) {
     const player = this.#current;
     if (!Number.isInteger(destination) || destination < 0 || destination >= this.#board.size) {
       throw DomainError.invalidArgument(`목적지 칸이 올바르지 않습니다: ${destination}`);
     }
-    if (destination === this.#board.indexOfKind(SPACE_KINDS.AIRPORT)) {
-      throw DomainError.invalidArgument('공항 칸은 목적지로 고를 수 없습니다');
+    if (this.#forbiddenTravelIndexes(player).includes(destination)) {
+      throw DomainError.invalidArgument(`목적지로 고를 수 없는 칸입니다: ${destination}`);
     }
     player.consumeAirportTicket();
     const from = player.position;
@@ -675,9 +706,21 @@ export class Game {
     this.#moveBy(player, steps, 0);
   }
 
+  /**
+   * 정리 페이즈 커맨드의 공통 전제: 메워야 할 채무가 실제로 있어야 한다.
+   * 스냅샷이 손상되면 AWAIT_LIQUIDATION인데 채무가 비어 있을 수 있는데, 그때
+   * 원시 TypeError가 클라이언트 경로까지 올라가면 ERR010(500)이 된다.
+   */
+  #assertPendingDebt() {
+    if (!this.#turn.debt) {
+      throw DomainError.invalidState('메워야 할 채무가 없습니다(정리 페이즈 상태가 손상됨)');
+    }
+  }
+
   #sell({ cityIndex }) {
     const player = this.#current;
-    if (!Number.isInteger(cityIndex) || !this.#turn.debt) {
+    this.#assertPendingDebt();
+    if (!Number.isInteger(cityIndex)) {
       throw DomainError.invalidArgument(`매각할 칸이 올바르지 않습니다: ${cityIndex}`);
     }
     if (!this.#board.isOwnable(cityIndex) || !this.#board.cityAt(cityIndex).isOwnedBy(player.id)) {
@@ -746,7 +789,9 @@ export class Game {
       case SPACE_KINDS.AIRPORT:
         player.grantAirportTicket();
         this.#emit(EVENT_TYPES.AIRPORT_TICKET_GRANTED, { playerId: player.id });
-        return this.#endTurn();
+        // 조난과 같은 취급: 더블이어도 추가 턴이 없다. 그래야 이동권은 언제나
+        // "다음 자기 턴에 30번 칸에서" 쓰이고, 다른 칸에서 쓰이는 일이 없다.
+        return this.#endTurn({ allowExtra: false });
       default:
         return this.#endTurn();
     }
@@ -1071,7 +1116,9 @@ export class Game {
         amount: items.reduce((sum, item) => sum + item.amount, 0),
       });
     }
-    const next = this.#turn.debt.next;
+    // 인수는 "보유 현금으로만" 가능하다(명세 4장). 정리 페이즈를 거쳐 매각·대출로 돈을
+    // 마련한 통행료였다면 그 돈으로 인수하는 셈이 되므로, 제안 없이 턴을 끝낸다.
+    const next = wasLiquidation ? { kind: CONTINUATIONS.TURN_END } : this.#turn.debt.next;
     this.#turn.debt = null;
     this.#continueAfterPayment(next);
   }
@@ -1095,6 +1142,7 @@ export class Game {
 
   #autoSell() {
     const player = this.#current;
+    this.#assertPendingDebt();
     const owned = this.#board
       .ownedBy(player.id)
       .sort((a, b) => a.liquidationValue() - b.liquidationValue() || a.index - b.index);
@@ -1113,6 +1161,7 @@ export class Game {
 
   #takeLoan() {
     const player = this.#current;
+    this.#assertPendingDebt();
     if (!player.canTakeLoan()) {
       throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
     }
@@ -1127,28 +1176,39 @@ export class Game {
   }
 
   #declareBankruptcy() {
+    this.#assertPendingDebt();
     this.#bankrupt(this.#current);
+  }
+
+  /**
+   * 파산 시 남은 현금을 받을 살아 있는 채권자들(좌석 순서).
+   * `PAY_TO_ALL`처럼 채권자가 여러 명일 수 있으므로 목록으로 다룬다.
+   * 파산자 자신은 제외한다 — 자기에게 돌려주면 그 돈이 `eliminate()`에서 사라져
+   * 돈의 보존 불변식이 깨진다(손상된 스냅샷에 대한 방어).
+   */
+  #bankruptcyCreditors(debt, bankruptId) {
+    const ids = new Set(
+      (debt?.items ?? [])
+        .filter((item) => item.sink === SINKS.PLAYER && item.toPlayerId)
+        .map((item) => item.toPlayerId),
+    );
+    return this.#players.filter(
+      (candidate) => ids.has(candidate.id) && !candidate.eliminated && candidate.id !== bankruptId,
+    );
   }
 
   /** 파산: 남은 현금을 채권자에게 넘기고 모든 자산을 초기화한 뒤 탈락한다. */
   #bankrupt(player) {
     const debt = this.#turn.debt;
-    const creditorItem = debt?.items.find((item) => item.sink === SINKS.PLAYER) ?? null;
     const toJackpot = Boolean(debt?.items.some((item) => item.sink === SINKS.JACKPOT));
-    const creditor = creditorItem ? this.playerById(creditorItem.toPlayerId) : null;
-    const creditorId = creditor && !creditor.eliminated ? creditor.id : null;
+    const creditors = this.#bankruptcyCreditors(debt, player.id);
+    const creditorId = creditors[0]?.id ?? null;
     const remaining = player.cash;
 
     if (remaining > 0) {
       player.pay(remaining);
-      if (creditorId) {
-        creditor.receive(remaining);
-        this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
-          fromId: player.id,
-          toId: creditorId,
-          amount: remaining,
-          reason: MONEY_REASONS.BANKRUPTCY,
-        });
+      if (creditors.length > 0) {
+        this.#splitAmongCreditors(player, creditors, remaining);
       } else if (toJackpot) {
         this.#casino.accumulate(remaining);
         this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
@@ -1162,7 +1222,9 @@ export class Game {
     this.#phase = PHASES.AWAIT_ROLL;
     this.#emit(EVENT_TYPES.BANKRUPT, {
       playerId: player.id,
+      // 대표 채권자(기존 계약). 여러 명일 수 있으므로 전원은 creditorIds로 함께 알린다.
       creditorId,
+      creditorIds: creditors.map((creditor) => creditor.id),
       paidAmount: remaining,
       releasedIndexes,
     });
@@ -1171,6 +1233,29 @@ export class Game {
       return;
     }
     this.#endTurn({ allowExtra: false });
+  }
+
+  /**
+   * 남은 현금을 채권자들에게 고르게(내림) 나누고, 나머지는 좌석 순서가 앞선 채권자에게 준다.
+   * 나눠 준 합계는 항상 남은 현금과 정확히 같아야 한다(돈의 보존 불변식).
+   */
+  #splitAmongCreditors(player, creditors, remaining) {
+    const share = Math.floor(remaining / creditors.length);
+    let leftover = remaining - share * creditors.length;
+    for (const creditor of creditors) {
+      const amount = share + (leftover > 0 ? 1 : 0);
+      leftover = Math.max(0, leftover - 1);
+      if (amount <= 0) {
+        continue;
+      }
+      creditor.receive(amount);
+      this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
+        fromId: player.id,
+        toId: creditor.id,
+        amount,
+        reason: MONEY_REASONS.BANKRUPTCY,
+      });
+    }
   }
 
   // ── 턴 전이 ─────────────────────────────────────────────────────────────
@@ -1227,7 +1312,8 @@ export class Game {
 
   #beginTurn() {
     const player = this.#current;
-    this.#turn = { rollWasDouble: false, casinoRoundsLeft: 0, debt: null };
+    // 이전 턴의 흔적(건설/인수 대상 칸까지)을 남기지 않는다.
+    this.#turn = { ...EMPTY_TURN };
     player.resetDoubles();
     this.#emit(EVENT_TYPES.TURN_STARTED, { playerId: player.id, round: this.#round });
 

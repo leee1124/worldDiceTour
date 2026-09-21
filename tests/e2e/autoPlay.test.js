@@ -20,7 +20,7 @@ const noopPublisher = { publishRoom: () => {}, publishGame: () => {} };
 /** 자동 진행 드라이버 없이 서비스만 조립한다(테스트가 직접 턴을 돌린다). */
 function createHeadlessApp(seed) {
   const random = new SeededRandomSource(seed);
-  const repository = new InMemoryRoomRepository({ random });
+  const repository = new InMemoryRoomRepository({ random, logger: silentLogger });
   const authenticator = new SeatAuthenticator();
   const clock = { now: () => 1_700_000_000_000 };
   const common = { repository, random, authenticator, publisher: noopPublisher, clock, logger: silentLogger };
@@ -134,13 +134,15 @@ describe('E2E: 컴퓨터 4인 자동 대전', () => {
     assert.equal(room.game.moneyReport().balanced, true);
   });
 
-  it('여러 시드에서 모든 페이즈가 최소 한 번은 등장한다', async () => {
+  it('여러 시드에서 모든 페이즈가 최소 한 번은 등장하고 모두 GAME_OVER에 닿는다', async () => {
     // Given
     const policy = new AutoPlayerPolicy();
     const seenPhases = new Set();
+    const seeds = [3, 11, 77, 512, 4_096];
+    const finished = [];
 
     // When
-    for (const seed of [3, 11, 77, 512, 4_096]) {
+    for (const seed of seeds) {
       const app = createHeadlessApp(seed);
       const code = await startFourComputerGame(app, { roundLimit: 20 });
       let guard = 0;
@@ -151,6 +153,7 @@ describe('E2E: 컴퓨터 4인 자동 대전', () => {
         }
         seenPhases.add(turn.view.phase);
         const decision = policy.decide(turn.view);
+        assert.ok(decision, `시드 ${seed}: 결정할 수 없는 페이즈 ${turn.view.phase}`);
         await app.gameService.executeAsServer({
           code,
           seatId: turn.seatId,
@@ -159,11 +162,20 @@ describe('E2E: 컴퓨터 4인 자동 대전', () => {
         });
         guard += 1;
       }
+      // 한 판이 끝날 때마다 실제로 종료됐는지, 돈이 보존됐는지 확인한다.
+      const room = await app.repository.findByCode(code);
+      assert.equal(room.game.isOver(), true, `시드 ${seed}: 커맨드 ${guard}회 안에 끝나지 않았습니다`);
+      assert.equal(room.game.phase, 'GAME_OVER');
+      assert.equal(room.isFinished(), true);
+      assert.equal(room.game.moneyReport().balanced, true, `시드 ${seed}: 돈 보존 위반`);
+      finished.push(seed);
     }
 
     // Then
+    assert.deepEqual(finished, seeds, '모든 시드가 GAME_OVER에 닿아야 한다');
     for (const phase of ['AWAIT_ROLL', 'AWAIT_BUY', 'AWAIT_BUILD', 'AWAIT_ACQUIRE', 'AWAIT_CASINO']) {
       assert.ok(seenPhases.has(phase), `${phase} 페이즈가 한 번도 등장하지 않았습니다`);
     }
+    assert.ok(seenPhases.has('GAME_OVER') === false, 'autoTurn은 끝난 게임을 돌려주지 않는다');
   });
 });

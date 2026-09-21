@@ -1,11 +1,37 @@
 # 월드 다이스 투어 — 서버 API 계약 (클라이언트 UI 개발자용)
 
+## 변경 이력 (UI 개발자 필독)
+
+기존 `GameViewDto` 필드명은 하나도 바뀌지 않았다. 아래는 **추가된 필드와 동작 변경**뿐이다.
+
+| # | 종류 | 변경 내용 | 영향 |
+|---|---|---|---|
+| 1 | 동작 | `DELETE /api/rooms/:code/seats/:seatId`는 **대기실에서만** 가능. 게임 중/종료 후에는 `409 ERR005` | 게임 중 "나가기" 버튼은 좌석 삭제 대신 **연결만 끊기**로 구현. 호스트가 그 좌석을 자동 진행으로 돌릴 수 있다 |
+| 2 | 동작 | `TRAVEL`의 `destination`이 **현재 칸**이면 `400 ERR001`. `pending.forbiddenIndexes`가 이제 `[30]`이 아니라 `[30, <현재 칸>]`을 담는다(공항 칸에 서 있으면 `[30]`) | 공항 목적지 선택 UI는 `forbiddenIndexes`에 든 칸을 **모두** 비활성화할 것 |
+| 3 | 동작 | 공항 칸(30)에 더블로 도착해도 `EXTRA_TURN` 이벤트가 없다 | 더블 연출 후 곧바로 턴이 넘어간다 |
+| 4 | 동작 | 통행료를 `AWAIT_LIQUIDATION`을 거쳐(`SELL`/`AUTO_SELL`/`TAKE_LOAN`) 낸 경우 **인수를 제안하지 않는다** — `ACQUIRE_OFFERED` 없이 `TURN_ENDED` | 정리 후 인수 모달을 기대하지 말 것. 현금으로 바로 낸 통행료 뒤에는 이전과 같이 제안된다 |
+| 5 | 동작 | `SET_AUTOPILOT enabled:true`는 **그 좌석이 오프라인일 때만** 가능(`online: true`면 `409 ERR005`) | 호스트 UI는 `seats[].online === false`인 사람 좌석에만 "자동 진행" 버튼을 켤 것 |
+| 6 | 동작 | `SET_AUTOPILOT enabled:false`는 호스트 **또는 그 좌석 본인 토큰**으로 가능 | 돌아온 플레이어가 스스로 "직접 플레이로 복귀" 버튼을 누를 수 있다 |
+| 7 | 동작 | 자동 진행 중인 좌석의 게임 커맨드는 그 좌석 토큰이어도 `403 ERR003` | 자동 진행 중에는 행동 버튼을 비활성화하고 "복귀" 버튼만 노출할 것 |
+| 8 | **추가 필드** | `RoomDto.autoStalled`(boolean) — 자동 진행이 재시도까지 실패해 멈췄다는 일회성 신호 | `true`인 `room` 이벤트를 받으면 호스트에게 경고를 띄울 것. 다음 `room` 이벤트에서는 다시 `false` |
+| 9 | 동작 | 본문이 있는 요청은 `Content-Type: application/json`이 **필수**(파라미터 허용). 아니면 `400 ERR001` | `fetch`에 헤더를 반드시 붙일 것(`FormData`·`text/plain` 금지) |
+| 10 | **새 에러 코드** | `ERR015`(403) — 허용되지 않은 `Host` 헤더 | 랜 주소(사설 IP/localhost/`*.local`/단일 라벨)로만 접속. 그 외 도메인은 `ALLOWED_HOSTS` 환경변수에 등록 |
+| 11 | 동작 | 모든 API JSON 응답에 `cache-control: no-store` | 캐시 우회 쿼리 파라미터를 붙일 필요가 없다 |
+| 12 | **새 에러 코드** | `ERR016`(503) — SSE 구독자 상한(방당 16, 전체 128) 초과. **이벤트 스트림이 아니라 JSON**으로 온다 | `EventSource`가 바로 끊기면 재접속을 무한 반복하지 말고 잠시 뒤 재시도할 것 |
+| 13 | **새 에러 코드** | `ERR017`(503) — 서버 방 개수 상한(200) 초과 | 방 만들기 실패 안내를 띄우고 잠시 후 재시도를 권할 것 |
+| 14 | 동작 | `rankings` 정렬에 동점 기준이 추가됐다: 총자산 → **현금** → 좌석 순서 | 같은 상태면 항상 같은 순위가 나온다(종료 모달이 흔들리지 않는다) |
+| 15 | 동작 + **추가 필드** | 채권자가 여러 명인 채무(`한턱 쏘기`)로 파산하면 남은 현금이 **여러 `MONEY_TRANSFERRED` 이벤트로 나뉘어** 발생한다(이전에는 첫 채권자 한 명에게 전액). `BANKRUPT`에 `creditorIds`(배열)가 추가됐다 | 파산 로그 연출은 `MONEY_TRANSFERRED`를 여러 건 받을 수 있다고 가정할 것. 누가 받았는지는 `creditorIds`를 볼 것(`creditorId`는 대표 한 명이라 금액과 짝지으면 어긋난다) |
+| 16 | 동작 | 에러 응답에서 본문을 끝까지 읽지 않은 경우(413/415) 연결이 닫힌다(`connection: close`) | 큰 본문을 보내다 거절당하면 그 연결은 재사용되지 않는다 |
+
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
-- Base URL: `http://<호스트>:5173` (서버는 `0.0.0.0`에 바인딩. `PORT` 환경변수로 변경 가능)
+- Base URL: `http://<호스트>:5173` (서버는 `0.0.0.0`에 바인딩. `PORT` 환경변수로 변경 가능 — 1~65535 정수가 아니면 서버가 시작하지 않는다)
 - 요청/응답 본문은 모두 `application/json; charset=utf-8`
+- **본문이 있는 요청은 `Content-Type: application/json`이 필수다**(`; charset=utf-8` 같은 파라미터는 허용). 다른 타입이거나 헤더가 없으면 `400 ERR001` — 브라우저 폼으로는 이 타입을 만들 수 없으므로 사이트 간 요청 위조(CSRF)가 막힌다.
 - 인증 헤더: `Authorization: Bearer <seatToken>`
-- 요청 본문 최대 크기: **16KB** (초과 시 `ERR009`)
+- 요청 본문 최대 크기: **16KB**. 한도를 넘는 순간 수신을 멈추고 `413 ERR009`를 보낸 뒤 연결을 닫는다(`connection: close`).
+- **`Host` 헤더 검사(DNS 리바인딩 방어)**: 랜에서 실제로 쓰이는 주소만 받는다 — `localhost`, `127.0.0.0/8`, `[::1]`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, 점이 없는 단일 라벨 호스트명(`mypc`), `*.local`(mDNS). 각각 포트를 붙일 수 있다. 그 밖의 이름은 `ALLOWED_HOSTS` 환경변수(콤마 구분, 정확 일치)에 적어야 하며, 없으면 `403 ERR015`.
+- 모든 API JSON 응답에 `cache-control: no-store`가 붙는다.
 - **알 수 없는 필드는 무시**된다(화이트리스트 검증)
 - 모든 응답에 보안 헤더가 붙는다: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
 - 정적 파일은 `public/` 아래만 서빙된다. `data/rooms/*.json`(좌석 토큰 포함)은 **절대 서빙되지 않는다.**
@@ -31,9 +57,9 @@
 |---|---|---|---|
 | `ERR001` | 400 | 요청 형식이 올바르지 않습니다. | 이름/커맨드/payload 화이트리스트 위반, 깨진 JSON, 알 수 없는 커맨드·호스트 동작 |
 | `ERR002` | 401 | 좌석 인증에 실패했습니다. | 토큰 없음/형식 오류/일치하는 좌석 없음 |
-| `ERR003` | 403 | 권한이 없습니다. | 호스트 전용 동작을 비호스트가 요청, 본문 `seatId`가 토큰 좌석과 불일치, 남의 좌석 강퇴 |
+| `ERR003` | 403 | 권한이 없습니다. | 호스트 전용 동작을 비호스트가 요청, 본문 `seatId`가 토큰 좌석과 불일치, 남의 좌석 강퇴, **자동 진행 중인 좌석의 게임 커맨드** |
 | `ERR004` | 404 | 방을 찾을 수 없습니다. | 방 코드 형식 오류 또는 없는 방 |
-| `ERR005` | 409 | 지금은 할 수 없는 동작입니다. | 현재 페이즈에서 불가한 커맨드, 대기실에서 게임 커맨드, 이미 시작/종료된 방 |
+| `ERR005` | 409 | 지금은 할 수 없는 동작입니다. | 현재 페이즈에서 불가한 커맨드, 대기실에서 게임 커맨드, 이미 시작/종료된 방, **게임 중 좌석 삭제**, **접속 중인 좌석에 자동 진행 켜기** |
 | `ERR006` | 409 | 당신의 차례가 아닙니다. | 다른 좌석 차례에 커맨드 전송 |
 | `ERR007` | 409 | 방의 좌석이 모두 찼습니다. | 좌석 4개 초과 참가 |
 | `ERR008` | 409 | 현금이 부족합니다. | 매입/건설/인수/구조비를 현금으로 낼 수 없음 |
@@ -43,6 +69,9 @@
 | `ERR012` | 409 | 좌석을 찾을 수 없습니다. | 없는 좌석 id 지정 |
 | `ERR013` | 409 | 게임을 시작할 수 없습니다. | 좌석 2명 미만 |
 | `ERR014` | 405 | 허용되지 않은 요청 방식입니다. | 잘못된 HTTP 메서드 |
+| `ERR015` | 403 | 허용되지 않은 접속 주소입니다. | `Host` 헤더가 랜 주소 화이트리스트에 없음(DNS 리바인딩 방어). 헤더 자체가 없어도 거부 |
+| `ERR016` | 503 | 접속자가 너무 많습니다. 잠시 후 다시 시도하세요. | SSE 구독자 상한(방당 16 / 전체 128) 초과 |
+| `ERR017` | 503 | 방을 더 만들 수 없습니다. 잠시 후 다시 시도하세요. | 서버 방 개수 상한(200) 초과. 30분 이상 방치된 대기실을 먼저 정리한 뒤에도 자리가 없을 때 |
 
 ---
 
@@ -59,6 +88,7 @@
 ### `GET /api/rooms`
 
 참가 가능한 방 목록(대기실이고 자리가 남은 방만, 최근 수정 순).
+서버는 이 응답을 **메모리 요약 색인**으로 만든다(방마다 게임 상태를 복원하지 않으므로 방이 많아도 가볍다).
 
 ```json
 {
@@ -79,6 +109,8 @@
 ### `POST /api/rooms` → 201
 
 방 만들기. 요청 `{ "hostName": "하나" }` (`^[가-힣a-zA-Z0-9 ]{1,10}$`, 공백만인 이름 불가)
+
+- 서버가 동시에 들고 있을 수 있는 방은 **200개**다. 상한에 닿으면 서버가 먼저 **30분 이상 방치된 대기실**을 정리하고, 그래도 자리가 없으면 `503 ERR017`로 거절한다(진행 중인 방은 정리하지 않는다).
 
 ```json
 {
@@ -110,7 +142,10 @@
 
 본인 퇴장(자기 토큰) 또는 호스트 강퇴(호스트 토큰). 인증 필수.
 - `seatId` 형식은 `^seat-\d{1,3}$`.
-- 호스트가 나가면 남은 첫 좌석이 호스트를 이어받는다. 마지막 좌석이 나가면 방이 삭제된다.
+- 호스트가 나가면 남은 첫 좌석이 호스트를 이어받는다. 마지막 좌석이 나가면 방이 삭제된다(열려 있던 SSE 스트림도 함께 닫힌다).
+- **대기실(`LOBBY`)에서만 가능하다.** 진행 중(`PLAYING`)이거나 끝난(`FINISHED`) 방에서는 본인 퇴장이든 호스트 강퇴든 `409 ERR005`다. 게임에서 플레이어를 빼면 턴 순서와 채권 관계가 깨져 방을 되살릴 수 없기 때문이다.
+  - 따라서 **게임 중 "나가기"는 클라이언트가 그냥 연결을 끊는 것**으로 구현한다(`EventSource`를 닫으면 presence가 사라져 `online: false`가 방송된다).
+  - 남은 사람들은 멈추지 않는다: 호스트가 `SET_AUTOPILOT`으로 그 오프라인 좌석을 서버 자동 진행으로 돌릴 수 있다.
 
 ```json
 { "room": { "...RoomDto": "" } }
@@ -124,10 +159,17 @@
 |---|---|---|---|
 | `ADD_COMPUTER` | `name` | 컴퓨터 좌석 추가 | 대기실, 좌석 4개 미만 |
 | `SET_OPTIONS` | `roundLimit`: `null \| 20 \| 30` | 라운드 제한 | 대기실 |
-| `SET_AUTOPILOT` | `seatId`, `enabled`(boolean) | 오프라인 좌석을 서버 자동 진행으로 전환/복귀 | 사람 좌석만 |
+| `SET_AUTOPILOT` | `seatId`, `enabled`(boolean) | 오프라인 좌석을 서버 자동 진행으로 전환/복귀 | 사람 좌석만. **켜기**는 호스트 + 그 좌석이 오프라인일 때만(`ERR005`), **끄기**는 호스트 또는 그 좌석 본인 토큰(그 외 `ERR003`) |
 | `START` | — | 게임 시작 | 대기실, 좌석 2명 이상 |
 
 `START` 직후 SSE로 `room`과 `game`(events: `[]`)이 함께 방송된다.
+
+**`SET_AUTOPILOT` 상세 (이중 조종 방지)**
+- **켜기(`enabled: true`)**: 호스트 토큰만, 그리고 대상 좌석이 `online: false`일 때만. 접속 중이면 `409 ERR005`. 사람과 서버가 같은 좌석을 동시에 조종하면 커맨드가 경합하기 때문이다.
+- **끄기(`enabled: false`)**: 호스트 토큰 **또는 그 좌석 본인 토큰**. 돌아온 플레이어가 스스로 조종권을 회수할 수 있다. 남의 좌석을 비호스트가 끄려 하면 `403 ERR003`.
+- 자동 진행 중인 좌석에 `POST /commands`를 보내면 토큰이 맞아도 `403 ERR003`이다(먼저 자동 진행을 끌 것). 이 검사는 "내 차례 아님(`ERR006`)"보다 먼저 걸린다.
+- 켠 좌석이 **지금 차례**면 서버가 곧바로 대행을 예약하고, 끄면 대기 중인 예약을 취소한다.
+- 컴퓨터 좌석(`kind: "COMPUTER"`)의 설정은 바꿀 수 없다(`409 ERR005`).
 
 ### `POST /api/rooms/:code/commands`
 
@@ -165,6 +207,11 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 
 없는 방이면 `404 ERR004`(스트림을 열지 않는다).
 
+**상한과 헤더**
+- 구독자 상한: **방당 16, 서버 전체 128**. 넘으면 스트림을 열지 않고 `503 ERR016`을 **JSON으로** 응답한다(`content-type: application/json`). `EventSource`는 이때 곧바로 `error`를 받으므로, 즉시 재접속을 반복하지 말고 잠시 기다린 뒤 다시 시도할 것.
+- SSE 응답에도 공통 보안 헤더가 붙는다.
+- presence 변화(구독 추가/끊김)로 인한 `room` 재방송은 방마다 약 200ms 동안 **합쳐서 한 번만** 보낸다. 핫시트 기기가 좌석 여러 개로 붙어도 스냅샷이 연달아 쏟아지지 않는다.
+
 ---
 
 ## 3. RoomDto
@@ -181,7 +228,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
     { "id": "seat-2", "name": "컴퓨터1", "kind": "COMPUTER", "autopilot": false, "isHost": false, "online": true }
   ],
   "createdAt": 1758400000000,
-  "updatedAt": 1758400009000
+  "updatedAt": 1758400009000,
+  "autoStalled": false
 }
 ```
 
@@ -192,9 +240,10 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `hostSeatId` | 호스트 좌석 id. 호스트만 호스트 동작 가능 |
 | `options.roundLimit` | `null`(무제한) / `20` / `30` |
 | `seats[].kind` | `HUMAN` \| `COMPUTER` |
-| `seats[].autopilot` | 사람 좌석을 서버가 대신 진행 중인지 |
+| `seats[].autopilot` | 사람 좌석을 서버가 대신 진행 중인지. `true`인 동안 그 좌석의 게임 커맨드는 `ERR003` |
 | `seats[].online` | presence로 확인된 접속 여부(컴퓨터는 항상 true) |
-| `createdAt`/`updatedAt` | epoch ms. 24시간 이상 방치된 방은 서버 시작 시 정리된다 |
+| `createdAt`/`updatedAt` | epoch ms. 24시간 이상 방치된 방은 서버 시작 시와 **1시간 주기로** 정리된다 |
+| `autoStalled` | 자동 진행(컴퓨터/자동 좌석 대행)이 재시도를 모두 소진해 멈췄다는 **일회성 신호**. 이 값이 `true`인 `room` 이벤트는 "호스트가 개입해야 한다"는 뜻이며, 이후의 평범한 `room` 이벤트에서는 다시 `false`다. 호스트는 해당 좌석의 자동 진행을 끄거나 방을 정리하면 된다 |
 
 ---
 
@@ -255,7 +304,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `board[].toll` | 지금 이 칸에 걸리면 낼 통행료 |
 | `board[].acquisitionPrice` | 인수 가격(`invested × 2`). 인수 불가(랜드마크/휴양지/주인 없음)면 `null` |
 | `pending` | 현재 플레이어가 내려야 하는 결정(6장). 결정이 없으면 `null` |
-| `rankings` | 종료 시에만 채워진다: `[{ playerId, name, rank, cash, totalAssets, loanDebt, eliminated }]` |
+| `rankings` | 종료 시에만 채워진다: `[{ playerId, name, rank, cash, totalAssets, loanDebt, eliminated }]`. 정렬은 생존자 → 총자산 → **현금** → 좌석 순서(같은 상태면 항상 같은 순위) |
 
 > 소유 불가능 칸(`START`/`TICKET`/`TAX`/`ISLAND`/`CASINO`/`AIRPORT`)에는 `price` 이하 필드가 없다.
 
@@ -272,7 +321,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `AWAIT_ACQUIRE` | `ACQUIRE`, `SKIP_ACQUIRE` | 없음 |
 | `AWAIT_CASINO` | `CASINO_BET`, `CASINO_LEAVE` | `CASINO_BET`: `{ game, bet, choice }` |
 | `AWAIT_ISLAND_CHOICE` | `ISLAND_PAY`, `ISLAND_ROLL` | 없음 |
-| `AWAIT_TRAVEL` | `TRAVEL` | `{ destination: 0~39 }` (공항 칸 30은 불가) |
+| `AWAIT_TRAVEL` | `TRAVEL` | `{ destination: 0~39 }` (공항 칸 30과 현재 칸은 불가) |
 | `AWAIT_LIQUIDATION` | `SELL`, `AUTO_SELL`, `TAKE_LOAN`, `DECLARE_BANKRUPTCY` | `SELL`: `{ cityIndex: 0~39 }` |
 | `GAME_OVER` | 없음(모든 커맨드 `ERR005`) | — |
 
@@ -287,19 +336,20 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `SKIP_BUILD` | 건설 포기 |
 | `START_BUILD` | 출발 칸 보너스. `pending.candidates` 중 하나의 `index`와 그 후보의 `options`에서 고른 건물 |
 | `SKIP_START_BUILD` | 보너스 포기 |
-| `ACQUIRE` | 통행료를 낸 남의 도시를 `pending.price`(= invested × 2)에 인수. **보유 현금만** 사용(부족하면 `ERR008`). 인수 후 `AWAIT_BUILD` |
+| `ACQUIRE` | 통행료를 낸 남의 도시를 `pending.price`(= invested × 2)에 인수. **보유 현금만** 사용(부족하면 `ERR008`). 인수 후 `AWAIT_BUILD`. 통행료를 정리 페이즈로 낸 턴에는 이 페이즈에 오지 않는다 |
 | `SKIP_ACQUIRE` | 인수 포기 |
 | `CASINO_BET` | `game`: `ODD_EVEN`(choice `ODD`\|`EVEN`) / `HIGH_LOW_SEVEN`(choice `LOW`\|`HIGH`\|`SEVEN`) / `SLOT`(choice 불필요). `bet`은 10,000원 단위, 10,000 ~ min(현금, 500,000). 한 방문 최대 3판 |
 | `CASINO_LEAVE` | 카지노에서 나가 턴 종료 |
 | `ISLAND_PAY` | 구조비 200,000원 지불 후 즉시 `AWAIT_ROLL`(같은 턴에 정상 굴림). 현금 부족 시 `ERR008` |
 | `ISLAND_ROLL` | 더블이면 탈출해 그 눈만큼 이동(추가 턴 없음), 아니면 남은 턴 −1 후 턴 종료 |
-| `TRAVEL` | 공항 이동권 사용. 앞 방향으로 이동하므로 출발 칸을 지나면 월급. 도착 칸 효과 정상 적용 |
+| `TRAVEL` | 공항 이동권 사용. 앞 방향으로 이동하므로 출발 칸을 지나면 월급. 도착 칸 효과 정상 적용. `pending.forbiddenIndexes`의 칸(공항 칸·현재 칸)을 고르면 `ERR001` |
 | `SELL` | 정리 페이즈에서 고른 자산 하나를 `invested × 0.5`에 은행 매각(건물 포함 초기화) |
 | `AUTO_SELL` | 환급액이 낮은 자산부터 필요한 만큼 자동 매각. 팔 자산이 없으면 `ERR005` |
 | `TAKE_LOAN` | 게임당 1회. 현금 +1,000,000, 채무 1,200,000. 이후 월급이 채무 상환에 압류된다. 이미 썼으면 `ERR005` |
 | `DECLARE_BANKRUPTCY` | 정리 페이즈에서 **항상 가능**. 남은 현금을 채권자에게 넘기고 모든 자산 초기화 후 탈락 |
 
-> 현금 ≥ 지불액이 되는 즉시 지불이 자동 완료되고 중단됐던 흐름(예: 통행료 뒤의 인수 제안)이 이어진다.
+> 현금 ≥ 지불액이 되는 즉시 지불이 자동 완료되고 중단됐던 흐름이 이어진다.
+> 단 **정리 페이즈를 거친 통행료 뒤에는 인수를 제안하지 않는다** — 인수는 보유 현금으로만 할 수 있으므로(명세 4장), 매각·대출로 만든 돈으로 인수하는 길을 막는다.
 
 ---
 
@@ -313,7 +363,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `ACQUIRE` | `index`, `name`, `ownerId`, `price` |
 | `CASINO` | `roundsLeft`, `limits: { min, max, unit }`, `jackpot` |
 | `ISLAND` | `remainingTurns`, `fee`(200000), `canPayFee` |
-| `TRAVEL` | `forbiddenIndexes: [30]` |
+| `TRAVEL` | `forbiddenIndexes: number[]` — 공항 칸(30)과 현재 칸. 공항 칸에 서 있으면 한 칸으로 합쳐져 `[30]` |
 | `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ index, name, refund }]` |
 
 `AWAIT_ROLL`과 `GAME_OVER`에서는 `pending`이 `null`이다.
@@ -374,7 +424,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `ISLAND_RESCUE_PAID` | `playerId`, `amount` | 구조비 지불 |
 | `ISLAND_ESCAPED` | `playerId`, `by`(`PAY` \| `DOUBLE`) | 탈출 |
 | `ISLAND_STAY` | `playerId`, `remainingTurns` | 탈출 실패 |
-| `AIRPORT_TICKET_GRANTED` | `playerId` | 공항 도착(다음 턴에 이동권) |
+| `AIRPORT_TICKET_GRANTED` | `playerId` | 공항 도착(다음 턴에 이동권). 더블이어도 이 턴은 여기서 끝난다 |
 | `AIRPORT_READY` | `playerId` | 이동권을 쓸 턴이 시작됨 |
 | `TRAVELED` | `playerId`, `from`, `to` | 목적지 선택 완료 |
 | `CASINO_ENTERED` | `playerId`, `roundsLeft`, `jackpot` | 카지노 입장 |
@@ -392,7 +442,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `LIQUIDATION_REQUIRED` | `playerId`, `amountDue`, `creditorId`, `reason` | 정리 페이즈 진입 |
 | `PROPERTY_SOLD` | `playerId`, `index`, `name`, `refund` | 자산 매각 |
 | `DEBT_SETTLED` | `playerId`, `amount` | 정리 후 채무 정산 완료 |
-| `BANKRUPT` | `playerId`, `creditorId`, `paidAmount`, `releasedIndexes` | 파산(초기화된 칸 목록 포함) |
+| `BANKRUPT` | `playerId`, `creditorId`, `creditorIds`, `paidAmount`, `releasedIndexes` | 파산(초기화된 칸 목록 포함). `creditorIds`는 실제로 돈을 받은 좌석 전원(좌석 순서, 은행 채무면 `[]`), `creditorId`는 그중 대표 한 명이다. **`creditorId`와 `paidAmount`를 짝지어 한 명에게 전액이 갔다고 보면 안 된다** — 분배 내역은 함께 발생하는 `MONEY_TRANSFERRED` 이벤트들에 있다 |
 
 ### 행운 티켓 효과(`TICKET_DRAWN.effect.type`)
 

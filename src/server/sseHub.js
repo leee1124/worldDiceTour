@@ -1,5 +1,11 @@
+import { AppError } from '../application/errors.js';
+
 /** 하트비트 주기(프록시/모바일 절전 대비). */
 const HEARTBEAT_MS = 20_000;
+/** 한 방이 받는 최대 구독자 수(핫시트 기기를 넉넉히 감당하는 값). */
+export const MAX_SUBSCRIBERS_PER_ROOM = 16;
+/** 서버 전체 최대 구독자 수. 열린 스트림은 메모리와 소켓을 계속 점유한다. */
+export const MAX_SUBSCRIBERS_TOTAL = 128;
 
 /**
  * 방별 SSE 구독자 관리.
@@ -11,12 +17,44 @@ export class SseHub {
   #rooms = new Map();
   #logger;
   #heartbeat;
+  #maxPerRoom;
+  #maxTotal;
 
-  constructor({ logger, heartbeatMs = HEARTBEAT_MS } = {}) {
+  constructor({
+    logger,
+    heartbeatMs = HEARTBEAT_MS,
+    maxPerRoom = MAX_SUBSCRIBERS_PER_ROOM,
+    maxTotal = MAX_SUBSCRIBERS_TOTAL,
+  } = {}) {
     this.#logger = logger ?? console;
+    this.#maxPerRoom = maxPerRoom;
+    this.#maxTotal = maxTotal;
     this.#heartbeat = setInterval(() => this.#sendHeartbeat(), heartbeatMs);
     if (typeof this.#heartbeat.unref === 'function') {
       this.#heartbeat.unref();
+    }
+  }
+
+  /** 지금 열려 있는 전체 구독자 수. */
+  get totalSubscribers() {
+    let total = 0;
+    for (const clients of this.#rooms.values()) {
+      total += clients.size;
+    }
+    return total;
+  }
+
+  /**
+   * 구독 여유가 있는지 확인한다(스트림 헤더를 쓰기 **전에** 호출해야 한다).
+   * 상한을 넘으면 이벤트 스트림 대신 규격 JSON 에러로 응답해야 하므로 예외를 던진다.
+   */
+  assertCapacity(code) {
+    const inRoom = this.subscriberCount(code);
+    if (inRoom >= this.#maxPerRoom) {
+      throw new AppError('ERR016', `방 ${code}의 구독자 상한(${this.#maxPerRoom}) 초과`);
+    }
+    if (this.totalSubscribers >= this.#maxTotal) {
+      throw new AppError('ERR016', `서버 전체 구독자 상한(${this.#maxTotal}) 초과`);
     }
   }
 

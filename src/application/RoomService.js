@@ -1,16 +1,16 @@
-import { Room } from '../domain/room/Room.js';
+import { MAX_SEATS, ROOM_STATUS, Room } from '../domain/room/Room.js';
 import { generateRoomCode, isValidRoomCode } from '../domain/room/RoomCode.js';
 import { AppError } from './errors.js';
+import { HOST_ACTIONS } from './hostActions.js';
 import { KeyedMutex } from './KeyedMutex.js';
 import { toRoomDto, toRoomSummaryDto, toGameViewDto } from './dto.js';
 
-/** 호스트 전용 동작 종류. */
-export const HOST_ACTIONS = Object.freeze({
-  ADD_COMPUTER: 'ADD_COMPUTER',
-  SET_OPTIONS: 'SET_OPTIONS',
-  START: 'START',
-  SET_AUTOPILOT: 'SET_AUTOPILOT',
-});
+/** 서버가 동시에 들고 있을 수 있는 최대 방 개수(플러딩 방어). */
+export const MAX_ROOMS = 200;
+/** 상한에 닿았을 때 먼저 쓸어낼 "방치된 대기실" 기준(30분). */
+export const IDLE_LOBBY_MS = 30 * 60 * 1000;
+/** 오래된 방 정리를 주기적으로 돌리는 간격(1시간). */
+export const STALE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 
 /** 방 코드 생성 재시도 횟수. */
 const CODE_ATTEMPTS = 20;
@@ -32,6 +32,7 @@ export class RoomService {
   #autoDriver = null;
   #presence;
   #mutex;
+  #maxRooms;
 
   constructor({
     repository,
@@ -43,6 +44,7 @@ export class RoomService {
     logger,
     presence,
     mutex,
+    maxRooms = MAX_ROOMS,
   }) {
     this.#repository = repository;
     this.#random = random;
@@ -53,6 +55,7 @@ export class RoomService {
     this.#logger = logger ?? console;
     this.#presence = presence ?? { onlineSeatIds: () => [] };
     this.#mutex = mutex ?? new KeyedMutex();
+    this.#maxRooms = maxRooms;
   }
 
   /** 컴퓨터/자동 진행 좌석을 대신 진행시키는 드라이버를 연결한다(순환 의존 방지). */
@@ -60,10 +63,14 @@ export class RoomService {
     this.#autoDriver = driver;
   }
 
+  /**
+   * 참가 가능한 방 목록.
+   * 저장소의 **요약 색인**만 읽는다 — 목록 한 번 볼 때마다 모든 방의 게임을 복원하지 않는다.
+   */
   async listRooms() {
-    const rooms = await this.#repository.findAll();
-    return rooms
-      .filter((room) => room.isLobby() && !room.isFull())
+    const summaries = await this.#repository.findAllSummaries();
+    return summaries
+      .filter((summary) => summary.status === ROOM_STATUS.LOBBY && summary.seatCount < MAX_SEATS)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .map(toRoomSummaryDto);
   }
@@ -82,11 +89,31 @@ export class RoomService {
     };
   }
 
+  /**
+   * SSE presence 쌍(`seatId` + 좌석 토큰)을 검증해 실제 좌석 id만 돌려준다.
+   * 토큰 대조는 인증기(infrastructure)가, 방 조회는 이 서비스가 맡아 컨트롤러가
+   * 저장소나 도메인 엔티티를 직접 만지지 않게 한다.
+   * @param {{code:string, pairs:Array<{seatId:string, token:string}>}} params
+   * @returns {Promise<string[]>} 검증을 통과한 좌석 id
+   */
+  async verifyPresence({ code, pairs = [] }) {
+    const room = await this.#loadRoom(code);
+    const verified = [];
+    for (const { seatId, token } of pairs) {
+      const resolved = this.#authenticator.resolveSeatId(room, token);
+      if (resolved && resolved === seatId) {
+        verified.push(resolved);
+      }
+    }
+    return verified;
+  }
+
   async createRoom({ hostName }) {
     return this.#mutex.runExclusive(CREATE_LOCK_KEY, () => this.#createRoomLocked({ hostName }));
   }
 
   async #createRoomLocked({ hostName }) {
+    await this.#enforceRoomCapacity();
     const now = this.#clock.now();
     const code = await this.#generateUniqueCode();
     const token = this.#tokenFactory.create();
@@ -122,9 +149,9 @@ export class RoomService {
     this.#guard(() => room.removeSeat({ seatId, bySeatId, now: this.#clock.now() }));
 
     if (room.isEmpty()) {
-      this.#autoDriver?.cancel(room.code);
-      await this.#repository.delete(room.code);
-      return this.#roomDto(room);
+      const dto = this.#roomDto(room);
+      await this.#deleteRoom(room.code);
+      return dto;
     }
     await this.#repository.save(room);
     this.#publishRoom(room);
@@ -155,7 +182,14 @@ export class RoomService {
         break;
       case HOST_ACTIONS.SET_AUTOPILOT:
         this.#guard(() =>
-          room.setAutopilot({ seatId: action.seatId, enabled: Boolean(action.enabled), bySeatId, now }),
+          room.setAutopilot({
+            seatId: action.seatId,
+            enabled: Boolean(action.enabled),
+            bySeatId,
+            // 도메인 규칙("접속 중인 좌석은 켤 수 없다")이 판단할 재료를 PresenceQuery 포트로 확인해 넘긴다.
+            onlineSeatIds: this.#presence.onlineSeatIds(room.code),
+            now,
+          }),
         );
         break;
       case HOST_ACTIONS.START:
@@ -169,23 +203,130 @@ export class RoomService {
     this.#publishRoom(room);
     if (room.game) {
       this.#publisher.publishGame(room.code, { view: toGameViewDto(room.game), events: [] });
-      this.#autoDriver?.schedule(room.code);
     }
+    this.#syncAutoDriver(room);
     return this.#roomDto(room);
   }
 
-  /** 시작 시 오래된 방 정리. */
+  /**
+   * 자동 진행 예약을 현재 턴 좌석에 맞춘다.
+   * 자동 진행을 켠 좌석의 차례면 예약하고, 되돌렸으면 대기 중인 타이머를 취소한다
+   * (사람이 돌아왔는데 서버가 한 수 더 두는 일을 막는다).
+   */
+  #syncAutoDriver(room) {
+    if (room.currentSeatIsAutoControlled()) {
+      this.#autoDriver?.schedule(room.code);
+      return;
+    }
+    this.#autoDriver?.cancelTimer(room.code);
+  }
+
+  /**
+   * 방 개수 상한을 지킨다.
+   * 상한에 닿으면 먼저 **방치된 대기실**(30분 이상 변화 없음)을 쓸어내고, 그래도 자리가 없으면
+   * 거절한다. 진행 중인 방은 사람이 돌아올 수 있으므로 건드리지 않는다.
+   */
+  async #enforceRoomCapacity() {
+    const summaries = await this.#repository.findAllSummaries();
+    if (summaries.length < this.#maxRooms) {
+      return;
+    }
+    let remaining = summaries.length;
+    for (const summary of summaries) {
+      if (summary.status !== ROOM_STATUS.LOBBY) {
+        continue;
+      }
+      if (await this.#deleteIfStillIdle(summary.code)) {
+        remaining -= 1;
+      }
+    }
+    if (remaining >= this.#maxRooms) {
+      throw new AppError('ERR017', `방 개수 상한(${this.#maxRooms}) 초과`);
+    }
+  }
+
+  /**
+   * 오래된 방 정리를 주기적으로 돌린다(시작 시 한 번만으로는 오래 켜 둔 서버가 계속 쌓인다).
+   * 타이머는 unref해 서버 종료를 막지 않는다.
+   * @returns {() => void} 정리 중단 함수
+   */
+  startStaleCleanup({ intervalMs = STALE_CLEANUP_INTERVAL_MS, timers = { setInterval, clearInterval } } = {}) {
+    const handle = timers.setInterval(() => {
+      void this.#runStaleCleanup();
+    }, intervalMs);
+    if (typeof handle?.unref === 'function') {
+      handle.unref();
+    }
+    return () => timers.clearInterval(handle);
+  }
+
+  /** 주기 정리는 실패해도 서버를 멈추지 않는다(다음 주기에 다시 시도). */
+  async #runStaleCleanup() {
+    try {
+      const removed = await this.cleanupStaleRooms();
+      if (removed.length > 0) {
+        this.#logger.info?.(`[RoomService] 오래된 방 ${removed.length}개 정리: ${removed.join(', ')}`);
+      }
+    } catch (error) {
+      this.#logger.error(`[RoomService] 주기 방 정리 실패: ${error.message}`);
+    }
+  }
+
+  /** 오래된 방 정리(시작 시 + 주기적으로). */
   async cleanupStaleRooms() {
     const now = this.#clock.now();
     const rooms = await this.#repository.findAll();
     const removed = [];
     for (const room of rooms) {
-      if (room.isStale(now)) {
-        await this.#repository.delete(room.code);
+      if (!room.isStale(now)) {
+        continue;
+      }
+      if (await this.#deleteIfStale(room.code)) {
         removed.push(room.code);
       }
     }
     return removed;
+  }
+
+  /**
+   * 방치된 방을 **그 방의 잠금 안에서 다시 확인한 뒤** 지운다.
+   *
+   * 목록을 읽은 시점과 지우는 시점 사이에 그 방에 커맨드·참가가 들어올 수 있다. 잠금 없이 지우면
+   * 방금 커밋된 수가 사라지거나(진행 중인 방), 참가가 방을 되살려 스트림만 끊긴 유령 방이 남는다.
+   * @returns {Promise<boolean>} 실제로 지웠는지
+   */
+  #deleteIfStale(code) {
+    return this.#deleteUnderLock(code, (room, now) => room.isStale(now));
+  }
+
+  /** 상한 정리용: 여전히 "방치된 대기실"일 때만 지운다. */
+  #deleteIfStillIdle(code) {
+    return this.#deleteUnderLock(
+      code,
+      (room, now) => room.isLobby() && now - room.updatedAt > IDLE_LOBBY_MS,
+    );
+  }
+
+  #deleteUnderLock(code, stillDeletable) {
+    return this.#mutex.runExclusive(code, async () => {
+      const room = await this.#repository.findByCode(code);
+      if (!room || !stillDeletable(room, this.#clock.now())) {
+        return false;
+      }
+      await this.#deleteRoom(code);
+      return true;
+    });
+  }
+
+  /**
+   * 방을 지우고 그 방에 매달린 자원을 함께 정리한다.
+   * 스트림을 닫지 않으면 구독자가 사라진 방의 이벤트를 영원히 기다리고, 예약을 취소하지 않으면
+   * 드라이버가 없는 방을 계속 깨운다.
+   */
+  async #deleteRoom(code) {
+    this.#autoDriver?.cancel(code);
+    await this.#repository.delete(code);
+    this.#publisher.closeRoom?.(code);
   }
 
   // ── 내부 ────────────────────────────────────────────────────────────────

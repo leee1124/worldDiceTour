@@ -120,6 +120,78 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     assertMoneyConserved(game, '자동 매각');
   });
 
+  describe('정리로 낸 통행료 뒤에는 인수를 제안하지 않는다(현금으로만 인수)', () => {
+    /** 방콕(3, 통행료 140,000 / 인수가 392,000) 통행료를 못 내는 상태 + 팔면 넉넉해지는 서울. */
+    const richAssetGame = () =>
+      insolventGame({
+        cities: [
+          { index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL] },
+          { index: 39, ownerId: 's1', buildings: [VILLA, BUILDING, HOTEL] },
+        ],
+      });
+
+    it('대출로 메운 경우', () => {
+      // Given
+      const game = insolventGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.TAKE_LOAN);
+
+      // Then (대출금 덕에 인수가 392,000원을 낼 수는 있지만 제안하지 않는다)
+      assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
+      assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+      assert.ok(eventTypes(events).includes(EVENT_TYPES.TURN_ENDED));
+      assertMoneyConserved(game, '대출 후 인수 금지');
+    });
+
+    it('자동 매각으로 메운 경우', () => {
+      // Given
+      const game = richAssetGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.AUTO_SELL);
+
+      // Then
+      assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
+      assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+      assertMoneyConserved(game, '자동 매각 후 인수 금지');
+    });
+
+    it('선택 매각으로 메운 경우', () => {
+      // Given
+      const game = richAssetGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 39 });
+
+      // Then
+      assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
+      assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
+      assertMoneyConserved(game, '선택 매각 후 인수 금지');
+    });
+
+    it('현금으로 바로 낸 경우에는 그대로 인수를 제안한다', () => {
+      // Given (통행료 140,000원을 처음부터 현금으로 낼 수 있다)
+      const game = buildGame({
+        cities: [{ index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL] }],
+        random: new FakeRandomSource([1, 2]),
+      });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED).index, 3);
+      assert.equal(game.phase, PHASES.AWAIT_ACQUIRE);
+    });
+  });
+
   it('자동 매각으로 충분하면 더 비싼 자산은 남긴다', () => {
     // Given
     const game = insolventGame({
@@ -138,6 +210,42 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     assert.equal(game.board.cityAt(37).isOwned(), false);
     assert.equal(game.board.cityAt(39).isOwnedBy('s1'), true);
   });
+});
+
+describe('Game(정리 페이즈에 채무가 없는 깨진 상태)', () => {
+  /** 스냅샷이 손상되면 AWAIT_LIQUIDATION인데 채무가 비어 있을 수 있다. */
+  const debtlessLiquidation = () =>
+    buildGame({
+      phase: PHASES.AWAIT_LIQUIDATION,
+      debt: null,
+      cities: [{ index: 39, ownerId: 's1' }],
+      random: new FakeRandomSource([]),
+    });
+
+  for (const [label, type, payload] of [
+    ['선택 매각', COMMAND_TYPES.SELL, { cityIndex: 39 }],
+    ['자동 매각', COMMAND_TYPES.AUTO_SELL, {}],
+    ['대출', COMMAND_TYPES.TAKE_LOAN, {}],
+    ['파산 선언', COMMAND_TYPES.DECLARE_BANKRUPTCY, {}],
+  ]) {
+    it(`${label}은 원시 TypeError가 아니라 규격 도메인 예외로 거부된다`, () => {
+      // Given
+      const game = debtlessLiquidation();
+
+      // When / Then
+      assert.throws(
+        () => game.execute('s1', type, payload),
+        (error) => {
+          assert.equal(error.name, 'DomainError');
+          assert.equal(error.code, DOMAIN_ERROR_CODES.INVALID_STATE);
+          return true;
+        },
+      );
+      assert.equal(game.version, 0);
+      assert.equal(game.playerById('s1').eliminated, false);
+      assert.equal(game.board.cityAt(39).isOwnedBy('s1'), true);
+    });
+  }
 });
 
 describe('Game(대출)', () => {
@@ -170,6 +278,65 @@ describe('Game(대출)', () => {
     assert.equal(game.pendingDecision.canLoan, false);
     assert.throws(() => game.execute('s1', COMMAND_TYPES.TAKE_LOAN), {
       code: DOMAIN_ERROR_CODES.INVALID_STATE,
+    });
+  });
+
+  describe('대출로도 메우지 못하는 큰 채무', () => {
+    /** 서울(39, 랜드마크) 통행료 2,800,000원을 현금 5,000원으로 맞닥뜨린다. */
+    const hugeDebtGame = (overrides = {}) =>
+      buildGame({
+        positions: { s1: 36 },
+        cash: { s1: 5_000 },
+        cities: [{ index: 39, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL], landmark: true }],
+        random: new FakeRandomSource([1, 2]),
+        ...overrides,
+      });
+
+    it('대출을 받아도 부족하면 정리 페이즈에 남고, 두 번째 대출은 거부된다', () => {
+      // Given
+      const game = hugeDebtGame();
+      game.execute('s1', COMMAND_TYPES.ROLL);
+      assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
+      assert.equal(game.pendingDecision.amountDue, 2_800_000);
+
+      // When (실제로 대출을 한 번 받는다 — loanUsed를 주입하지 않는다)
+      game.execute('s1', COMMAND_TYPES.TAKE_LOAN);
+
+      // Then (여전히 부족해 정리 페이즈이며 채무는 그대로다)
+      assert.equal(game.playerById('s1').cash, 5_000 + LOAN_PRINCIPAL);
+      assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
+      assert.equal(game.pendingDecision.amountDue, 2_800_000);
+      assert.equal(game.pendingDecision.canLoan, false);
+
+      // When / Then (두 번째 대출은 거부)
+      assert.throws(() => game.execute('s1', COMMAND_TYPES.TAKE_LOAN), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(game.playerById('s1').loanDebt, LOAN_DEBT);
+      assertMoneyConserved(game, '대출 후에도 부족');
+    });
+
+    it('부족한 매각 한 번으로는 정리 페이즈가 끝나지 않고 채무도 줄지 않는다', () => {
+      // Given (하노이를 팔아도 30,000원뿐)
+      const game = hugeDebtGame({
+        cities: [
+          { index: 39, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL], landmark: true },
+          { index: 1, ownerId: 's1' },
+        ],
+      });
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 1 });
+
+      // Then
+      assert.equal(findEvent(events, EVENT_TYPES.PROPERTY_SOLD).refund, 30_000);
+      assert.equal(findEvent(events, EVENT_TYPES.DEBT_SETTLED), undefined);
+      assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
+      assert.equal(game.pendingDecision.amountDue, 2_800_000);
+      assert.equal(game.playerById('s1').cash, 35_000);
+      assert.equal(game.pendingDecision.canSell, false, '팔 자산이 더 없다');
+      assertMoneyConserved(game, '부족한 매각');
     });
   });
 
@@ -234,6 +401,67 @@ describe('Game(대출)', () => {
   });
 });
 
+describe('Game(순위 동점 처리)', () => {
+  it('총자산이 같으면 현금이 많은 쪽이 앞선다', () => {
+    // Given (총자산 1,000,000원 동점: s1은 전액 현금, s2는 현금 200,000 + 서울 800,000)
+    const game = buildGame({
+      cash: { s1: 1_000_000, s2: 200_000 },
+      cities: [{ index: 39, ownerId: 's2' }],
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const rankings = game.rankings();
+
+    // Then
+    assert.equal(rankings[0].totalAssets, rankings[1].totalAssets);
+    assert.deepEqual(
+      rankings.map((entry) => entry.playerId),
+      ['s1', 's2'],
+    );
+  });
+
+  it('총자산과 현금이 모두 같으면 좌석 순서를 따른다', () => {
+    // Given
+    const game = buildGame({
+      seats: [
+        { id: 's1', name: '하나' },
+        { id: 's2', name: '두리' },
+        { id: 's3', name: '세찌' },
+      ],
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const rankings = game.rankings();
+
+    // Then
+    assert.deepEqual(
+      rankings.map((entry) => entry.playerId),
+      ['s1', 's2', 's3'],
+    );
+    assert.deepEqual(
+      rankings.map((entry) => entry.rank),
+      [1, 2, 3],
+    );
+  });
+
+  it('현금이 많아도 총자산이 적으면 뒤로 간다', () => {
+    // Given (s1 현금 900,000 / s2 현금 100,000 + 서울 800,000 = 900,000... s2가 더 많게)
+    const game = buildGame({
+      cash: { s1: 900_000, s2: 200_000 },
+      cities: [{ index: 39, ownerId: 's2' }],
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const rankings = game.rankings();
+
+    // Then (s2 총자산 1,000,000 > s1 900,000)
+    assert.equal(rankings[0].playerId, 's2');
+  });
+});
+
 describe('Game(파산 선언)', () => {
   it('정리 페이즈에서는 언제든 파산을 선언할 수 있다', () => {
     // Given
@@ -278,7 +506,20 @@ describe('Game(파산 선언)', () => {
     assert.throws(() => game.execute('s1', COMMAND_TYPES.AUTO_SELL), {
       code: DOMAIN_ERROR_CODES.INVALID_STATE,
     });
-    assert.doesNotThrow(() => game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY));
+    assert.throws(() => game.execute('s1', COMMAND_TYPES.TAKE_LOAN), {
+      code: DOMAIN_ERROR_CODES.INVALID_STATE,
+    });
+
+    // When (남은 유일한 선택지를 실제로 실행한다)
+    const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then (파산이 성립하고 남은 현금이 채권자에게 넘어간다)
+    assert.equal(findEvent(events, EVENT_TYPES.BANKRUPT).playerId, 's1');
+    assert.equal(game.playerById('s1').eliminated, true);
+    assert.equal(game.playerById('s1').cash, 0);
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 5_000);
+    assert.equal(game.isOver(), true);
+    assertMoneyConserved(game, '유일한 선택지 파산');
   });
 
   it('마지막 한 명이 남으면 게임이 끝난다', () => {
@@ -292,6 +533,90 @@ describe('Game(파산 선언)', () => {
     // Then
     assert.equal(game.isOver(), true);
     assert.equal(findEvent(events, EVENT_TYPES.GAME_OVER).rankings[0].playerId, 's2');
+  });
+
+  it('여러 사람에게 줄 채무로 파산하면 남은 현금을 고르게 나눈다', () => {
+    // Given (한턱 쏘기 티켓: s2·s3에게 30,000원씩 = 60,000원, 현금은 1,000원뿐)
+    const game = buildGame({
+      seats: [
+        { id: 's1', name: '하나' },
+        { id: 's2', name: '두리' },
+        { id: 's3', name: '세찌' },
+      ],
+      cash: { s1: 1_000 },
+      drawPile: ['T16'],
+      random: new FakeRandomSource([1, 1, 0]),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+    assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then (1,000원을 두 명에게 500원씩)
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 500);
+    assert.equal(game.playerById('s3').cash, STARTING_CASH + 500);
+    assert.equal(game.playerById('s1').cash, 0);
+    const transfers = events.filter((event) => event.type === EVENT_TYPES.MONEY_TRANSFERRED);
+    assert.deepEqual(
+      transfers.map((event) => [event.toId, event.amount]),
+      [
+        ['s2', 500],
+        ['s3', 500],
+      ],
+    );
+    const bankrupt = findEvent(events, EVENT_TYPES.BANKRUPT);
+    assert.equal(bankrupt.paidAmount, 1_000);
+    // 대표 채권자 한 명(기존 필드)과 실제 수령자 전원(추가 필드)을 함께 알려준다.
+    assert.equal(bankrupt.creditorId, 's2');
+    assert.deepEqual(bankrupt.creditorIds, ['s2', 's3']);
+    assertMoneyConserved(game, '여러 채권자 파산');
+  });
+
+  it('고르게 나눌 수 없는 잔액은 좌석 순서가 앞선 채권자가 받는다', () => {
+    // Given (현금 1,001원 → 500원씩 나누고 남은 1원은 s2에게)
+    const game = buildGame({
+      seats: [
+        { id: 's1', name: '하나' },
+        { id: 's2', name: '두리' },
+        { id: 's3', name: '세찌' },
+      ],
+      cash: { s1: 1_001 },
+      drawPile: ['T16'],
+      random: new FakeRandomSource([1, 1, 0]),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 501);
+    assert.equal(game.playerById('s3').cash, STARTING_CASH + 500);
+    assertMoneyConserved(game, '나머지 배분');
+  });
+
+  it('채권자가 자기 자신으로 기록된 깨진 채무에서도 돈이 사라지지 않는다', () => {
+    // Given (손상된 스냅샷: 자기에게 갚아야 하는 채무)
+    const game = buildGame({
+      cash: { s1: 1_000 },
+      phase: PHASES.AWAIT_LIQUIDATION,
+      debt: {
+        reason: 'TOLL',
+        items: [{ amount: 500_000, sink: 'PLAYER', toPlayerId: 's1' }],
+        event: { type: EVENT_TYPES.TOLL_PAID, payload: { payerId: 's1', amount: 500_000 } },
+        next: { kind: 'TURN_END' },
+      },
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then (자기에게 돌려주지 않고 은행으로 보내 총액이 보존된다)
+    assert.equal(game.playerById('s1').eliminated, true);
+    assert.equal(game.playerById('s1').cash, 0);
+    assertMoneyConserved(game, '자기 채권자 방어');
   });
 
   it('은행에 대한 채무로 파산하면 남은 현금은 은행으로 간다', () => {
@@ -310,12 +635,14 @@ describe('Game(파산 선언)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When
-    game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+    const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
 
     // Then
     assert.equal(game.playerById('s1').eliminated, true);
     assert.equal(game.playerById('s2').cash, STARTING_CASH);
     assert.equal(game.board.cityAt(1).isOwned(), false);
+    // 은행 채무에는 플레이어 채권자가 없다.
+    assert.deepEqual(findEvent(events, EVENT_TYPES.BANKRUPT).creditorIds, []);
     assertMoneyConserved(game, '은행 채무 파산');
   });
 });

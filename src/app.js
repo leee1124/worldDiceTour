@@ -22,8 +22,12 @@ export function createApp({
   logger = console,
   clock = { now: () => Date.now() },
   heartbeatMs,
+  allowedHosts = [],
+  sseLimits = {},
+  presenceDebounceMs,
+  staleCleanupIntervalMs,
 }) {
-  const sseHub = new SseHub({ logger, ...(heartbeatMs ? { heartbeatMs } : {}) });
+  const sseHub = new SseHub({ logger, ...(heartbeatMs ? { heartbeatMs } : {}), ...sseLimits });
   const presence = { onlineSeatIds: (code) => sseHub.onlineSeatIds(code) };
   const authenticator = new SeatAuthenticator();
   // 방 단위 "불러오기 → 변경 → 저장"을 직렬화한다(두 서비스가 같은 잠금을 공유해야 한다).
@@ -65,13 +69,17 @@ export function createApp({
     roomService,
     gameService,
     sseHub,
-    authenticator,
-    repository,
     networkInfo: () => serverInfo(currentPort()),
     logger,
+    ...(presenceDebounceMs === undefined ? {} : { presenceDebounceMs }),
   });
 
-  const server = createHttpServer({ controller, publicDir, logger });
+  const server = createHttpServer({ controller, publicDir, logger, allowedHosts });
+
+  // 오래된 방 정리는 시작 시 한 번으로 끝내지 않고 주기적으로 돈다(오래 켜 둔 서버 대비).
+  const stopStaleCleanup = roomService.startStaleCleanup(
+    staleCleanupIntervalMs === undefined ? {} : { intervalMs: staleCleanupIntervalMs },
+  );
 
   function currentPort() {
     const address = server.address();
@@ -86,6 +94,7 @@ export function createApp({
     gameService,
     /** 테스트/종료용: 타이머와 열린 스트림을 모두 정리한 뒤 서버를 닫는다. */
     async close() {
+      stopStaleCleanup();
       driver.stop();
       sseHub.closeAll();
       await new Promise((resolve) => server.close(resolve));

@@ -19,6 +19,9 @@ export const ERROR_CATALOG = Object.freeze({
   ERR012: { status: 409, message: '좌석을 찾을 수 없습니다.' },
   ERR013: { status: 409, message: '게임을 시작할 수 없습니다.' },
   ERR014: { status: 405, message: '허용되지 않은 요청 방식입니다.' },
+  ERR015: { status: 403, message: '허용되지 않은 접속 주소입니다.' },
+  ERR016: { status: 503, message: '접속자가 너무 많습니다. 잠시 후 다시 시도하세요.' },
+  ERR017: { status: 503, message: '방을 더 만들 수 없습니다. 잠시 후 다시 시도하세요.' },
 });
 
 /** 도메인 사유 코드 → 클라이언트 에러 코드 매핑. */
@@ -29,6 +32,7 @@ const DOMAIN_TO_APP = Object.freeze({
   [DOMAIN_ERROR_CODES.NOT_YOUR_TURN]: 'ERR006',
   [DOMAIN_ERROR_CODES.INSUFFICIENT_CASH]: 'ERR008',
   [DOMAIN_ERROR_CODES.NOT_HOST]: 'ERR003',
+  [DOMAIN_ERROR_CODES.FORBIDDEN]: 'ERR003',
   [DOMAIN_ERROR_CODES.ROOM_FULL]: 'ERR007',
   [DOMAIN_ERROR_CODES.SEAT_NOT_FOUND]: 'ERR012',
   [DOMAIN_ERROR_CODES.NOT_ENOUGH_SEATS]: 'ERR013',
