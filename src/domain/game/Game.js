@@ -173,7 +173,7 @@ export class Game {
    * @param {{ticketCatalog?: Record<string, object>}} [options]
    *   `ticketCatalog`는 **테스트 전용** 티켓 목록이다. 배포 데이터로는 만들 수 없는 상황
    *   (예: 티켓이 연달아 나오는 연쇄)을 실제로 재현해 검증하기 위한 seam이며,
-   *   운영 경로에서는 언제나 생략해 배포 티켓 20장을 쓴다.
+   *   운영 경로에서는 언제나 생략해 배포 티켓 22장을 쓴다.
    */
   static restore(snapshot, random, { ticketCatalog } = {}) {
     if (!snapshot || !Array.isArray(snapshot.players)) {
