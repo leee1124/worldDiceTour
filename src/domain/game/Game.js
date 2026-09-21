@@ -505,6 +505,7 @@ export class Game {
       .map((city) => ({
         index: city.index,
         name: city.name,
+        price: city.price,
         options: this.#buildOptionsOf(city),
       }));
   }
