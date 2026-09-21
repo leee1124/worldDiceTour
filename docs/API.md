@@ -700,6 +700,10 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 
 섹터 코드와 이름: `AIRLINE` 항공 · `CONSTRUCTION` 건설 · `HOTEL` 호텔·관광 · `ENTERTAINMENT` 카지노·엔터 · `ENERGY` 에너지.
 
+> **`instruments` 배열의 순서는 고정이 아니다.** 상장폐지가 일어나면 그 종목이 목록에서 빠지고
+> 신규 상장 종목이 **배열 끝에** 붙는다(개수는 항상 5). 카드 위치를 배열 인덱스로 기억하지 말고
+> **`id`를 키로** 쓸 것 — 그러면 종목이 교체돼도 화면이 어긋나지 않는다.
+
 ### 9.2 종목 (기준 시세)
 
 | id | 이름 | 섹터 | 기준가 | 배당 | 변동성 |
