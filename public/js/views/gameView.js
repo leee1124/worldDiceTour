@@ -64,9 +64,9 @@ export function createGameView({
   return {
     element,
 
-    update(state) {
+    update(state, context = {}) {
       if (state.view) {
-        statusStrip.update(state);
+        statusStrip.update(state, context);
         legendView.update(state);
       }
       setText(codeNode, state.room?.code ?? '----');

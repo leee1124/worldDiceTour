@@ -1,0 +1,1403 @@
+/* ==========================================================================
+   증권거래소 — 시장 패널 · 종목 카드 · 거래 시트 · 뉴스 카드 · 총자산 내역
+   콘셉트: 종이 보드 위에 놓인 얇은 전광판. 국면마다 띠 색만 바뀌고 글자는 늘 또렷하다.
+   ========================================================================== */
+
+:root {
+  /* 등락·손익 색. 색만으로 방향을 말하지 않는다(화살표·부호를 늘 함께 쓴다). */
+  --tick-up: #2fd39a;
+  --tick-down: #ff6b7a;
+  --tick-flat: var(--text-500);
+
+  /* 경기 국면 */
+  --cycle-expansion: #35c98f;
+  --cycle-overheat: #ff9d3c;
+  --cycle-recession: #6f8fdc;
+  --cycle-recovery: #48c7d8;
+}
+
+/* ── 시장 패널 ──────────────────────────────────────────────── */
+
+.market-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(239, 193, 101, 0.22);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(8, 24, 36, 0.92), rgba(6, 16, 25, 0.96));
+  text-align: left;
+}
+
+.market-panel[data-cycle='expansion'] {
+  border-top: 2px solid var(--cycle-expansion);
+}
+.market-panel[data-cycle='overheat'] {
+  border-top: 2px solid var(--cycle-overheat);
+}
+.market-panel[data-cycle='recession'] {
+  border-top: 2px solid var(--cycle-recession);
+}
+.market-panel[data-cycle='recovery'] {
+  border-top: 2px solid var(--cycle-recovery);
+}
+
+.market-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.3rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.market-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.market-toggle-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.market-eyebrow {
+  color: var(--gold-300);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.market-head-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.45rem;
+}
+
+.market-toggle-icon {
+  flex: none;
+  color: var(--text-500);
+  font-size: 0.9rem;
+}
+
+.cycle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cycle-badge[data-tone='expansion'] {
+  border-color: color-mix(in srgb, var(--cycle-expansion) 55%, transparent);
+  background: color-mix(in srgb, var(--cycle-expansion) 16%, transparent);
+  color: var(--cycle-expansion);
+}
+.cycle-badge[data-tone='overheat'] {
+  border-color: color-mix(in srgb, var(--cycle-overheat) 55%, transparent);
+  background: color-mix(in srgb, var(--cycle-overheat) 16%, transparent);
+  color: var(--cycle-overheat);
+}
+.cycle-badge[data-tone='recession'] {
+  border-color: color-mix(in srgb, var(--cycle-recession) 55%, transparent);
+  background: color-mix(in srgb, var(--cycle-recession) 16%, transparent);
+  color: var(--cycle-recession);
+}
+.cycle-badge[data-tone='recovery'] {
+  border-color: color-mix(in srgb, var(--cycle-recovery) 55%, transparent);
+  background: color-mix(in srgb, var(--cycle-recovery) 16%, transparent);
+  color: var(--cycle-recovery);
+}
+
+.cycle-age,
+.market-rate-label {
+  color: var(--text-500);
+  font-size: 0.74rem;
+}
+
+.market-rate {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.market-rate-value {
+  font-family: var(--font-num);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--gold-300);
+}
+
+/* 뉴스 한 줄 */
+.market-news {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-100);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market-news:hover {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.market-news-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.market-news-round {
+  flex: none;
+  color: var(--gold-400);
+  font-family: var(--font-num);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.market-news-headline {
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-news-more {
+  margin-left: auto;
+  color: var(--text-500);
+  font-size: 1rem;
+}
+
+.market-spectate {
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(47, 243, 224, 0.1);
+  color: var(--neon-cyan);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.market-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+/* ── 종목 카드 캐러셀 ──────────────────────────────────────── */
+
+.market-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 10.5rem;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+}
+
+.instr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--tick-flat);
+  border-radius: var(--radius-sm);
+  background: rgba(3, 12, 20, 0.55);
+  scroll-snap-align: start;
+}
+
+.instr-card[data-tone='up'] {
+  border-left-color: var(--tick-up);
+}
+.instr-card[data-tone='down'] {
+  border-left-color: var(--tick-down);
+}
+
+.instr-card--delisted {
+  opacity: 0.6;
+  border-left-color: var(--danger);
+  background: rgba(60, 10, 16, 0.5);
+}
+
+.instr-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+
+.instr-name {
+  overflow: hidden;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instr-sector {
+  flex: none;
+  color: var(--text-500);
+  font-size: 0.68rem;
+}
+
+.instr-figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+
+.instr-price {
+  font-family: var(--font-num);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.instr-price--up {
+  animation: tick-up 700ms ease-out;
+}
+
+.instr-price--down {
+  animation: tick-down 700ms ease-out;
+}
+
+.instr-change {
+  font-family: var(--font-num);
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.instr-change[data-tone='up'],
+.instr-pnl[data-tone='up'] {
+  color: var(--tick-up);
+}
+.instr-change[data-tone='down'],
+.instr-pnl[data-tone='down'] {
+  color: var(--tick-down);
+}
+.instr-change[data-tone='flat'],
+.instr-pnl[data-tone='flat'] {
+  color: var(--tick-flat);
+}
+
+.instr-spark-slot {
+  height: 2.1rem;
+}
+
+.instr-spark {
+  display: block;
+  width: 100%;
+  height: 2.1rem;
+}
+
+.instr-spark-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.instr-spark-area {
+  fill: currentColor;
+  opacity: 0.14;
+  stroke: none;
+}
+
+.instr-spark-dot {
+  fill: currentColor;
+}
+
+.instr-card[data-tone='up'] .instr-spark {
+  color: var(--tick-up);
+}
+.instr-card[data-tone='down'] .instr-spark {
+  color: var(--tick-down);
+}
+.instr-card[data-tone='flat'] .instr-spark {
+  color: var(--text-500);
+}
+
+.instr-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 0.3rem;
+  font-size: 0.72rem;
+}
+
+/* 좁은 칸에서도 "보유 40주"와 "+32,000원"이 글자 단위로 쪼개지지 않게. */
+.instr-mine,
+.instr-pnl,
+.instr-dividend {
+  white-space: nowrap;
+}
+
+.instr-foot--meta {
+  color: var(--text-500);
+  font-size: 0.68rem;
+}
+
+.instr-mine {
+  color: var(--text-300);
+  font-weight: 700;
+}
+
+.instr-pnl {
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.instr-state {
+  color: #ffb3b8;
+  font-weight: 800;
+}
+
+/* ── 다음 틱 압력 · 내 금융자산 ────────────────────────────── */
+
+.market-nudges,
+.market-mine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.market-nudge-label,
+.market-mine-label {
+  color: var(--text-500);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.nudge-chip,
+.market-mine-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.72rem;
+}
+
+.market-mine-chip {
+  border-style: solid;
+  background: var(--surface);
+}
+
+.nudge-chip[data-tone='up'] {
+  border-color: color-mix(in srgb, var(--tick-up) 50%, transparent);
+  color: var(--tick-up);
+}
+.nudge-chip[data-tone='down'] {
+  border-color: color-mix(in srgb, var(--tick-down) 50%, transparent);
+  color: var(--tick-down);
+}
+
+.nudge-chip-value,
+.market-mine-value {
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.market-mine-key {
+  color: var(--text-500);
+}
+
+.market-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* ── 예약 주문 목록 ────────────────────────────────────────── */
+
+.market-queue,
+.trade-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.market-queue-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.market-queue-title,
+.trade-queue-title {
+  color: var(--text-300);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.market-queue-note {
+  color: var(--text-500);
+  font-size: 0.68rem;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-row {
+  display: grid;
+  grid-template-columns: minmax(2.5rem, auto) auto 1fr auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.74rem;
+}
+
+.queue-row--mine {
+  border-color: rgba(47, 243, 224, 0.4);
+  background: rgba(47, 243, 224, 0.07);
+}
+
+.queue-seat {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-kind {
+  padding: 0.02rem 0.35rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.queue-kind--BUY_STOCK {
+  color: var(--tick-up);
+}
+.queue-kind--SELL_STOCK {
+  color: var(--tick-down);
+}
+
+.queue-detail {
+  color: var(--text-300);
+  font-family: var(--font-num);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-spacer {
+  width: 0;
+}
+
+/* ── 거래 시트 ──────────────────────────────────────────────── */
+
+.trade {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.trade-tabs {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.trade-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: var(--tap);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-300);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.trade-tab--on {
+  border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.16);
+  color: var(--gold-300);
+}
+
+.trade-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.trade-seats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.trade-seats-label {
+  color: var(--text-500);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.trade-picker {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 8.5rem;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+}
+
+.instr-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-height: var(--tap);
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(3, 12, 20, 0.5);
+  color: var(--text-100);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  scroll-snap-align: start;
+}
+
+.instr-chip--on {
+  border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.14);
+}
+
+.instr-chip--off {
+  opacity: 0.5;
+}
+
+.instr-chip-name {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instr-chip-price {
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.instr-chip-change {
+  font-family: var(--font-num);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.instr-chip-change[data-tone='up'] {
+  color: var(--tick-up);
+}
+.instr-chip-change[data-tone='down'] {
+  color: var(--tick-down);
+}
+.instr-chip-change[data-tone='flat'] {
+  color: var(--tick-flat);
+}
+
+.instr-chip-qty {
+  color: var(--text-300);
+  font-size: 0.68rem;
+}
+
+.instr-chip-qty--none {
+  color: var(--text-500);
+}
+
+.trade-sides {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.trade-side {
+  min-height: var(--tap);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-300);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.trade-side--on {
+  border-color: var(--neon-cyan);
+  background: rgba(47, 243, 224, 0.14);
+  color: var(--neon-cyan);
+}
+
+.trade-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.trade-stepper-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.trade-stepper-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.trade-stepper-max,
+.trade-stepper-note {
+  color: var(--text-500);
+  font-size: 0.72rem;
+}
+
+.trade-stepper-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.trade-step {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-100);
+  font: inherit;
+  font-family: var(--font-num);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.trade-step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.trade-quantity {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem;
+  flex: 1 1 4.5rem;
+  min-height: var(--tap);
+  padding: 0 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(3, 12, 20, 0.6);
+}
+
+.trade-quantity-value {
+  font-family: var(--font-num);
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: var(--tap);
+}
+
+.trade-quantity-unit {
+  color: var(--text-500);
+  font-size: 0.78rem;
+}
+
+.trade-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.money-row--strong .money-row-value {
+  font-size: 1.05rem;
+  color: var(--gold-300);
+}
+
+.trade-reason {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgba(240, 85, 95, 0.14);
+  color: #ffb9be;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.trade-note {
+  color: var(--text-500);
+  font-size: 0.76rem;
+}
+
+/*
+  주문·마감 버튼은 시트 아래에 붙여 둔다(폰에서 본문이 길어도 항상 손에 닿게).
+  배경은 **완전히 불투명해야 한다** — 반투명이면 뒤의 금액 줄이 비쳐 숫자가 겹쳐 보인다.
+*/
+.trade-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  position: sticky;
+  bottom: -1.1rem;
+  margin: 0 -1.1rem -1.1rem;
+  padding: 0.5rem 1.1rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line-strong);
+  background: #0b1a27;
+  box-shadow: 0 -8px 18px rgba(4, 10, 16, 0.55);
+}
+
+/* 주문 한 건(되돌릴 수 있다) — 차례를 넘기는 금색 CTA와 색으로 구분한다. */
+.btn--accent {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3ad9c6, #1d9e97);
+  color: #03201f;
+  box-shadow: 0 8px 18px rgba(47, 243, 224, 0.2);
+}
+
+.btn--accent:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5ff0dd, #26b6ad);
+}
+
+.trade-budget {
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.trade-hold-note {
+  color: var(--text-500);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+/* ── 정리 모달의 부분 매각 행 ──────────────────────────────── */
+
+/*
+  주식·예금은 수량을 고를 수 있어 한 줄에 이름 + 스테퍼 + 환급 + 버튼이 모두 들어가야 한다.
+  360px 폰에서는 불가능하므로 **줄바꿈으로 눕힌다** — 미디어 쿼리가 아니라 flex-basis로 정하므로
+  모달이 좁으면(폰) 두세 줄, 넓으면 한 줄이 된다(모달 폭은 화면 폭과 다를 수 있다).
+*/
+.sell-row--pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.sell-row--pick .sell-main {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.sell-row--pick .sell-stepper {
+  flex: 1 1 9.5rem;
+}
+
+.sell-row--pick .sell-tail {
+  flex: 1 1 7rem;
+  justify-content: flex-end;
+}
+
+.sell-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sell-unit {
+  color: var(--text-500);
+  font-size: 0.7rem;
+}
+
+.sell-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sell-quantity {
+  flex: 1 1 auto;
+  min-width: 3.5rem;
+  font-family: var(--font-num);
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.sell-tail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+/* ── 뉴스 카드 연출 ────────────────────────────────────────── */
+
+.news-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(3, 9, 15, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.news-overlay--leaving {
+  animation: news-out 180ms ease-in forwards;
+}
+
+.news-card {
+  position: relative;
+  width: min(22rem, 100%);
+  min-height: 12rem;
+  transform-style: preserve-3d;
+  transition: transform 520ms cubic-bezier(0.2, 1.05, 0.35, 1);
+}
+
+.news-card--flipped {
+  transform: rotateY(180deg);
+}
+
+.news-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(239, 193, 101, 0.4);
+  border-radius: var(--radius-lg);
+  backface-visibility: hidden;
+  box-shadow: var(--shadow-lift);
+}
+
+.news-face--back {
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(140deg, #1d3348, #0d1b28);
+}
+
+.news-back-mark {
+  font-size: 2.4rem;
+}
+
+.news-back-title {
+  color: var(--gold-300);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.news-face--front {
+  transform: rotateY(180deg);
+  background: linear-gradient(170deg, var(--paper-100), var(--paper-200));
+  color: var(--ink-900);
+}
+
+.news-eyebrow {
+  color: var(--gold-700);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.news-headline {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--ink-900);
+}
+
+.news-why {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-700);
+}
+
+.news-why-label {
+  font-weight: 800;
+  color: var(--gold-700);
+}
+
+.news-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: auto;
+}
+
+.news-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.12rem 0.5rem;
+  border: 1px solid rgba(20, 34, 45, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.news-chip[data-tone='up'] {
+  color: #0c7a55;
+  border-color: rgba(12, 122, 85, 0.4);
+}
+.news-chip[data-tone='down'] {
+  color: #b3242f;
+  border-color: rgba(179, 36, 47, 0.4);
+}
+.news-chip[data-tone='flat'] {
+  color: var(--ink-700);
+}
+
+/* 시트 안(어두운 배경)에서는 칩 색을 밝은 쪽으로 뒤집는다. */
+.news-chips--sheet .news-chip {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+.news-chips--sheet .news-chip[data-tone='up'] {
+  color: var(--tick-up);
+}
+.news-chips--sheet .news-chip[data-tone='down'] {
+  color: var(--tick-down);
+}
+.news-chips--sheet .news-chip[data-tone='flat'] {
+  color: var(--text-300);
+}
+
+.news-sheet-cycle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.news-sheet-rate {
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.news-sheet-card {
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(170deg, var(--paper-100), var(--paper-200));
+  color: var(--ink-900);
+}
+
+.news-sheet-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* 국면 전환 배너 */
+.cycle-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 1.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(140deg, rgba(14, 34, 50, 0.97), rgba(7, 18, 28, 0.97));
+  box-shadow: var(--shadow-lift);
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition: opacity 220ms ease-out, transform 260ms cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+.cycle-banner--in {
+  opacity: 1;
+  transform: none;
+}
+
+.cycle-banner[data-phase='EXPANSION'] {
+  border-color: var(--cycle-expansion);
+}
+.cycle-banner[data-phase='OVERHEAT'] {
+  border-color: var(--cycle-overheat);
+}
+.cycle-banner[data-phase='RECESSION'] {
+  border-color: var(--cycle-recession);
+}
+.cycle-banner[data-phase='RECOVERY'] {
+  border-color: var(--cycle-recovery);
+}
+
+.cycle-banner-eyebrow {
+  color: var(--text-500);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.cycle-banner-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.cycle-banner-from {
+  color: var(--text-500);
+}
+
+.cycle-banner-arrow {
+  color: var(--gold-400);
+}
+
+.cycle-banner-to {
+  color: var(--gold-300);
+}
+
+.cycle-banner-note {
+  color: var(--text-300);
+  font-size: 0.78rem;
+}
+
+/* 상장폐지 */
+.delist-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: min(20rem, 100%);
+  padding: 1.1rem 1.2rem;
+  border: 2px solid var(--danger);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, rgba(56, 10, 18, 0.97), rgba(24, 6, 10, 0.97));
+  box-shadow: var(--shadow-lift);
+  opacity: 0;
+  transform: scale(1.06);
+  transition: opacity 200ms ease-out, transform 240ms ease-out;
+}
+
+.delist-card--in {
+  opacity: 1;
+  transform: none;
+}
+
+.delist-stamp {
+  padding: 0.15rem 0.7rem;
+  border: 2px solid var(--danger);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  transform: rotate(-6deg);
+}
+
+.delist-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.delist-price,
+.delist-note {
+  color: var(--text-300);
+  font-size: 0.8rem;
+}
+
+.delist-wiped {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+.delist-wiped-row {
+  color: #ffb3b8;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* ── 종료 순위의 총자산 내역 ───────────────────────────────── */
+
+/*
+  내역이 "현금 · 부동산 · 주식 · 예금"으로 길어졌다. 좁은 화면에서 한 줄을 고집하면
+  이름 칸이 0으로 눌려 한 글자씩 세로로 쪼개진다 — 폭이 모자라면 금액 덩어리를 아랫줄로 내린다.
+*/
+.ranking-row {
+  flex-wrap: wrap;
+}
+
+.ranking-main {
+  flex: 1 1 6rem;
+}
+
+.ranking-assets {
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+
+.ranking-breakdown {
+  white-space: normal;
+  text-align: right;
+  line-height: 1.45;
+}
+
+/* ── 총자산 내역(플레이어 카드) ────────────────────────────── */
+
+.player-breakdown-toggle {
+  min-height: 32px;
+  padding: 0.1rem 0.3rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-500);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player-breakdown-toggle:hover {
+  color: var(--text-300);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.player-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.15rem 0.5rem;
+}
+
+.nw-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.72rem;
+}
+
+.nw-key {
+  color: var(--text-500);
+}
+
+.nw-value {
+  font-family: var(--font-num);
+  font-weight: 800;
+}
+
+.nw-row--out .nw-value {
+  color: var(--tick-down);
+}
+
+/* ── 첫 사용 안내 ──────────────────────────────────────────── */
+
+.tutorial-text {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-100);
+}
+
+.tutorial-points {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.tutorial-point {
+  color: var(--text-300);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* ── 상황판의 거래 버튼 ────────────────────────────────────── */
+
+.strip-btn--trade {
+  width: 100%;
+}
+
+/* ── 로비 호스트 도구 ──────────────────────────────────────── */
+
+/*
+  설명이 길어 칩이 눌리기 쉽다 — 뷰포트 기준 미디어 쿼리 대신 **행 안에서** 접히게 둔다
+  (호스트 도구 카드 폭은 화면 폭과 다를 수 있다).
+*/
+.tool-row--finance {
+  flex-wrap: wrap;
+  border-color: rgba(239, 193, 101, 0.35);
+  background: rgba(239, 193, 101, 0.07);
+}
+
+.tool-row--finance .tool-label {
+  flex: 1 1 13rem;
+}
+
+.tool-row--finance .chip-row {
+  flex: 0 0 auto;
+}
+
+.tool-row--finance .btn--chip {
+  white-space: nowrap;
+}
+
+.tool-row--readonly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── 애니메이션 ────────────────────────────────────────────── */
+
+@keyframes tick-up {
+  0% {
+    color: var(--tick-up);
+    transform: translateY(0.25rem);
+  }
+  100% {
+    color: inherit;
+    transform: none;
+  }
+}
+
+@keyframes tick-down {
+  0% {
+    color: var(--tick-down);
+    transform: translateY(-0.25rem);
+  }
+  100% {
+    color: inherit;
+    transform: none;
+  }
+}
+
+@keyframes news-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+  넓은 화면: 종목 카드를 한 줄에 펼친다(가로 스크롤 없이 5종목이 모두 보인다).
+  두 줄로 접히면 중앙 코어가 길어져 라운드·차례 안내가 스크롤 밖으로 밀려난다 —
+  그래서 최소 폭을 좁게 잡아 **한 줄을 유지**한다.
+*/
+@media (min-width: 68.01rem) {
+  .market-rail {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr));
+    overflow-x: visible;
+  }
+
+  /* 칸이 좁아진 만큼 이름·업종과 가격·등락을 세로로 쌓는다(가로로 넘치지 않게). */
+  .instr-head,
+  .instr-figures {
+    flex-direction: column;
+    /* stretch여야 이름이 칸 폭을 채우고 말줄임(…)이 걸린다 — flex-start면 글자 폭대로 넘친다. */
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .instr-price {
+    font-size: 0.88rem;
+  }
+
+  .instr-card {
+    padding: 0.4rem 0.4rem;
+  }
+}
+
+/* 아주 좁은 폰: 종목 카드 폭을 화면에 맞춰 한 장씩 스냅되게 한다. */
+@media (max-width: 24rem) {
+  .market-rail {
+    grid-auto-columns: 9.5rem;
+  }
+
+  .trade-picker {
+    grid-auto-columns: 7.8rem;
+  }
+}
+
+/* 모션 축소: 뒤집기·카운트 대신 그냥 나타난다(정보는 하나도 잃지 않는다). */
+@media (prefers-reduced-motion: reduce) {
+  .news-card,
+  .cycle-banner,
+  .delist-card {
+    transition: none;
+  }
+
+  .news-card--flipped {
+    transform: rotateY(180deg);
+  }
+
+  .instr-price--up,
+  .instr-price--down {
+    animation: none;
+  }
+}
