@@ -381,6 +381,8 @@ export function createGameController({ appRoot, overlayRoot }) {
           storage.markAllTutorialsSeen(TUTORIAL_CARDS.map((item) => item.id));
           modalHost.close(TUTORIAL_MODAL_ID);
         },
+        // ✕/Esc로 닫으면 지금 카드만 읽은 것으로 본다(나머지는 다음에 다시 뜬다).
+        onDismiss: () => storage.markTutorialSeen(card.id),
       }),
     );
   }
@@ -405,6 +407,9 @@ export function createGameController({ appRoot, overlayRoot }) {
       if (windowKey && isMyActingTurn(state)) {
         tradeSheet = { mode: 'TRADE', seatId: actingSeatId(state) };
         tradeView.resetForm();
+        // 처음 거래하는 사람에게 안내 카드를 한 번 얹는다. 지금 그리는 중이라
+        // 이 렌더가 끝난 뒤에 띄운다(같은 렌더에서 열면 closeOthers가 곧바로 닫는다).
+        window.setTimeout(() => showTutorial(), 0);
       } else if (tradeSheet?.mode === 'TRADE') {
         tradeSheet = null;
       }
@@ -420,6 +425,12 @@ export function createGameController({ appRoot, overlayRoot }) {
     }
     // 창구가 닫혔으면 거래 모드를 유지할 수 없다.
     if (tradeSheet.mode === 'TRADE' && (view.phase !== 'AWAIT_TRADE' || !isMyActingTurn(state))) {
+      tradeSheet = null;
+      modalHost.close(TRADE_MODAL_ID);
+      return false;
+    }
+    // 내 결정(매입·건설·정리 등)이 기다리고 있으면 예약 주문 시트가 그것을 가려서는 안 된다.
+    if (tradeSheet.mode === 'QUEUE' && isMyTurn(state) && view.pending && view.pending.kind !== 'TRADE') {
       tradeSheet = null;
       modalHost.close(TRADE_MODAL_ID);
       return false;

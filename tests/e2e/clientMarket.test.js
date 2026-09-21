@@ -355,6 +355,17 @@ test('주문 폼: 주문 건수를 다 쓰면 모든 주문이 막힌다', () =>
   assert.equal(preview.reason, 'ORDER_LIMIT');
 });
 
+test('주문 폼: 예산이 바닥나 수량이 0이 돼도 진짜 이유(주문 한도)를 말한다', () => {
+  // Given 주문 3건을 모두 쓴 창구(고를 수 있는 수량이 0이 된다)
+  const spent = { ...OPEN_BUDGET, ordersUsed: 3, ordersLeft: 0, notionalLeft: 0 };
+  // When 수량 0으로 미리보면
+  const stock = previewOrder({ ...base, budget: spent, kind: 'BUY_STOCK', instrument: AIR, quantity: 0 });
+  const deposit = previewOrder({ ...base, budget: spent, kind: 'DEPOSIT', amount: 0 });
+  // Then "수량 범위"가 아니라 "주문 한도"라고 말한다(수량이 0인 것은 결과이지 원인이 아니다)
+  assert.equal(stock.reason, 'ORDER_LIMIT');
+  assert.equal(deposit.reason, 'ORDER_LIMIT');
+});
+
 test('주문 폼: 창구가 닫혀 있으면 즉시 주문은 막고 예약 주문은 허용한다', () => {
   // Given 창구가 닫힌 예산(남의 턴)
   const closed = { ...OPEN_BUDGET, open: false };

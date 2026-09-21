@@ -100,7 +100,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
   const previewNode = el('div', { class: 'trade-preview' });
   const reasonNode = el('p', { class: 'trade-reason', role: 'status' });
   const noteNode = el('p', { class: 'trade-note' });
-  const submitButton = button({ class: 'btn btn--primary btn--block', dataset: { focusKey: 'trade-submit' } }, '주문');
+  const submitButton = button({ class: 'btn btn--accent btn--block', dataset: { focusKey: 'trade-submit' } }, '주문');
 
   const budgetNode = el('p', { class: 'trade-budget' });
   const closeButton = button(
@@ -118,10 +118,11 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
     previewNode,
     reasonNode,
     noteNode,
-    submitButton,
   ]);
 
-  const footerNode = el('div', { class: 'trade-footer' }, [budgetNode, closeButton, holdNote]);
+  // 주문 버튼과 마감 버튼은 **항상 손에 닿아야 한다** — 폰에서 시트 본문이 길어도 아래에 붙여 둔다.
+  // 색으로도 역할이 갈린다: 주문은 청록(되돌릴 수 있는 한 건), 마감은 금색(차례를 넘기는 결정).
+  const footerNode = el('div', { class: 'trade-footer' }, [submitButton, budgetNode, closeButton, holdNote]);
 
   const element = el('div', { class: 'trade' }, [tabList, panelNode, queueListNode, footerNode]);
 
@@ -358,10 +359,21 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
     replaceChildren(stepperNode, [
       el('div', { class: 'trade-stepper-head' }, [
         el('span', { class: 'trade-stepper-label', text: side === 'BUY_STOCK' ? '살 수량' : '팔 수량' }),
-        el('span', {
-          class: 'trade-stepper-max',
-          text: max > 0 ? `최대 ${max}주` : '가능 수량 0주',
-        }),
+        // "최대"는 스테퍼 줄이 아니라 머리줄에 둔다 — 360px 폰에서 ±버튼 5개와 함께 두면 줄이 접힌다.
+        button(
+          {
+            class: 'btn btn--chip trade-max',
+            disabled: locked || max === 0,
+            dataset: { focusKey: 'trade-max' },
+            on: {
+              click: () => {
+                quantity = max;
+                render();
+              },
+            },
+          },
+          max > 0 ? `최대 ${max}주` : '가능 수량 0주',
+        ),
       ]),
       el('div', { class: 'trade-stepper-row' }, [
         stepButton('−10', '10주 줄이기', () => {
@@ -381,20 +393,6 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
           quantity = stepQuantity(quantity, 10, { rules: limits, max });
           render();
         }, { disabled: locked || max === 0 || quantity >= max }),
-        button(
-          {
-            class: 'btn btn--chip trade-max',
-            disabled: locked || max === 0,
-            dataset: { focusKey: 'trade-max' },
-            on: {
-              click: () => {
-                quantity = max;
-                render();
-              },
-            },
-          },
-          '최대',
-        ),
       ]),
       card
         ? el('p', { class: 'trade-stepper-note', text: `현재가 ${formatWon(card.price)} · 배당 ${card.dividendText}` })
@@ -501,7 +499,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
       const used = queuedCountOf(ctx.market, ctx.seatId);
       setText(budgetNode, `예약 ${limits.maxQueuedOrders}건 중 ${used}건 사용`);
       setHidden(closeButton, true);
-      setText(holdNote, '예약 주문은 내 차례가 시작될 때 자동으로 체결됩니다.');
+      setText(holdNote, '내 차례가 시작될 때 자동으로 체결됩니다.');
       setHidden(holdNote, false);
       return;
     }
@@ -512,7 +510,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
     closeButton.disabled = !ctx.interactive || ctx.locked;
     closeButton.setAttribute('aria-busy', ctx.locked ? 'true' : 'false');
     // "창을 닫아도 턴은 넘어가지 않는다"를 못 박는다(닫기 버튼과 CTA를 헷갈리지 않게).
-    setText(holdNote, '이 창을 닫아도 차례는 넘어가지 않습니다. 위 버튼을 눌러야 주사위 차례로 갑니다.');
+    setText(holdNote, '✕로 닫아도 차례는 그대로입니다(금색 버튼을 눌러야 넘어갑니다).');
     setHidden(holdNote, false);
   }
 
@@ -636,9 +634,7 @@ export function tradeModalSpec({ tradeView, seatName, mode, onDismiss }) {
   return {
     id: TRADE_MODAL_ID,
     title: queueing ? '🧾 예약 주문' : '💱 거래 창구',
-    subtitle: queueing
-      ? `${seatName} · 내 차례가 시작될 때 자동 체결됩니다`
-      : `${seatName} · 주문을 마치면 아래 버튼으로 주사위 차례로 갑니다`,
+    subtitle: queueing ? `${seatName} · 내 차례에 자동 체결` : `${seatName} · 주문 뒤 아래에서 마감`,
     dismissible: true,
     variant: 'sheet',
     keepBody: true,

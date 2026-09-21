@@ -142,10 +142,8 @@ export function previewOrder(input) {
     if (instrument.state === 'DELISTED') {
       return reject('DELISTED', context);
     }
-    const qty = toInt(quantity);
-    if (qty < limits.minQuantity || qty > limits.maxQuantity) {
-      return reject('QUANTITY_RANGE', context);
-    }
+    // 수량과 무관한 이유(창구가 닫혔다·건수를 다 썼다)를 **먼저** 본다.
+    // 예산이 0이면 고를 수 있는 수량도 0이 되는데, 그때 "수량 범위"라고 말하면 진짜 이유를 가린다.
     if (!queueMode && !open) {
       return reject('WINDOW_CLOSED', context);
     }
@@ -154,6 +152,10 @@ export function previewOrder(input) {
     }
     if (!queueMode && ordersLeft <= 0) {
       return reject('ORDER_LIMIT', context);
+    }
+    const qty = toInt(quantity);
+    if (qty < limits.minQuantity || qty > limits.maxQuantity) {
+      return reject('QUANTITY_RANGE', context);
     }
 
     const notional = notionalOf(qty, instrument.price);
@@ -214,10 +216,6 @@ export function previewOrder(input) {
   }
 
   /* ── 예금 ─────────────────────────────────────────────── */
-  const money = toInt(amount);
-  if (money <= 0 || money % limits.depositUnit !== 0) {
-    return reject('DEPOSIT_UNIT', context);
-  }
   if (!queueMode && !open) {
     return reject('WINDOW_CLOSED', context);
   }
@@ -226,6 +224,10 @@ export function previewOrder(input) {
   }
   if (!queueMode && ordersLeft <= 0) {
     return reject('ORDER_LIMIT', context);
+  }
+  const money = toInt(amount);
+  if (money <= 0 || money % limits.depositUnit !== 0) {
+    return reject('DEPOSIT_UNIT', context);
   }
 
   if (kind === 'DEPOSIT') {

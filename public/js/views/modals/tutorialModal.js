@@ -15,8 +15,9 @@ export const TUTORIAL_MODAL_ID = 'market-tutorial';
  * @param {number} input.total
  * @param {() => void} input.onNext 다음 카드(또는 닫기)
  * @param {() => void} input.onSkip 전부 그만 보기
+ * @param {() => void} input.onDismiss 직접 닫기(이 카드만 읽은 것으로 표시한다)
  */
-export function tutorialModalSpec({ card, index, total, onNext, onSkip }) {
+export function tutorialModalSpec({ card, index, total, onNext, onSkip, onDismiss }) {
   const last = index >= total - 1;
   return {
     id: TUTORIAL_MODAL_ID,
@@ -24,7 +25,7 @@ export function tutorialModalSpec({ card, index, total, onNext, onSkip }) {
     subtitle: `처음 보는 사람을 위한 안내 · ${index + 1} / ${total}`,
     dismissible: true,
     variant: 'sheet',
-    onDismiss: onSkip,
+    onDismiss: onDismiss ?? onSkip,
     render: () =>
       el('div', { class: 'modal-stack tutorial' }, [
         ...card.paragraphs.map((text) => el('p', { class: 'tutorial-text', text })),

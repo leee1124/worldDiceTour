@@ -59,7 +59,8 @@ function sellRow(item, { locked, unit, onSellAsset, onSellProperty }) {
   const unitValue = Number.isInteger(item.unitValue) && item.unitValue > 0 ? item.unitValue : null;
   const pickable = !isProperty && maxQuantity > 1;
 
-  const row = el('div', { class: 'sell-row' });
+  // 수량을 고르는 행은 폰에서 한 줄에 다 들어가지 않는다 — 두 줄짜리 격자로 그린다.
+  const row = el('div', { class: ['sell-row', pickable ? 'sell-row--pick' : null] });
 
   if (!pickable) {
     replaceChildren(row, [

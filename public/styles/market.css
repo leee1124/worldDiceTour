@@ -351,8 +351,16 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.3rem;
+  flex-wrap: wrap;
+  gap: 0 0.3rem;
   font-size: 0.72rem;
+}
+
+/* 좁은 칸에서도 "보유 40주"와 "+32,000원"이 글자 단위로 쪼개지지 않게. */
+.instr-mine,
+.instr-pnl,
+.instr-dividend {
+  white-space: nowrap;
 }
 
 .instr-foot--meta {
@@ -780,15 +788,33 @@
   font-size: 0.76rem;
 }
 
+/*
+  주문·마감 버튼은 시트 아래에 붙여 둔다(폰에서 본문이 길어도 항상 손에 닿게).
+  배경은 **완전히 불투명해야 한다** — 반투명이면 뒤의 금액 줄이 비쳐 숫자가 겹쳐 보인다.
+*/
 .trade-footer {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   position: sticky;
-  bottom: 0;
-  padding-top: 0.45rem;
-  border-top: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(10, 23, 35, 0.4), rgba(10, 23, 35, 0.98) 40%);
+  bottom: -1.1rem;
+  margin: 0 -1.1rem -1.1rem;
+  padding: 0.5rem 1.1rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line-strong);
+  background: #0b1a27;
+  box-shadow: 0 -8px 18px rgba(4, 10, 16, 0.55);
+}
+
+/* 주문 한 건(되돌릴 수 있다) — 차례를 넘기는 금색 CTA와 색으로 구분한다. */
+.btn--accent {
+  border-color: transparent;
+  background: linear-gradient(135deg, #3ad9c6, #1d9e97);
+  color: #03201f;
+  box-shadow: 0 8px 18px rgba(47, 243, 224, 0.2);
+}
+
+.btn--accent:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5ff0dd, #26b6ad);
 }
 
 .trade-budget {
@@ -805,6 +831,32 @@
 }
 
 /* ── 정리 모달의 부분 매각 행 ──────────────────────────────── */
+
+/*
+  주식·예금은 수량을 고를 수 있어 한 줄에 이름 + 스테퍼 + 환급 + 버튼이 모두 들어가야 한다.
+  360px 폰에서는 불가능하므로 **줄바꿈으로 눕힌다** — 미디어 쿼리가 아니라 flex-basis로 정하므로
+  모달이 좁으면(폰) 두세 줄, 넓으면 한 줄이 된다(모달 폭은 화면 폭과 다를 수 있다).
+*/
+.sell-row--pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+.sell-row--pick .sell-main {
+  flex: 1 1 7rem;
+  min-width: 0;
+}
+
+.sell-row--pick .sell-stepper {
+  flex: 1 1 9.5rem;
+}
+
+.sell-row--pick .sell-tail {
+  flex: 1 1 7rem;
+  justify-content: flex-end;
+}
 
 .sell-main {
   display: flex;
@@ -824,7 +876,8 @@
 }
 
 .sell-quantity {
-  min-width: 4rem;
+  flex: 1 1 auto;
+  min-width: 3.5rem;
   font-family: var(--font-num);
   font-size: 0.85rem;
   font-weight: 800;
@@ -834,8 +887,8 @@
 .sell-tail {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.35rem;
-  margin-left: auto;
 }
 
 /* ── 뉴스 카드 연출 ────────────────────────────────────────── */
@@ -1123,6 +1176,31 @@
   font-weight: 700;
 }
 
+/* ── 종료 순위의 총자산 내역 ───────────────────────────────── */
+
+/*
+  내역이 "현금 · 부동산 · 주식 · 예금"으로 길어졌다. 좁은 화면에서 한 줄을 고집하면
+  이름 칸이 0으로 눌려 한 글자씩 세로로 쪼개진다 — 폭이 모자라면 금액 덩어리를 아랫줄로 내린다.
+*/
+.ranking-row {
+  flex-wrap: wrap;
+}
+
+.ranking-main {
+  flex: 1 1 6rem;
+}
+
+.ranking-assets {
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+
+.ranking-breakdown {
+  white-space: normal;
+  text-align: right;
+  line-height: 1.45;
+}
+
 /* ── 총자산 내역(플레이어 카드) ────────────────────────────── */
 
 .player-breakdown-toggle {
@@ -1246,13 +1324,34 @@
   }
 }
 
-/* 넓은 화면: 종목 카드는 캐러셀이 아니라 격자로 펼친다(중앙 코어가 넉넉하다). */
+/*
+  넓은 화면: 종목 카드를 한 줄에 펼친다(가로 스크롤 없이 5종목이 모두 보인다).
+  두 줄로 접히면 중앙 코어가 길어져 라운드·차례 안내가 스크롤 밖으로 밀려난다 —
+  그래서 최소 폭을 좁게 잡아 **한 줄을 유지**한다.
+*/
 @media (min-width: 68.01rem) {
   .market-rail {
     grid-auto-flow: row;
     grid-auto-columns: auto;
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr));
     overflow-x: visible;
+  }
+
+  /* 칸이 좁아진 만큼 이름·업종과 가격·등락을 세로로 쌓는다(가로로 넘치지 않게). */
+  .instr-head,
+  .instr-figures {
+    flex-direction: column;
+    /* stretch여야 이름이 칸 폭을 채우고 말줄임(…)이 걸린다 — flex-start면 글자 폭대로 넘친다. */
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .instr-price {
+    font-size: 0.88rem;
+  }
+
+  .instr-card {
+    padding: 0.4rem 0.4rem;
   }
 }
 
