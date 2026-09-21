@@ -248,7 +248,8 @@ export function createBoardView({ onCellActivate }) {
       const place = layout[index] ?? { x: 0, y: 0 };
       token.style.setProperty('--fan-x', `${place.x}em`);
       token.style.setProperty('--fan-y', `${place.y}em`);
-      token.style.zIndex = String(index + 1);
+      // 쌓임 순서는 CSS(.token--turn / .token--found)에 맡긴다 —
+      // 인라인 z-index를 주면 "지금 차례" 말이 다른 말 밑에 깔린다.
     }
   }
 
