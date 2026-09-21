@@ -1,5 +1,5 @@
 import { EVENT_TYPES } from './events.js';
-import { MONEY_REASONS } from '../shared/MoneyIntent.js';
+import { MONEY_REASONS, MoneyIntent } from '../shared/MoneyIntent.js';
 import { SINKS } from './payment/DebtNote.js';
 import { TICKET_EFFECTS } from './data/tickets.js';
 
@@ -10,14 +10,10 @@ import { TICKET_EFFECTS } from './data/tickets.js';
 export const TICKET_ACTIONS = Object.freeze({
   /** 아무 일도 없다(턴 종료). */
   NONE: 'NONE',
-  /** 은행에서 수령: `amount` */
-  GAIN: 'GAIN',
-  /** 강제 지불: `items`/`reason`/`event`가 그대로 결제 흐름으로 들어간다. */
+  /** 돈이 곧바로 움직인다: `intents`/`events`를 적용한 뒤 턴 종료. */
+  SETTLE: 'SETTLE',
+  /** 강제 지불(현금이 부족하면 정리 페이즈): `items`/`reason`/`event`가 결제 흐름으로 들어간다. */
   CHARGE: 'CHARGE',
-  /** 다른 모든 생존 좌석에게서 정액 징수: `amount` */
-  COLLECT_FROM_ALL: 'COLLECT_FROM_ALL',
-  /** 다른 모든 생존 좌석에게 정액 지불: `amount` */
-  PAY_TO_ALL: 'PAY_TO_ALL',
   /** 앞으로 `steps`칸 이동(도착 칸 효과 정상 적용). */
   MOVE: 'MOVE',
   /** 조난 섬으로 이송. */
@@ -35,19 +31,28 @@ const TAX_SINK = SINKS.JACKPOT;
  */
 export class TicketEffects {
   /**
-   * @param {{ticket: {id:string, effect:object}, player: import('./Player.js').Player, board: import('./Board.js').Board}} params
-   * @returns {{action: string, amount?: number, steps?: number, items?: object[], reason?: string, event?: object}}
+   * @param {object} params
+   * @param {{id:string, effect:object}} params.ticket
+   * @param {import('./Player.js').Player} params.player
+   * @param {import('./Board.js').Board} params.board
+   * @param {import('./Player.js').Player[]} params.livingPlayers 탈락하지 않은 좌석(좌석 순서)
+   * @returns {{action: string, amount?: number, steps?: number, items?: object[], reason?: string, event?: object, intents?: object[], events?: object[]}}
    */
-  resolve({ ticket, player, board }) {
+  resolve({ ticket, player, board, livingPlayers = [] }) {
     const { effect } = ticket;
     switch (effect.type) {
       case TICKET_EFFECTS.GAIN:
-        return { action: TICKET_ACTIONS.GAIN, amount: effect.amount };
+        return this.#gain({ ticket, player, amount: effect.amount });
       case TICKET_EFFECTS.GAIN_PER_CITY:
-        return {
-          action: TICKET_ACTIONS.GAIN,
+        return this.#gain({
+          ticket,
+          player,
           amount: board.cityCountOf(player.id) * effect.amount,
-        };
+        });
+      case TICKET_EFFECTS.COLLECT_FROM_ALL:
+        return this.#collectFromAll({ ticket, player, livingPlayers, amount: effect.amount });
+      case TICKET_EFFECTS.PAY_TO_ALL:
+        return this.#payToAll({ ticket, player, livingPlayers, amount: effect.amount });
       case TICKET_EFFECTS.LOSE:
         return this.#charge({ ticket, player, amount: effect.amount, sink: SINKS.BANK });
       case TICKET_EFFECTS.PAY_PER_BUILDING:
@@ -64,10 +69,6 @@ export class TicketEffects {
           amount: Math.floor(player.cash * effect.rate),
           sink: TAX_SINK,
         });
-      case TICKET_EFFECTS.COLLECT_FROM_ALL:
-        return { action: TICKET_ACTIONS.COLLECT_FROM_ALL, amount: effect.amount };
-      case TICKET_EFFECTS.PAY_TO_ALL:
-        return { action: TICKET_ACTIONS.PAY_TO_ALL, amount: effect.amount };
       case TICKET_EFFECTS.MOVE_RELATIVE:
         return { action: TICKET_ACTIONS.MOVE, steps: effect.steps };
       case TICKET_EFFECTS.MOVE_TO:
@@ -85,6 +86,103 @@ export class TicketEffects {
       default:
         return { action: TICKET_ACTIONS.NONE };
     }
+  }
+
+  /** 은행에서 수령. 0원이면 아무 일도 일어나지 않는다. */
+  #gain({ ticket, player, amount }) {
+    if (amount <= 0) {
+      return { action: TICKET_ACTIONS.NONE };
+    }
+    const reason = MONEY_REASONS.TICKET;
+    return {
+      action: TICKET_ACTIONS.SETTLE,
+      amount,
+      intents: [
+        MoneyIntent.fromBank({
+          playerId: player.id,
+          amount,
+          reason,
+          meta: { ticketId: ticket.id },
+        }),
+      ],
+      events: [
+        {
+          type: EVENT_TYPES.MONEY_GAINED,
+          payload: { playerId: player.id, amount, reason, ticketId: ticket.id },
+        },
+      ],
+    };
+  }
+
+  /**
+   * 「생일 축하」: 다른 모든 생존 좌석에게서 정액을 받는다.
+   *
+   * **각자 보유 현금 한도까지만** 받는다(명세 D6) — 자기 턴이 아닌 좌석을 정리 페이즈로 보낼 수
+   * 없기 때문이다. 이 한도 규칙이 티켓의 규칙이므로 Game이 아니라 여기에 있다.
+   * 실제로 낸 금액이 0원이어도 이벤트는 남긴다(누가 얼마를 냈는지 로그에 보여야 한다).
+   */
+  #collectFromAll({ ticket, player, livingPlayers, amount }) {
+    const reason = MONEY_REASONS.TICKET;
+    const meta = { ticketId: ticket.id };
+    const paid = livingPlayers
+      .filter((other) => other.id !== player.id)
+      .map((other) => ({ other, amount: Math.min(amount, other.cash) }));
+
+    return {
+      action: TICKET_ACTIONS.SETTLE,
+      amount: paid.reduce((sum, entry) => sum + entry.amount, 0),
+      intents: paid.map((entry) =>
+        MoneyIntent.transfer({
+          fromId: entry.other.id,
+          toId: player.id,
+          amount: entry.amount,
+          reason,
+          meta,
+        }),
+      ),
+      events: paid.map((entry) => ({
+        type: EVENT_TYPES.MONEY_TRANSFERRED,
+        payload: {
+          fromId: entry.other.id,
+          toId: player.id,
+          amount: entry.amount,
+          reason,
+          ticketId: ticket.id,
+        },
+      })),
+    };
+  }
+
+  /**
+   * 「한턱 쏘기」: 다른 모든 생존 좌석에게 정액을 지불한다.
+   * 받을 사람 수만큼의 항목을 가진 **하나의 채무**다 — 현금이 부족하면 정리 페이즈로 간다.
+   */
+  #payToAll({ ticket, player, livingPlayers, amount }) {
+    const receivers = livingPlayers.filter((other) => other.id !== player.id);
+    if (receivers.length === 0 || amount <= 0) {
+      return { action: TICKET_ACTIONS.NONE };
+    }
+    const reason = MONEY_REASONS.TICKET;
+    return {
+      action: TICKET_ACTIONS.CHARGE,
+      amount: amount * receivers.length,
+      items: receivers.map((receiver) => ({
+        amount,
+        sink: SINKS.PLAYER,
+        toPlayerId: receiver.id,
+      })),
+      reason,
+      event: {
+        type: EVENT_TYPES.MONEY_LOST,
+        payload: {
+          playerId: player.id,
+          amount: amount * receivers.length,
+          reason,
+          ticketId: ticket.id,
+          toPlayerIds: receivers.map((receiver) => receiver.id),
+        },
+      },
+    };
   }
 
   /**

@@ -1,5 +1,4 @@
 import { DomainError } from '../shared/DomainError.js';
-import { MoneyIntent } from '../shared/MoneyIntent.js';
 import { BankLedger } from './BankLedger.js';
 import { Board } from './Board.js';
 import { Casino } from './Casino.js';
@@ -797,100 +796,26 @@ export class Game {
 
   /** 티켓 효과는 `TicketEffects`가 계산하고, Game은 상태기계만 움직인다. */
   #applyTicket(player, ticket, depth) {
-    const action = this.#ticketEffects.resolve({ ticket, player, board: this.#board });
+    const action = this.#ticketEffects.resolve({
+      ticket,
+      player,
+      board: this.#board,
+      livingPlayers: this.livingPlayers(),
+    });
     switch (action.action) {
-      case TICKET_ACTIONS.GAIN:
-        return this.#gainFromBank(player, action.amount, ticket.id);
+      case TICKET_ACTIONS.SETTLE:
+        this.#applyTrade(action);
+        return this.#endTurn();
       case TICKET_ACTIONS.CHARGE:
-        return action.amount > 0 ? this.#charge(action) : this.#endTurn();
+        return this.#charge(action);
       case TICKET_ACTIONS.MOVE:
         return this.#moveBy(player, action.steps, depth);
       case TICKET_ACTIONS.TO_ISLAND:
         this.#sendToIsland(player, { teleport: true });
         return this.#endTurn();
-      case TICKET_ACTIONS.COLLECT_FROM_ALL:
-        return this.#collectFromAll(player, action.amount, ticket.id);
-      case TICKET_ACTIONS.PAY_TO_ALL:
-        return this.#payToAll(player, action.amount, ticket.id);
       default:
         return this.#endTurn();
     }
-  }
-
-  #gainFromBank(player, amount, ticketId) {
-    if (amount > 0) {
-      this.#treasury.receiveFromBank({
-        playerId: player.id,
-        amount,
-        reason: MONEY_REASONS.TICKET,
-        meta: { ticketId },
-      });
-      this.#emit(EVENT_TYPES.MONEY_GAINED, {
-        playerId: player.id,
-        amount,
-        reason: MONEY_REASONS.TICKET,
-        ticketId,
-      });
-    }
-    this.#endTurn();
-  }
-
-  /**
-   * 다른 모든 생존 플레이어에게서 정액을 받는다.
-   * 자기 턴이 아닌 플레이어를 정리 페이즈로 보낼 수는 없으므로 보유 현금 한도까지만 받는다.
-   */
-  #collectFromAll(player, amount, ticketId) {
-    const collected = this.livingPlayers()
-      .filter((other) => other.id !== player.id)
-      .map((other) => ({ other, paid: Math.min(amount, other.cash) }));
-
-    this.#treasury.apply(
-      collected.map(({ other, paid }) =>
-        MoneyIntent.transfer({
-          fromId: other.id,
-          toId: player.id,
-          amount: paid,
-          reason: MONEY_REASONS.TICKET,
-          meta: { ticketId },
-        }),
-      ),
-    );
-    for (const { other, paid } of collected) {
-      this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
-        fromId: other.id,
-        toId: player.id,
-        amount: paid,
-        reason: MONEY_REASONS.TICKET,
-        ticketId,
-      });
-    }
-    this.#endTurn();
-  }
-
-  #payToAll(player, amount, ticketId) {
-    const receivers = this.livingPlayers().filter((other) => other.id !== player.id);
-    if (receivers.length === 0 || amount <= 0) {
-      this.#endTurn();
-      return;
-    }
-    this.#charge({
-      items: receivers.map((receiver) => ({
-        amount,
-        sink: SINKS.PLAYER,
-        toPlayerId: receiver.id,
-      })),
-      reason: MONEY_REASONS.TICKET,
-      event: {
-        type: EVENT_TYPES.MONEY_LOST,
-        payload: {
-          playerId: player.id,
-          amount: amount * receivers.length,
-          reason: MONEY_REASONS.TICKET,
-          ticketId,
-          toPlayerIds: receivers.map((receiver) => receiver.id),
-        },
-      },
-    });
   }
 
   // ── 지불/정리/파산 (payment 서브시스템에 위임) ──────────────────────────
