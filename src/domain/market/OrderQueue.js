@@ -16,8 +16,14 @@ export const ORDER_KINDS = Object.freeze({
 const STOCK_KINDS = Object.freeze([ORDER_KINDS.BUY_STOCK, ORDER_KINDS.SELL_STOCK]);
 const CASH_KINDS = Object.freeze([ORDER_KINDS.DEPOSIT, ORDER_KINDS.WITHDRAW]);
 
-/** 주문 id 형식(컨트롤러 검증과 같은 모양). */
-export const ORDER_ID_PATTERN = /^ord-\d{1,4}$/;
+/**
+ * 주문 id 형식(컨트롤러 검증과 같은 모양).
+ *
+ * 자리수를 넉넉히 둔다 — 시퀀스는 방 전체가 공유하고 초기화되지 않으므로, 한 좌석이 예약을
+ * 걸고 취소하는 것만 반복해도 상한에 닿을 수 있다. 상한에 닿으면 **모든 좌석의** 예약 기능이
+ * 영구히 죽으므로(id가 형식 검증을 통과하지 못한다) 현실적으로 도달할 수 없는 자리수를 쓴다.
+ */
+export const ORDER_ID_PATTERN = /^ord-\d{1,9}$/;
 
 /**
  * 예약 주문 큐(남의 턴에 걸어 두는 주문).
@@ -69,15 +75,17 @@ export class OrderQueue {
         `예약 주문은 좌석당 ${MAX_QUEUED_ORDERS_PER_SEAT}건까지입니다: ${seatId}`,
       );
     }
-    this.#sequence += 1;
+    // 검증을 먼저 통과시킨 뒤에 시퀀스를 올린다 — 거절된 요청이 번호를 앞으로 밀면
+    // "거부돼도 상태는 바뀌지 않는다"는 계약이 깨진다(API.md 9.4).
     const order = normalize({
-      id: `ord-${this.#sequence}`,
+      id: `ord-${this.#sequence + 1}`,
       seatId,
       kind,
       instrumentId,
       quantity,
       amount,
     });
+    this.#sequence += 1;
     this.#orders.push(order);
     return { ...order };
   }

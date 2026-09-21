@@ -33,3 +33,16 @@ export const REJECT_REASONS = Object.freeze({
 });
 
 export const ALL_REJECT_REASONS = Object.freeze(Object.values(REJECT_REASONS));
+
+/**
+ * 한도 위반의 세부 종류. `DomainError.tradeLimit`의 `details`에 실어 보낸다.
+ *
+ * 예전에는 예약 주문 거절 사유를 **한국어 오류 메시지 정규식**으로 분류했는데, 메시지 문구를
+ * 다듬는 것만으로 사유가 조용히 바뀌었다. 코드로 분류한다.
+ */
+export const LIMIT_KINDS = Object.freeze({
+  ORDER: REJECT_REASONS.ORDER_LIMIT,
+  NOTIONAL: REJECT_REASONS.NOTIONAL_LIMIT,
+  POSITION: REJECT_REASONS.POSITION_LIMIT,
+  DEPOSIT_CAP: REJECT_REASONS.DEPOSIT_CAP,
+});

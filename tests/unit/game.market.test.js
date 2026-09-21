@@ -552,12 +552,18 @@ describe('정리(LIQUIDATION)와 파산에서의 주식·예금', () => {
     assert.deepEqual(game.pendingDecision.sellable[0], {
       assetKind: 'STOCK',
       assetId: 'AIR',
+      name: '한빛항공',
       label: '한빛항공',
       refund: 120_000,
       quantity: 10,
       maxQuantity: 10,
       unitValue: 12_000,
     });
+    // 자산군이 섞여도 이름 필드 키가 같아야 한 렌더러로 그릴 수 있다.
+    for (const asset of game.pendingDecision.sellable) {
+      assert.equal(typeof asset.name, 'string', `${asset.assetKind}에 name이 없다`);
+      assert.ok(asset.name.length > 0);
+    }
   });
 
   it('SELL_ASSET으로 주식을 수수료 없이 팔 수 있고 기존 SELL도 그대로 동작한다', () => {
@@ -576,6 +582,83 @@ describe('정리(LIQUIDATION)와 파산에서의 주식·예금', () => {
     assert.equal(eventPayload(events, EVENT_TYPES.ORDER_FILLED).fee, 0, '정리 매각은 수수료 면제');
     assert.equal(game.playerById('s1').cash, cashBefore + 60_000);
     assertMoneyConserved(game, '정리 매각 후');
+  });
+
+  it('정리 매각은 부족액을 덮는 수량까지만 허용한다(수수료 면제·한도 면제 악용 차단)', () => {
+    // Given (정리 매각은 수수료가 면제되고 창구 한도를 보지 않는다. 그래서 통행료를 조금 못 낸
+    //        상황을 만들어 놓고 보유 전량을 한 번에 털면 수수료 없이 창구 규칙을 우회한
+    //        대량 현금화가 된다 — "강제 지불을 메우는 매각"이라는 전제를 벗어난다)
+    const game = smallDebtGame();
+    const owed = game.pendingDecision.amountDue;
+    const shortfall = owed - game.playerById('s1').cash;
+    const needed = Math.ceil(shortfall / 12_000);
+    assert.ok(needed >= 1 && needed < 10, `부족액이 보유(10주)보다 작아야 한다: ${needed}주`);
+
+    // When / Then (필요량을 넘는 수량은 거부되고 상태가 그대로다)
+    assert.throws(
+      () =>
+        game.execute('s1', COMMAND_TYPES.SELL_ASSET, {
+          assetKind: 'STOCK',
+          assetId: 'AIR',
+          quantity: 10,
+        }),
+      { code: DOMAIN_ERROR_CODES.TRADE_LIMIT },
+    );
+    assert.equal(game.marketView({ actingSeatId: 's1' }).holdings.s1[0].qty, 10, '상태 불변');
+
+    // When (필요량만큼은 통과한다)
+    game.execute('s1', COMMAND_TYPES.SELL_ASSET, {
+      assetKind: 'STOCK',
+      assetId: 'AIR',
+      quantity: needed,
+    });
+
+    // Then
+    assert.equal(game.marketView({ actingSeatId: 's2' }).holdings.s1[0].qty, 10 - needed);
+    assertMoneyConserved(game, '정리 매각 상한');
+  });
+
+  it('수량을 생략하면 부족액을 덮는 만큼만 팔린다(전량이 아니다)', () => {
+    // Given
+    const game = smallDebtGame();
+    const shortfall = game.pendingDecision.amountDue - game.playerById('s1').cash;
+    const needed = Math.ceil(shortfall / 12_000);
+
+    // When
+    game.execute('s1', COMMAND_TYPES.SELL_ASSET, { assetKind: 'STOCK', assetId: 'AIR' });
+
+    // Then
+    assert.equal(game.marketView({ actingSeatId: 's2' }).holdings.s1?.[0]?.qty, 10 - needed);
+    assertMoneyConserved(game, '정리 매각 자동 수량');
+  });
+
+  it('부족액이 보유 전체보다 크면 전량 매각이 허용된다', () => {
+    // Given (서울 랜드마크 통행료 2,800,000원 — 10주(120,000원)로는 어림도 없다)
+    const game = liquidatingGame();
+
+    // When / Then
+    game.execute('s1', COMMAND_TYPES.SELL_ASSET, {
+      assetKind: 'STOCK',
+      assetId: 'AIR',
+      quantity: 10,
+    });
+    assert.equal(game.marketView({ actingSeatId: 's2' }).holdings.s1.length, 0);
+    assertMoneyConserved(game, '전량 정리 매각');
+  });
+
+  it('부동산은 쪼갤 수 없으므로 필요액을 넘어도 통째로 팔린다', () => {
+    // Given
+    const game = liquidatingGame({ withCity: true });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.SELL_ASSET, {
+      assetKind: 'PROPERTY',
+      assetId: '33',
+    });
+
+    // Then
+    assert.ok(eventTypes(events).includes(EVENT_TYPES.PROPERTY_SOLD));
+    assertMoneyConserved(game, '부동산 정리 매각');
   });
 
   it('AUTO_SELL은 주식 → 예금 → 부동산 순서로 판다', () => {
@@ -701,6 +784,26 @@ describe('스냅샷', () => {
     assert.equal(Game.restore(snapshot, new FakeRandomSource()).marketView({ actingSeatId: 's1' }), null);
   });
 });
+
+/**
+ * 통행료를 **조금** 못 내 정리 페이즈에 들어간 게임(주식 10주 보유).
+ * 부족액이 보유 수량보다 작아야 "필요량까지만" 규칙을 검증할 수 있다.
+ */
+function smallDebtGame() {
+  const game = buildStockGame({
+    seats: 2,
+    cash: { s1: 130_000 },
+    // 방콕(3) + 별장 → 통행료 = 70,000 × 0.4 = 28,000원
+    cities: [{ index: 3, ownerId: 's2', buildings: ['VILLA'] }],
+    positions: { s1: 0 },
+    random: new ScriptedRandomSource([1, 2]),
+  });
+  game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'AIR', quantity: 10 });
+  game.execute('s1', COMMAND_TYPES.CLOSE_TRADING, {});
+  game.execute('s1', COMMAND_TYPES.ROLL, {});
+  assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION, '소액 정리 페이즈 준비 실패');
+  return game;
+}
 
 /** 통행료를 못 내 정리 페이즈에 들어간 게임(주식 10주 + 예금 500,000원 보유). */
 function liquidatingGame({ withCity = false } = {}) {

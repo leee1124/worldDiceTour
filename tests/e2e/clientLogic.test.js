@@ -249,13 +249,6 @@ const EVENT_SAMPLES = {
     fee: 5_120,
     viaLiquidation: false,
   },
-  ORDER_REJECTED: {
-    playerId: 'seat-1',
-    kind: 'BUY_STOCK',
-    instrumentId: 'AIR',
-    quantity: 10,
-    reasonCode: 'INSUFFICIENT_CASH',
-  },
   DEPOSIT_MADE: { playerId: 'seat-1', amount: 500_000, balance: 500_000 },
   DEPOSIT_WITHDRAWN: { playerId: 'seat-1', amount: 200_000, balance: 300_000, viaLiquidation: false },
   DEPOSIT_INTEREST_PAID: { playerId: 'seat-1', amount: 5_000, balance: 1_000_000, baseRateBp: 50 },
@@ -308,10 +301,10 @@ const EVENT_SAMPLES = {
   },
 };
 
-test('게임 로그: 서버의 63종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
+test('게임 로그: 서버의 62종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
   // Given 서버가 정의한 모든 이벤트 종류(증권거래소 19종 포함)
   const types = Object.keys(EVENT_TYPES);
-  assert.equal(types.length, 63);
+  assert.equal(types.length, 62);
 
   // When 각 이벤트를 로그 문장으로 바꾸면
   for (const type of types) {

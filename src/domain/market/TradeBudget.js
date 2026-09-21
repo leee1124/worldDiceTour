@@ -1,5 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
-import { REJECT_REASONS } from './rejectReasons.js';
+import { LIMIT_KINDS, REJECT_REASONS } from './rejectReasons.js';
 
 /** 한 창구에서 낼 수 있는 주문 수(예치·인출도 1건으로 센다). */
 export const MAX_ORDERS_PER_WINDOW = 3;
@@ -83,7 +83,10 @@ export class TradeBudget {
   consume(notional) {
     const verdict = this.check(notional);
     if (!verdict.ok) {
-      throw DomainError.tradeLimit(`창구 예산을 넘습니다: ${verdict.reasonCode} (명목 ${notional})`);
+      throw DomainError.tradeLimit(
+        `창구 예산을 넘습니다: ${verdict.reasonCode} (명목 ${notional})`,
+        verdict.reasonCode,
+      );
     }
     return new TradeBudget({
       ordersUsed: this.#ordersUsed + 1,

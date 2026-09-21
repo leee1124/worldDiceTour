@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { LIMIT_KINDS } from './rejectReasons.js';
 
 /** 예치·인출 단위(설계서 §3.4). */
 export const DEPOSIT_UNIT = 10_000;
@@ -53,7 +54,10 @@ export class DepositAccount {
     assertAmount(amount);
     const next = this.balanceOf(playerId) + amount;
     if (next > DEPOSIT_CAP) {
-      throw DomainError.tradeLimit(`예금 한도(${DEPOSIT_CAP}원)를 넘습니다: ${next}`);
+      throw DomainError.tradeLimit(
+        `예금 한도(${DEPOSIT_CAP}원)를 넘습니다: ${next}`,
+        LIMIT_KINDS.DEPOSIT_CAP,
+      );
     }
     this.#balances.set(playerId, next);
     return next;

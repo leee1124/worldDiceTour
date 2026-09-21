@@ -23,9 +23,39 @@ export class Liquidator {
     return this.#registry.sellableOf(playerId);
   }
 
-  /** 고른 자산 한 건을 매각한다. */
-  sell({ playerId, kind, assetId, quantity }) {
-    return this.#registry.liquidate({ playerId, kind, assetId, quantity });
+  /**
+   * 고른 자산 한 건을 매각한다.
+   *
+   * `owed`(메워야 할 부족액)를 주면 **그 부족액을 덮는 수량까지만** 허용한다. 정리 매각은
+   * 수수료가 면제되고 창구 한도를 보지 않으므로, 상한이 없으면 작은 통행료를 일부러 만들어 놓고
+   * 보유 전량을 수수료 없이 털어 내는 길이 열린다 — 그것은 "강제 지불을 메우는 매각"이 아니다.
+   *
+   * 나눌 수 없는 자산(부동산 한 칸)은 `quantityCovering`을 구현하지 않으므로 상한이 없다.
+   */
+  sell({ playerId, kind, assetId, quantity = null, owed = null }) {
+    const needed = this.#quantityCovering({ playerId, kind, assetId, owed });
+    if (needed !== null && quantity !== null && quantity > needed) {
+      throw DomainError.tradeLimit(
+        `정리 매각은 부족액을 덮는 수량까지입니다: 요청 ${quantity} > 필요 ${needed}`,
+      );
+    }
+    return this.#registry.liquidate({
+      playerId,
+      kind,
+      assetId,
+      quantity: quantity ?? needed ?? undefined,
+    });
+  }
+
+  /** 그 자산군이 "부족액을 덮는 최소 수량"을 알면 그 값, 모르면 null. */
+  #quantityCovering({ playerId, kind, assetId, owed }) {
+    if (owed === null || owed <= 0) {
+      return null;
+    }
+    const provider = this.#registry.providerOf(kind);
+    return typeof provider.quantityCovering === 'function'
+      ? provider.quantityCovering({ playerId, assetId, owed })
+      : null;
   }
 
   /**

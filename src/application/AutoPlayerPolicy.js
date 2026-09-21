@@ -3,6 +3,12 @@ import { CASINO_GAMES } from '../domain/game/Casino.js';
 import { COMMAND_TYPES } from '../domain/game/commands.js';
 import { PHASES } from '../domain/game/phases.js';
 import { SPACE_KINDS } from '../domain/game/data/board.js';
+import { CYCLE_PHASES } from '../domain/market/data/cycle.js';
+import { INSTRUMENT_STATES } from '../domain/market/data/instruments.js';
+import { MAX_POSITION_PER_INSTRUMENT } from '../domain/market/Holdings.js';
+import { DEPOSIT_CAP, DEPOSIT_UNIT } from '../domain/market/DepositAccount.js';
+import { MAX_NOTIONAL_PER_ORDER } from '../domain/market/TradeBudget.js';
+import { MAX_QUANTITY } from '../domain/market/TradingDesk.js';
 
 /** 매입 기준: 현금이 가격의 2배 이상. */
 const BUY_CASH_RATIO = 2;
@@ -32,9 +38,9 @@ export const AUTO_DEPOSIT_UNIT = 100_000;
 /** 한 번에 주식에 넣을 목표 금액. */
 export const AUTO_STOCK_BUDGET = 600_000;
 /** 매수하는 국면. */
-const BUYING_PHASES = Object.freeze(['RECOVERY', 'EXPANSION']);
+const BUYING_PHASES = Object.freeze([CYCLE_PHASES.RECOVERY, CYCLE_PHASES.EXPANSION]);
 /** 매도하는 국면. */
-const SELLING_PHASES = Object.freeze(['OVERHEAT', 'RECESSION']);
+const SELLING_PHASES = Object.freeze([CYCLE_PHASES.RECESSION, CYCLE_PHASES.OVERHEAT]);
 
 /**
  * 컴퓨터/자동 진행 좌석의 의사결정(규칙 기반, 상태 없음).
@@ -124,8 +130,8 @@ export class AutoPlayerPolicy {
     if (!attractive) {
       return deposit > 0 ? withdrawAll(deposit) : null;
     }
-    const unit = market.rules?.depositUnit ?? 10_000;
-    const room = (market.rules?.depositCap ?? 10_000_000) - deposit;
+    const unit = market.rules?.depositUnit ?? DEPOSIT_UNIT;
+    const room = (market.rules?.depositCap ?? DEPOSIT_CAP) - deposit;
     const amount = Math.min(floorTo(spare, AUTO_DEPOSIT_UNIT), floorTo(room, unit));
     if (amount < unit) {
       return null;
@@ -171,7 +177,9 @@ export class AutoPlayerPolicy {
       return null;
     }
     const cheapest = [...(market.instruments ?? [])]
-      .filter((instrument) => instrument.state === 'LISTED' && instrument.basePrice > 0)
+      .filter(
+        (instrument) => instrument.state === INSTRUMENT_STATES.LISTED && instrument.basePrice > 0,
+      )
       .sort(
         (a, b) =>
           a.price * b.basePrice - b.price * a.basePrice || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
@@ -182,7 +190,7 @@ export class AutoPlayerPolicy {
     const held = (market.holdings?.[budget.seatId] ?? []).find(
       (position) => position.instrumentId === cheapest.id,
     );
-    const positionRoom = (rules.maxPositionPerInstrument ?? 500) - (held?.qty ?? 0);
+    const positionRoom = (rules.maxPositionPerInstrument ?? MAX_POSITION_PER_INSTRUMENT) - (held?.qty ?? 0);
     const wanted = Math.min(
       Math.floor(AUTO_STOCK_BUDGET / cheapest.price),
       Math.floor(spare / cheapest.price),
@@ -199,12 +207,9 @@ export class AutoPlayerPolicy {
     if (!Number.isFinite(price) || price <= 0) {
       return 0;
     }
-    const perOrder = Math.floor((rules.maxNotionalPerOrder ?? 1_000_000) / price);
+    const perOrder = Math.floor((rules.maxNotionalPerOrder ?? MAX_NOTIONAL_PER_ORDER) / price);
     const perWindow = Math.floor(budget.notionalLeft / price);
-    return Math.max(
-      0,
-      Math.min(wanted, rules.maxQuantity ?? 200, perOrder, perWindow),
-    );
+    return Math.max(0, Math.min(wanted, rules.maxQuantity ?? MAX_QUANTITY, perOrder, perWindow));
   }
 
   #priceOf(market, instrumentId) {
@@ -214,7 +219,7 @@ export class AutoPlayerPolicy {
   #isListed(market, instrumentId) {
     return (
       (market.instruments ?? []).find((instrument) => instrument.id === instrumentId)?.state ===
-      'LISTED'
+      INSTRUMENT_STATES.LISTED
     );
   }
 

@@ -4,7 +4,7 @@ import { MARKET_EVENT_TYPES } from './events.js';
 import { MAX_NOTIONAL_PER_ORDER } from './TradeBudget.js';
 import { MAX_POSITION_PER_INSTRUMENT } from './Holdings.js';
 import { assertAmount as assertDepositAmount, DEPOSIT_CAP } from './DepositAccount.js';
-import { REJECT_REASONS } from './rejectReasons.js';
+import { LIMIT_KINDS, REJECT_REASONS } from './rejectReasons.js';
 
 export { REJECT_REASONS };
 
@@ -49,6 +49,7 @@ export class TradingDesk {
     if (holdings.qtyOf(playerId, instrument.id) + quantity > MAX_POSITION_PER_INSTRUMENT) {
       throw DomainError.tradeLimit(
         `종목 보유 상한(${MAX_POSITION_PER_INSTRUMENT}주)을 넘습니다: ${instrument.id}`,
+        LIMIT_KINDS.POSITION,
       );
     }
     if (cash < notional + fee) {
@@ -180,7 +181,10 @@ export class TradingDesk {
     assertDepositAmount(amount);
     assertBudget(budget, 0);
     if (account.balanceOf(playerId) + amount > DEPOSIT_CAP) {
-      throw DomainError.tradeLimit(`예금 한도(${DEPOSIT_CAP}원)를 넘습니다`);
+      throw DomainError.tradeLimit(
+        `예금 한도(${DEPOSIT_CAP}원)를 넘습니다`,
+        LIMIT_KINDS.DEPOSIT_CAP,
+      );
     }
     if (cash < amount) {
       throw DomainError.insufficientCash(`현금이 부족합니다: ${cash}원 < ${amount}원`);
@@ -291,10 +295,13 @@ function assertQuantity(quantity) {
 function assertBudget(budget, notional) {
   const verdict = budget.check(notional);
   if (!verdict.ok) {
-    throw DomainError.tradeLimit(`창구 한도를 넘습니다: ${verdict.reasonCode}`);
+    throw DomainError.tradeLimit(`창구 한도를 넘습니다: ${verdict.reasonCode}`, verdict.reasonCode);
   }
   if (notional > MAX_NOTIONAL_PER_ORDER) {
-    throw DomainError.tradeLimit(`주문 1건 명목금액 한도를 넘습니다: ${notional}`);
+    throw DomainError.tradeLimit(
+      `주문 1건 명목금액 한도를 넘습니다: ${notional}`,
+      LIMIT_KINDS.NOTIONAL,
+    );
   }
 }
 

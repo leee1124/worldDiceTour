@@ -368,12 +368,6 @@ const FORMATTERS = {
     );
   },
 
-  ORDER_REJECTED: (event, ctx) =>
-    line(
-      LINE_KINDS.ALERT,
-      `${ctx.name(event.playerId)}의 주문이 거절됐습니다 — ${rejectReasonLabel(event.reasonCode)}.`,
-    ),
-
   DEPOSIT_MADE: (event, ctx) =>
     line(
       LINE_KINDS.MONEY_OUT,

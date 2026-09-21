@@ -43,7 +43,7 @@
 | 27 | **추가 필드** | `GameViewDto.market` — 시세·국면·뉴스·전원 보유/예금·예약 주문·내 예산·수수료 규칙이 담긴 공개 스냅샷. 투자 모드가 `OFF`면 **`null`** | 남의 턴에도 항상 그려지는 시세 패널/티커의 유일한 입력이다 |
 | 28 | **추가 필드** | `GameViewDto.players[]`에 `stockValue`·`depositBalance`·`netWorth`(내역 객체) 가산. `totalAssets`의 **뜻이 넓어졌다** — 이제 주식 평가액과 예금도 포함한다 | 플레이어 패널의 총자산 내역을 `현금 / 부동산 / 주식 / 예금 / −대출`로 분해해 보여 줄 것. `totalAssets === netWorth.total` |
 | 29 | **추가 필드** | `pending`에 `kind: "TRADE"`가 생겼고, `LIQUIDATION`의 `sellable` 항목에 `quantity`·`maxQuantity`·`unitValue`가 가산됐다(`index`·`name`은 여전히 부동산 항목에만 있다) | 정리 모달은 `assetKind`로 분기하고 주식은 수량 입력을 받을 것 |
-| 30 | **새 이벤트** | 19종: `TRADING_OPENED` `TRADING_CLOSED` `ORDER_FILLED` `ORDER_REJECTED` `DEPOSIT_MADE` `DEPOSIT_WITHDRAWN` `DEPOSIT_INTEREST_PAID` `DIVIDEND_PAID` `NEWS_PUBLISHED` `CYCLE_CHANGED` `BASE_RATE_CHANGED` `PRICES_UPDATED` `INSTRUMENT_DELISTED` `INSTRUMENT_LISTED` `HOLDINGS_WIPED` `QUEUED_ORDER_PLACED` `QUEUED_ORDER_CANCELLED` `QUEUED_ORDER_EXECUTED` `QUEUED_ORDER_REJECTED` (7장) | 라운드 틱 연출(뉴스 카드 뒤집기 → 시세 갱신)은 `NEWS_PUBLISHED` → `PRICES_UPDATED` 순서로 온다 |
+| 30 | **새 이벤트** | 18종: `TRADING_OPENED` `TRADING_CLOSED` `ORDER_FILLED` `DEPOSIT_MADE` `DEPOSIT_WITHDRAWN` `DEPOSIT_INTEREST_PAID` `DIVIDEND_PAID` `NEWS_PUBLISHED` `CYCLE_CHANGED` `BASE_RATE_CHANGED` `PRICES_UPDATED` `INSTRUMENT_DELISTED` `INSTRUMENT_LISTED` `HOLDINGS_WIPED` `QUEUED_ORDER_PLACED` `QUEUED_ORDER_CANCELLED` `QUEUED_ORDER_EXECUTED` `QUEUED_ORDER_REJECTED` (7장) | 라운드 틱 연출(뉴스 카드 뒤집기 → 시세 갱신)은 `NEWS_PUBLISHED` → `PRICES_UPDATED` 순서로 온다 |
 | 31 | **새 에러 코드** | `ERR018`(409) 주문 한도를 초과했습니다 / `ERR019`(429) 요청이 너무 잦습니다 | `ERR018`은 창구 예산(3건·2,000,000원)·종목 보유 상한·예금 한도 위반. `ERR019`는 좌석당 거래 커맨드 레이트 리밋(5초 10건) — **즉시 재시도하지 말 것** |
 | 32 | 동작 | 저장 파일이 `schemaVersion: 3`이 됐다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방은 자동 승급되며 **투자 모드는 `OFF`로 유지된다**(진행 중인 판에 기능이 끼어들지 않는다) |
 | 33 | 동작 | `rankings`와 `players[].totalAssets`가 주식 평가액·예금을 포함한다(단일 출처 `NetWorth`) | 종료 순위 모달의 총자산 내역도 28번의 `netWorth`로 분해해 보여 줄 수 있다 |
@@ -569,7 +569,6 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `TRADING_OPENED` | `playerId`, `ordersLeft`, `notionalLeft`, `afterTrade` | 거래 창구 열림(`TURN_STARTED` 직후). `afterTrade`는 창구를 닫으면 갈 곳(`ROLL`\|`ISLAND`\|`TRAVEL`) |
 | `TRADING_CLOSED` | `playerId`, `reason` | 창구 닫힘. `reason`: `PLAYER`(직접 마감) \| `BUDGET_EXHAUSTED`(예산 소진 자동 마감) |
 | `ORDER_FILLED` | `playerId`, `kind`(`BUY`\|`SELL`), `instrumentId`, `name`, `quantity`, `price`, `notional`, `fee`, `viaLiquidation` | 체결. `notional = quantity × price`, 매수 실제 지출 = `notional + fee`, 매도 실제 수령 = `notional − fee`. `viaLiquidation`이 `true`면 정리/파산 매각이라 `fee`가 `0`이다 |
-| `ORDER_REJECTED` | `playerId`, `kind`, `instrumentId`, `quantity`, `reasonCode` | 주문 거절(예약 주문 자동 체결에서만 발생. 직접 보낸 주문은 이벤트 대신 **에러 응답**으로 거절된다) |
 | `DEPOSIT_MADE` | `playerId`, `amount`, `balance` | 예치 |
 | `DEPOSIT_WITHDRAWN` | `playerId`, `amount`, `balance`, `viaLiquidation` | 인출 |
 | `DEPOSIT_INTEREST_PAID` | `playerId`, `amount`, `balance`, `baseRateBp` | 라운드 틱 예금 이자. 대출 채무가 있으면 이자가 0이라 이 이벤트가 **발생하지 않는다** |

@@ -112,6 +112,16 @@ export class Game {
   /** @type {Readonly<Record<string, (payload: object) => void>>} */ #handlers;
   #phase;
   #version;
+  /**
+   * 낙관적 동시성 토큰. **게임 상태를 실제로 바꾼 커맨드**에만 오른다.
+   *
+   * `version`은 화면 갱신용이라 예약 주문처럼 상태를 바꾸지 않는 커맨드에도 올라야 한다
+   * (안 올리면 클라이언트가 같은 version의 메시지를 중복으로 보고 버린다). 그런데 자동 진행
+   * 드라이버가 그 값을 동시성 토큰으로 쓰면, 남의 턴에 예약 주문을 반복하는 것만으로 대행 결정을
+   * 계속 무효화해 재시도 한도를 소진시킬 수 있다 — 방 전체의 진행이 멈춘다.
+   * 그래서 두 값을 분리한다.
+   */
+  #stateVersion;
   #initialTotal;
   #turn;
   #events = [];
@@ -127,6 +137,7 @@ export class Game {
     turnIndex = 0,
     round = 1,
     version = 0,
+    stateVersion = null,
     options = { roundLimit: null },
     initialTotal,
     turn = { ...EMPTY_TURN },
@@ -143,6 +154,9 @@ export class Game {
     this.#phase = phase;
     this.#clock = new RoundClock({ round, turnIndex, roundLimit: options.roundLimit ?? null });
     this.#version = version;
+    // 저장소는 커맨드마다 방을 다시 직렬화·복원하므로 이 값도 **스냅샷에 실어야** 한다.
+    // 없으면(구버전 스냅샷) version에서 출발한다.
+    this.#stateVersion = stateVersion ?? version;
     this.#initialTotal = initialTotal;
     this.#market = market;
     // 성적표 수집은 Phase 1부터 가동한다(설계서 §9.1 항목 7) — 나중에 켜면 지난 판의 자료가 없다.
@@ -251,6 +265,7 @@ export class Game {
       turnIndex: snapshot.turnIndex ?? 0,
       round: snapshot.round ?? 1,
       version: snapshot.version ?? 0,
+      stateVersion: snapshot.stateVersion ?? null,
       options: snapshot.options ?? { roundLimit: null },
       // 초기 총액이 없는 아주 오래된 스냅샷: 보존 불변식을 거꾸로 풀어 되살린다.
       // `총현금 + 잭팟 = 초기총액 + 은행순유입`이므로 초기총액 = 총현금 + 잭팟 − 은행순유입이다.
@@ -291,6 +306,14 @@ export class Game {
 
   get version() {
     return this.#version;
+  }
+
+  /**
+   * 낙관적 동시성 토큰(자동 진행 드라이버 전용).
+   * 예약 주문처럼 게임 상태를 바꾸지 않는 커맨드에는 오르지 않는다.
+   */
+  get stateVersion() {
+    return this.#stateVersion;
   }
 
   get options() {
@@ -460,6 +483,9 @@ export class Game {
     this.#nudges?.observe(this.#events, { jackpotBefore, jackpotAfter: this.#casino.jackpot });
     this.#recorder.observeEvents({ round: this.#clock.round, events: this.#events });
     this.#version += 1;
+    if (COMMAND_OWNERSHIP[type] !== COMMAND_OWNERSHIPS.OWN_SEAT_ANYTIME) {
+      this.#stateVersion += 1;
+    }
     return [...this.#events];
   }
 
@@ -1263,12 +1289,14 @@ export class Game {
    * 기존 `SELL`(도시 전용)은 하위호환으로 남아 있고 같은 경로를 쓴다.
    */
   #sellAsset({ assetKind, assetId, quantity }) {
-    this.#payment.assertPendingDebt();
+    const note = this.#payment.assertPendingDebt();
     const { intents, events } = this.#liquidator.sell({
       playerId: this.#current.id,
       kind: assetKind,
       assetId,
       quantity,
+      // 정리 매각은 "강제 지불을 메우는" 매각이다 — 부족액을 넘는 대량 매각을 막는다.
+      owed: note.total - this.#current.cash,
     });
     this.#treasury.apply(intents);
     this.#emitAll(events);
@@ -1311,6 +1339,7 @@ export class Game {
   toSnapshot() {
     return {
       version: this.#version,
+      stateVersion: this.#stateVersion,
       phase: this.#phase,
       turnIndex: this.#clock.turnIndex,
       round: this.#clock.round,

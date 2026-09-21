@@ -27,19 +27,28 @@ export const DOMAIN_ERROR_CODES = Object.freeze({
 
 export class DomainError extends Error {
   #code;
+  #details;
 
   /**
    * @param {string} code DOMAIN_ERROR_CODES 중 하나
    * @param {string} message 내부 진단용 메시지(클라이언트로 그대로 보내지 않는다)
+   * @param {string|null} [details] 같은 사유 안에서의 **세부 종류**(기계가 읽는 값).
+   *   호출자가 사유를 더 잘게 구분해야 할 때 쓴다 — 예전에는 한국어 메시지를 정규식으로
+   *   분류했는데, 문구를 다듬는 것만으로 분기가 조용히 바뀌었다. 클라이언트로는 나가지 않는다.
    */
-  constructor(code, message) {
+  constructor(code, message, details = null) {
     super(message);
     this.name = 'DomainError';
     this.#code = code;
+    this.#details = details;
   }
 
   get code() {
     return this.#code;
+  }
+
+  get details() {
+    return this.#details;
   }
 
   static invalidArgument(message) {
@@ -82,7 +91,7 @@ export class DomainError extends Error {
     return new DomainError(DOMAIN_ERROR_CODES.NOT_ENOUGH_SEATS, message);
   }
 
-  static tradeLimit(message) {
-    return new DomainError(DOMAIN_ERROR_CODES.TRADE_LIMIT, message);
+  static tradeLimit(message, details = null) {
+    return new DomainError(DOMAIN_ERROR_CODES.TRADE_LIMIT, message, details);
   }
 }

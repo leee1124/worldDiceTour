@@ -21,12 +21,14 @@ import {
   ORDER_KINDS,
 } from '../domain/market/OrderQueue.js';
 import { MAX_SERIES_LENGTH } from '../domain/market/PriceSeries.js';
-import { MAX_NUDGE_BP } from '../domain/market/PriceProcess.js';
+import { MAX_NUDGE_BP, PriceProcess } from '../domain/market/PriceProcess.js';
 import { MAX_NOTIONAL_PER_WINDOW, MAX_ORDERS_PER_WINDOW } from '../domain/market/TradeBudget.js';
 import { CYCLE_PHASES } from '../domain/market/data/cycle.js';
 import {
   ALL_SECTORS,
+  CLASS_PARAMS,
   INSTRUMENT_STATES,
+  RESERVE_INSTRUMENTS,
   instrumentSpecById,
 } from '../domain/market/data/instruments.js';
 import { newsCardById } from '../domain/market/data/news.js';
@@ -313,6 +315,12 @@ function validateGameCore(game) {
   assert(isPlainObject(game), '게임 스냅샷이 객체가 아닙니다');
   assert(ALL_PHASES.includes(game.phase), `게임 페이즈 오류: ${describe(game.phase)}`);
   assert(isFiniteInteger(game.version) && game.version >= 0, '게임 version 오류');
+  assert(
+    game.stateVersion === undefined ||
+      game.stateVersion === null ||
+      (isFiniteInteger(game.stateVersion) && game.stateVersion >= 0),
+    `게임 stateVersion 오류: ${describe(game.stateVersion)}`,
+  );
   assert(isFiniteInteger(game.round) && game.round >= 1, '게임 round 오류');
   assert(Array.isArray(game.players) && game.players.length >= 2, '게임 플레이어 목록 오류');
   assert(
@@ -513,6 +521,7 @@ function validateMarketSnapshot(game, { seatIds }) {
   assert(isPlainObject(market), '시장 스냅샷이 객체가 아닙니다');
 
   const listed = validateInstrumentsSnapshot(market.instruments);
+  validateReserveSnapshot(market.reserve, listed);
   validateCycleSnapshot(market.cycle);
   assert(
     isFiniteInteger(market.baseRateBp) &&
@@ -526,8 +535,7 @@ function validateMarketSnapshot(game, { seatIds }) {
   validateHoldingsSnapshot(market.holdings, { seatIds, listed });
   validateDepositsSnapshot(market.deposits, { seatIds });
   validateOrderQueueSnapshot(market.orderQueue, { seatIds, listed });
-  validateReserveSnapshot(market.reserve);
-  validateWindowSnapshot(market.window, { seatIds, tradingPhase });
+  validateWindowSnapshot(market.window, { seatIds, tradingPhase, currentSeatId: currentSeatIdOf(game) });
 }
 
 /** @returns {Set<string>} 상장 목록에 있는 종목 id(보유·예약의 참조 정합성 기준) */
@@ -536,7 +544,10 @@ function validateInstrumentsSnapshot(instruments) {
   const ids = new Set();
   for (const instrument of instruments) {
     assert(isPlainObject(instrument), '상품이 객체가 아닙니다');
-    assert(instrumentSpecById(instrument.id), `알 수 없는 종목입니다: ${describe(instrument.id)}`);
+    const spec = instrumentSpecById(instrument.id);
+    assert(spec, `알 수 없는 종목입니다: ${describe(instrument.id)}`);
+    assert(CLASS_PARAMS[spec.klass], `알 수 없는 상품 종류입니다: ${describe(spec.klass)}`);
+    assert(CLASS_PARAMS[spec.klass], `알 수 없는 상품 종류입니다: ${describe(spec.klass)}`);
     assert(!ids.has(instrument.id), `종목이 중복됐습니다: ${describe(instrument.id)}`);
     ids.add(instrument.id);
     assert(
@@ -547,6 +558,26 @@ function validateInstrumentsSnapshot(instruments) {
       Object.values(INSTRUMENT_STATES).includes(instrument.state),
       `상장 상태 오류: ${describe(instrument.state)}`,
     );
+    // SPEC 12.1은 "가격은 항상 tickUnit의 배수이며 경계 안"이라고 약속한다. 복원 경로에도 그
+    // 약속이 있어야 한다 — 없으면 규칙이 만들 수 없는 가격(예: 수수료보다 싼 주가)이 들어와
+    // 매도가 불가능해지거나 돈이 생긴다.
+    const params = CLASS_PARAMS[spec.klass];
+    const bounds = { basePrice: spec.basePrice, ...params };
+    assert(
+      instrument.price % params.tickUnit === 0,
+      `종목 가격이 단위(${params.tickUnit})의 배수가 아닙니다: ${describe(instrument.price)}`,
+    );
+    assert(
+      instrument.price >= PriceProcess.minPrice(bounds) &&
+        instrument.price <= PriceProcess.maxPrice(bounds),
+      `종목 가격이 경계를 벗어납니다: ${describe(instrument.id)}=${describe(instrument.price)}`,
+    );
+    if (instrument.state === INSTRUMENT_STATES.LISTED) {
+      assert(
+        !PriceProcess.isDelisted({ price: instrument.price, ...bounds }),
+        `상장 상태인데 상장폐지 임계 이하입니다: ${describe(instrument.id)}`,
+      );
+    }
     assert(
       Array.isArray(instrument.series) &&
         instrument.series.length > 0 &&
@@ -557,6 +588,10 @@ function validateInstrumentsSnapshot(instruments) {
       assert(
         isFiniteInteger(price) && price > 0 && price <= MAX_MONEY,
         `가격 이력 값 오류: ${describe(price)}`,
+      );
+      assert(
+        price % params.tickUnit === 0,
+        `가격 이력이 단위의 배수가 아닙니다: ${describe(price)}`,
       );
     }
   }
@@ -711,21 +746,36 @@ function validateOrderQueueSnapshot(queue, { seatIds, listed }) {
   );
 }
 
-function validateReserveSnapshot(reserve) {
+/**
+ * 예비 상장 목록 검증.
+ * 예비 풀 소속이어야 하고, **이미 상장된 종목과 겹칠 수 없다** — 겹치면 같은 종목이 두 번
+ * 상장돼 보유·가격이 갈린다.
+ */
+function validateReserveSnapshot(reserve, listed) {
   if (reserve === undefined || reserve === null) {
     return;
   }
   assert(Array.isArray(reserve), '예비 상장 목록이 배열이 아닙니다');
+  const pool = RESERVE_INSTRUMENTS.map((spec) => spec.id);
+  const seen = new Set();
   for (const id of reserve) {
-    assert(instrumentSpecById(id), `알 수 없는 예비 종목입니다: ${describe(id)}`);
+    assert(pool.includes(id), `예비 풀 소속이 아닌 종목입니다: ${describe(id)}`);
+    assert(!seen.has(id), `예비 종목이 중복됐습니다: ${describe(id)}`);
+    assert(!listed.has(id), `이미 상장된 종목이 예비 목록에 있습니다: ${describe(id)}`);
+    seen.add(id);
   }
+}
+
+/** 현재 턴 좌석 id(거래 창구 정합성 검증용). */
+function currentSeatIdOf(game) {
+  return game.players?.[game.turnIndex]?.id ?? null;
 }
 
 /**
  * 거래 창구 검증. **페이즈와 짝이 맞아야 한다** — `AWAIT_TRADE`인데 창구가 없거나 그 반대면
  * 복원된 방이 첫 거래 커맨드에서 터지므로 열리기 전에 격리한다.
  */
-function validateWindowSnapshot(window, { seatIds, tradingPhase }) {
+function validateWindowSnapshot(window, { seatIds, tradingPhase, currentSeatId }) {
   if (window === undefined || window === null) {
     assert(!tradingPhase, 'AWAIT_TRADE 페이즈인데 거래 창구가 없습니다');
     return;
@@ -733,6 +783,12 @@ function validateWindowSnapshot(window, { seatIds, tradingPhase }) {
   assert(tradingPhase, '거래 창구가 열려 있는데 페이즈가 AWAIT_TRADE가 아닙니다');
   assert(isPlainObject(window), '거래 창구가 객체가 아닙니다');
   assert(seatIds.has(window.seatId), `거래 창구 좌석이 방에 없습니다: ${describe(window.seatId)}`);
+  // 창구는 **현재 턴 좌석의 것**이다. 어긋나면 아무도 거래할 수 없는 창구가 되어
+  // 그 턴이 반쯤 죽는다(복원 직후 모든 거래 커맨드가 NOT_YOUR_TURN).
+  assert(
+    window.seatId === currentSeatId,
+    `거래 창구 좌석이 현재 턴 좌석과 다릅니다: ${describe(window.seatId)} ≠ ${describe(currentSeatId)}`,
+  );
   const budget = window.budget ?? {};
   assert(isPlainObject(budget), '거래 창구 예산이 객체가 아닙니다');
   assert(

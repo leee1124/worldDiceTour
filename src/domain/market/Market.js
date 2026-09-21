@@ -23,7 +23,7 @@ import {
 } from './TradeBudget.js';
 import { FEE_BP, FEE_MIN, MAX_QUANTITY, MIN_QUANTITY, TradingDesk } from './TradingDesk.js';
 import { MARKET_EVENT_TYPES } from './events.js';
-import { REJECT_REASONS } from './rejectReasons.js';
+import { ALL_REJECT_REASONS, REJECT_REASONS } from './rejectReasons.js';
 import {
   ALL_SECTORS,
   LISTED_INSTRUMENTS,
@@ -35,6 +35,9 @@ import { NEWS_EFFECT_TARGETS, newsCardById } from './data/news.js';
 
 /** 투자 모드 `STOCKS`가 다루는 상품 수(항상 유지된다). */
 const LISTING_SIZE = LISTED_INSTRUMENTS.length;
+
+const isPlainObject = (value) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
  * 시장 루트(Game Aggregate 안의 자식 루트).
@@ -864,7 +867,12 @@ function sumEffects(card, target) {
   return bp;
 }
 
-/** 도메인 오류를 예약 주문 거절 사유로 옮긴다. */
+/**
+ * 도메인 오류를 예약 주문 거절 사유로 옮긴다.
+ *
+ * 한도 위반은 `DomainError.details`에 실린 **세부 종류 코드**로 분류한다 — 예전에는 한국어
+ * 오류 메시지를 정규식으로 봤는데, 문구를 다듬는 것만으로 사유가 조용히 바뀌었다.
+ */
 function reasonCodeOf(error, order) {
   switch (error?.code) {
     case 'INSUFFICIENT_CASH':
@@ -874,11 +882,9 @@ function reasonCodeOf(error, order) {
           ? REJECT_REASONS.INSUFFICIENT_DEPOSIT
           : REJECT_REASONS.INSUFFICIENT_CASH;
     case 'TRADE_LIMIT':
-      return order.kind === 'DEPOSIT'
-        ? REJECT_REASONS.DEPOSIT_CAP
-        : /보유 상한/.test(error.message)
-          ? REJECT_REASONS.POSITION_LIMIT
-          : REJECT_REASONS.NOTIONAL_LIMIT;
+      return ALL_REJECT_REASONS.includes(error.details)
+        ? error.details
+        : REJECT_REASONS.NOTIONAL_LIMIT;
     case 'INVALID_PHASE':
       return REJECT_REASONS.WINDOW_CLOSED;
     default:
@@ -910,6 +916,11 @@ function restoreWindow(raw) {
   }
   if (typeof raw.seatId !== 'string' || raw.seatId.length === 0) {
     throw DomainError.invalidArgument(`거래 창구 좌석이 올바르지 않습니다: ${String(raw.seatId)}`);
+  }
+  // 숫자·문자열이 들어오면 구조 분해가 0으로 떨어져 **예산이 가득 찬 새 창구**가 된다.
+  // (검증기가 먼저 막지만, 여기서도 조용히 예산을 되돌리지 않게 한다.)
+  if (raw.budget !== undefined && raw.budget !== null && !isPlainObject(raw.budget)) {
+    throw DomainError.invalidArgument('거래 창구 예산이 객체가 아닙니다');
   }
   return { seatId: raw.seatId, budget: new TradeBudget(raw.budget ?? {}) };
 }

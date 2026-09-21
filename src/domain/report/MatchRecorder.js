@@ -3,6 +3,16 @@ import { EVENT_TYPES } from '../game/events.js';
 /** 하이라이트 보관 상한(설계서 §6.1). 넘으면 오래된 것부터 버린다. */
 export const MAX_HIGHLIGHTS = 200;
 
+/**
+ * 라운드별 자산 스냅샷 보관 상한.
+ *
+ * 방 파일은 **커맨드마다 전량 다시 쓰인다**. 라운드 제한 없음(`null`)이 실제 선택지이므로
+ * 상한이 없으면 200라운드 판에서 100KB가 매 커맨드마다 fsync된다(쓰기 증폭).
+ * 라운드 제한의 최대값(30)보다 넉넉히 두어 정상적인 판은 한 건도 잃지 않으면서,
+ * 긴 판에서는 최근 구간만 남긴다(성적표의 자산 추이는 최근이 중요하다).
+ */
+export const MAX_ROUND_SNAPSHOTS = 60;
+
 /** 하이라이트로 남길 사건과 기준. */
 export const HIGHLIGHT_TYPES = Object.freeze({
   BIG_TOLL: 'BIG_TOLL',
@@ -43,7 +53,9 @@ export class MatchRecorder {
   #pnl;
 
   constructor({ snapshots = [], highlights = [], pnl = {} } = {}) {
-    this.#snapshots = Array.isArray(snapshots) ? snapshots.map((entry) => cloneSnapshot(entry)) : [];
+    this.#snapshots = Array.isArray(snapshots)
+      ? snapshots.slice(-MAX_ROUND_SNAPSHOTS).map((entry) => cloneSnapshot(entry))
+      : [];
     this.#highlights = Array.isArray(highlights)
       ? highlights.slice(-MAX_HIGHLIGHTS).map((entry) => ({ ...entry }))
       : [];
@@ -89,7 +101,7 @@ export class MatchRecorder {
     this.#pnl.set(playerId, map);
   }
 
-  /** 라운드별 자산 스냅샷(라운드 틱이 끝난 뒤). */
+  /** 라운드별 자산 스냅샷(라운드 틱이 끝난 뒤). 상한을 넘으면 오래된 라운드부터 버린다. */
   recordRound({ round, players, netWorth }) {
     this.#snapshots.push({
       round,
@@ -98,6 +110,9 @@ export class MatchRecorder {
         ...netWorth.breakdownOf(player),
       })),
     });
+    if (this.#snapshots.length > MAX_ROUND_SNAPSHOTS) {
+      this.#snapshots.shift();
+    }
     return { intents: [], events: [] };
   }
 

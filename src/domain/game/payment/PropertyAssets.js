@@ -50,7 +50,12 @@ export class PropertyAssets {
       view: {
         index: city.index,
         name: city.name,
+        // 자산군이 섞인 목록에서 키를 맞추기 위한 가산 필드(부동산은 한 칸이 1건이다).
+        label: city.name,
         refund: city.liquidationValue(),
+        quantity: 1,
+        maxQuantity: 1,
+        unitValue: city.liquidationValue(),
         assetKind: PROPERTY_ASSET_KIND,
         assetId: String(city.index),
       },

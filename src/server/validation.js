@@ -1,7 +1,8 @@
 import { ALL_COMMAND_TYPES, COMMAND_TYPES } from '../domain/game/commands.js';
 import { DEPOSIT_CAP, DEPOSIT_UNIT } from '../domain/market/DepositAccount.js';
-import { ORDER_KINDS } from '../domain/market/OrderQueue.js';
+import { ORDER_ID_PATTERN, ORDER_KINDS } from '../domain/market/OrderQueue.js';
 import { MAX_QUANTITY, MIN_QUANTITY } from '../domain/market/TradingDesk.js';
+import { MAX_POSITION_PER_INSTRUMENT } from '../domain/market/Holdings.js';
 import { DEPOSIT_ASSET_KIND, STOCK_ASSET_KIND } from '../domain/market/MarketAssets.js';
 import { PROPERTY_ASSET_KIND } from '../domain/game/payment/PropertyAssets.js';
 import { BUILDING_TYPES } from '../domain/game/City.js';
@@ -20,8 +21,11 @@ export const SEAT_ID_PATTERN = /^seat-\d{1,3}$/;
 export const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 /** 종목 식별자. 존재 여부는 도메인이 본다(컨트롤러는 상장 목록을 모른다 — 형식만). */
 export const INSTRUMENT_ID_PATTERN = /^[A-Z]{2,6}$/;
-/** 예약 주문 식별자. */
-export const ORDER_ID_PATTERN = /^ord-\d{1,4}$/;
+/**
+ * 예약 주문 식별자. 단일 출처는 도메인 `OrderQueue`이며 여기서는 다시 내보내기만 한다
+ * (`export … from`만 쓰면 이 모듈 안에 지역 바인딩이 생기지 않아 사용 지점이 터진다).
+ */
+export { ORDER_ID_PATTERN };
 /** 정리 매각 자산 식별자(칸 번호·종목 id·'CASH'를 모두 담는다). */
 export const ASSET_ID_PATTERN = /^[A-Za-z0-9_-]{1,16}$/;
 
@@ -36,6 +40,13 @@ const SELLABLE_ASSET_KINDS = Object.freeze([
   STOCK_ASSET_KIND,
   DEPOSIT_ASSET_KIND,
 ]);
+
+/** 자산군별 `SELL_ASSET.quantity` 상한(수량의 뜻이 자산군마다 다르다). */
+const SELL_QUANTITY_MAX = Object.freeze({
+  [PROPERTY_ASSET_KIND]: 1,
+  [STOCK_ASSET_KIND]: MAX_POSITION_PER_INSTRUMENT,
+  [DEPOSIT_ASSET_KIND]: DEPOSIT_CAP,
+});
 
 /** 오류 메시지에 실을 값의 최대 길이. */
 const MAX_DETAIL_LENGTH = 120;
@@ -112,7 +123,9 @@ export function extractToken(headers) {
 }
 
 function requireInteger(value, { min, max, field }) {
-  if (!Number.isInteger(value) || value < min || value > max) {
+  // `Number.isInteger`는 `1e21`이나 `2^53+1`도 참이다. 상한이 없는 필드가 새로 생기는 순간
+  // 그런 값이 도메인으로 내려가므로 여기서부터 안전 정수만 받는다(RoomSerializer와 같은 기준).
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw invalid(`${field} 범위 오류: ${safeText(value)}`);
   }
   return value;
@@ -326,8 +339,13 @@ function parseSellAsset(payload) {
   return {
     assetKind: payload.assetKind,
     assetId,
-    // 예금은 원 단위 금액이 수량이므로 상한이 예금 한도다.
-    quantity: requireInteger(payload.quantity, { min: 1, max: DEPOSIT_CAP, field: 'quantity' }),
+    // 자산군마다 수량의 뜻이 다르다: 주식은 주 수(보유 상한), 예금은 원 단위 금액(예금 한도),
+    // 부동산은 한 칸이 1건이다. 컨트롤러가 첫 방어선이므로 자산군에 맞는 상한을 쓴다.
+    quantity: requireInteger(payload.quantity, {
+      min: 1,
+      max: SELL_QUANTITY_MAX[payload.assetKind],
+      field: 'quantity',
+    }),
   };
 }
 

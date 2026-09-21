@@ -53,6 +53,9 @@ export class StockAssets {
       const view = {
         assetKind: STOCK_ASSET_KIND,
         assetId: instrument.id,
+        // `name`은 자산군을 가리지 않는 공통 필드다 — 정리 목록을 렌더러 하나로 그릴 수 있어야 한다
+        // (부동산은 `name`, 주식은 `label`처럼 키가 갈리면 클라이언트가 자산군마다 분기해야 한다).
+        name: instrument.name,
         label: instrument.name,
         refund,
         quantity: position.qty,
@@ -84,6 +87,21 @@ export class StockAssets {
       instrumentId: assetId,
       quantity: quantity ?? held?.qty ?? 0,
     });
+  }
+
+  /**
+   * 부족액을 덮는 최소 주 수(보유 수량 이내).
+   * 1주 단위로 나눌 수 있으므로 필요한 만큼만 팔면 된다.
+   */
+  quantityCovering({ playerId, assetId, owed }) {
+    const instrument = this.#market.instrumentOf(assetId);
+    const held =
+      this.#market.holdingsOf(playerId).find((position) => position.instrumentId === assetId)?.qty ??
+      0;
+    if (!instrument?.isListed() || instrument.price <= 0 || held === 0) {
+      return held;
+    }
+    return Math.min(held, Math.ceil(owed / instrument.price));
   }
 
   /** 파산 청산: 예약 주문 취소 + 전 종목 시장가 매도. */
@@ -123,6 +141,7 @@ export class DepositAssets {
     const view = {
       assetKind: DEPOSIT_ASSET_KIND,
       assetId: DEPOSIT_ASSET_ID,
+      name: '예금',
       label: '예금',
       refund: balance,
       quantity: balance,
@@ -150,6 +169,16 @@ export class DepositAssets {
     void assetId;
     const balance = this.#market.depositOf(playerId);
     return this.#market.liquidateDeposit({ playerId, amount: quantity ?? balance });
+  }
+
+  /**
+   * 부족액을 덮는 최소 인출액(잔액 이내, 10,000원 단위 올림).
+   * 예금은 금액이 곧 수량이다.
+   */
+  quantityCovering({ playerId, owed }) {
+    const balance = this.#market.depositOf(playerId);
+    const needed = Math.ceil(owed / DEPOSIT_UNIT) * DEPOSIT_UNIT;
+    return Math.min(balance, needed);
   }
 
   /** 파산 청산: 전액 인출. */

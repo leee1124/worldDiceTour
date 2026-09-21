@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { LIMIT_KINDS } from './rejectReasons.js';
 
 /**
  * 한 좌석이 한 종목을 가질 수 있는 최대 수량(설계서 §3.8).
@@ -85,6 +86,7 @@ export class Holdings {
     if (qty > MAX_POSITION_PER_INSTRUMENT) {
       throw DomainError.tradeLimit(
         `종목 보유 상한(${MAX_POSITION_PER_INSTRUMENT}주)을 넘습니다: ${instrumentId} ${qty}`,
+        LIMIT_KINDS.POSITION,
       );
     }
     const avgCost = Math.floor((current.qty * current.avgCost + quantity * price) / qty);

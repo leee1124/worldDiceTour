@@ -653,6 +653,9 @@ describe('MarketAssets(AssetProvider 구현 — 주식·예금)', () => {
         view: {
           assetKind: STOCK_ASSET_KIND,
           assetId: 'AIR',
+          // 자산군이 섞인 한 배열을 렌더러 하나로 그릴 수 있어야 한다 — 이름 필드 키를
+          // 자산군마다 다르게 두면(부동산 name / 주식 label) 클라이언트가 분기해야 한다.
+          name: '한빛항공',
           label: '한빛항공',
           refund: 120_000,
           quantity: 10,
@@ -671,6 +674,7 @@ describe('MarketAssets(AssetProvider 구현 — 주식·예금)', () => {
         view: {
           assetKind: DEPOSIT_ASSET_KIND,
           assetId: 'CASH',
+          name: '예금',
           label: '예금',
           refund: 300_000,
           quantity: 300_000,

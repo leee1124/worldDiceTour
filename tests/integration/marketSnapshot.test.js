@@ -13,6 +13,7 @@ import { ROOM_STATUS, Room } from '../../src/domain/room/Room.js';
 import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
 import { PHASES } from '../../src/domain/game/phases.js';
 import { ORDER_KINDS } from '../../src/domain/market/OrderQueue.js';
+import { MatchRecorder, MAX_ROUND_SNAPSHOTS } from '../../src/domain/report/MatchRecorder.js';
 import { FakeRandomSource } from '../support/FakeRandomSource.js';
 import { ScriptedRandomSource } from '../support/ScriptedRandomSource.js';
 
@@ -221,6 +222,33 @@ describe('손상된 시장 스냅샷은 거부된다(참조 정합성 포함)', 
     '최근 뉴스 id가 목록에 없다': (market) => {
       market.latestNews = { id: 'NX9', round: 2 };
     },
+    // SPEC 12.1은 "가격은 항상 tickUnit의 배수이며 경계 안"이라고 약속한다. 복원 경로에도
+    // 그 약속이 있어야 한다 — 없으면 매도 수수료를 낼 수 없는 가격이 들어와 돈이 생긴다.
+    '가격이 tickUnit의 배수가 아니다': (market) => {
+      market.instruments[0].price = 12_050;
+    },
+    '가격이 하한 아래다': (market) => {
+      market.instruments[0].price = 100;
+    },
+    '가격이 상한 위다': (market) => {
+      market.instruments[0].price = 100_000;
+    },
+    '상장 상태인데 상장폐지 임계 이하다': (market) => {
+      market.instruments[0].price = 2_400;
+      market.instruments[0].state = 'LISTED';
+    },
+    '가격 이력이 tickUnit의 배수가 아니다': (market) => {
+      market.instruments[0].series = [12_000, 12_050];
+    },
+    '예비 종목이 예비 풀 소속이 아니다': (market) => {
+      market.reserve = ['AIR'];
+    },
+    '예비 종목이 이미 상장돼 있다': (market) => {
+      market.reserve = ['AIR', 'SKY'];
+    },
+    '거래 창구 좌석이 현재 턴 좌석이 아니다': (market) => {
+      market.window.seatId = 'seat-2';
+    },
   };
 
   for (const [label, mutate] of Object.entries(cases)) {
@@ -280,6 +308,26 @@ describe('손상된 시장 스냅샷은 거부된다(참조 정합성 포함)', 
 });
 
 describe('성적표 수집 스냅샷', () => {
+  it('라운드 스냅샷에 상한이 있어 방 파일이 무한히 자라지 않는다', () => {
+    // Given (라운드 제한 없음(null)이 실제 선택지이므로 200라운드 판도 가능하다.
+    //        커맨드마다 방 전체를 다시 쓰므로 상한이 없으면 쓰기 증폭이 계속 커진다)
+    const recorder = new MatchRecorder();
+    const netWorth = {
+      breakdownOf: () => ({ cash: 1, property: 0, stock: 0, deposit: 0, loanDebt: 0, total: 1 }),
+    };
+
+    // When
+    for (let round = 1; round <= MAX_ROUND_SNAPSHOTS + 40; round += 1) {
+      recorder.recordRound({ round, players: [{ id: 'seat-1' }], netWorth });
+    }
+
+    // Then (가장 오래된 라운드가 밀려나고 최근 것이 남는다)
+    const snapshot = recorder.toSnapshot();
+    assert.equal(snapshot.snapshots.length, MAX_ROUND_SNAPSHOTS);
+    assert.equal(snapshot.snapshots.at(-1).round, MAX_ROUND_SNAPSHOTS + 40);
+  });
+
+
   it('라운드 스냅샷·하이라이트·사유별 손익이 저장되고 왕복한다', () => {
     // Given
     const room = playingStockRoom();

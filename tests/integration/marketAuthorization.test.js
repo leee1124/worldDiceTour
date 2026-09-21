@@ -19,7 +19,7 @@ const silentLogger = { error: () => {}, warn: () => {}, info: () => {} };
 const noopPublisher = { publishRoom: () => {}, publishGame: () => {}, closeRoom: () => {} };
 
 /** 투자 모드가 켜진 2인 방(사람 좌석 둘). */
-async function stockApp({ tradeLimiter = new UnlimitedLimiter() } = {}) {
+async function stockApp({ tradeLimiter = new UnlimitedLimiter(), withComputer = false } = {}) {
   const random = new ScriptedRandomSource();
   const repository = new InMemoryRoomRepository({ random, logger: silentLogger });
   const common = {
@@ -36,11 +36,27 @@ async function stockApp({ tradeLimiter = new UnlimitedLimiter() } = {}) {
   const host = await roomService.createRoom({ hostName: '하나' });
   const code = host.room.code;
   const guest = await roomService.joinSeat({ code, name: '두리' });
+  if (withComputer) {
+    await roomService.hostAction({
+      code,
+      token: host.seatToken,
+      action: { type: 'ADD_COMPUTER', name: '컴퓨터' },
+    });
+  }
   await roomService.hostAction({
     code,
     token: host.seatToken,
     action: { type: 'SET_OPTIONS', roundLimit: 30, finance: { investmentMode: 'STOCKS' } },
   });
+  if (withComputer) {
+    // 첫 턴은 호스트 좌석이다. 자동 진행으로 돌려 `autoTurn`이 그 좌석을 돌려주게 한다
+    // (좌석이 오프라인이어야 하므로 presence가 빈 이 조립에서는 그대로 통과한다).
+    await roomService.hostAction({
+      code,
+      token: host.seatToken,
+      action: { type: 'SET_AUTOPILOT', seatId: host.seatId, enabled: true },
+    });
+  }
   await roomService.hostAction({ code, token: host.seatToken, action: { type: 'START' } });
 
   return {
@@ -300,6 +316,82 @@ describe('거래 커맨드 권한 매트릭스(서비스 레이어)', () => {
       'ERR003',
       '탈락 좌석의 예약',
     );
+  });
+
+  it('예약 주문은 자동 진행의 낙관적 동시성 토큰을 흔들지 않는다(진행 방해 차단)', async () => {
+    // Given (예약 주문은 게임 상태를 바꾸지 않으므로, 남의 턴에 이것만 반복해도
+    //        자동 진행 좌석의 결정이 무효가 되어서는 안 된다. 무효가 되면 재시도 한도를
+    //        소진시켜 그 방의 진행을 영구히 멈출 수 있다)
+    const app = await stockApp();
+    const turn = await app.gameService.autoTurn(app.code);
+
+    // 이 방은 사람 좌석 둘이라 autoTurn은 null이다 — 토큰 자체를 직접 비교한다.
+    const room = await app.repository.findByCode(app.code);
+    const before = room.game.stateVersion;
+
+    // When (게스트가 예약을 걸고 취소한다 — 게임 상태와 무관한 커맨드)
+    await app.gameService.execute({
+      code: app.code,
+      token: app.guest.token,
+      type: COMMAND_TYPES.QUEUE_ORDER,
+      payload: { kind: 'DEPOSIT', amount: 10_000 },
+    });
+    await app.gameService.execute({
+      code: app.code,
+      token: app.guest.token,
+      type: COMMAND_TYPES.CANCEL_QUEUED_ORDER,
+      payload: { orderId: 'ord-1' },
+    });
+
+    // Then
+    const after = await app.repository.findByCode(app.code);
+    assert.equal(turn, null, '사람 좌석뿐인 방에서는 자동 진행 대상이 없다');
+    assert.equal(after.game.stateVersion, before, '예약 주문이 동시성 토큰을 올렸다');
+    assert.ok(after.game.version > room.game.version, 'DTO version은 올라가야 한다(화면 갱신용)');
+  });
+
+  it('거래 커맨드는 동시성 토큰을 올린다(상태가 실제로 바뀌므로)', async () => {
+    // Given
+    const app = await stockApp();
+    const room = await app.repository.findByCode(app.code);
+    const before = room.game.stateVersion;
+
+    // When
+    await app.gameService.execute({
+      code: app.code,
+      token: app.host.token,
+      type: COMMAND_TYPES.BUY_STOCK,
+      payload: { instrumentId: 'AIR', quantity: 1 },
+    });
+
+    // Then
+    const after = await app.repository.findByCode(app.code);
+    assert.equal(after.game.stateVersion, before + 1);
+  });
+
+  it('자동 진행 좌석이 결정한 뒤 남이 예약을 걸어도 그 결정이 거부되지 않는다', async () => {
+    // Given (컴퓨터 좌석이 있는 방 — 자동 진행 대행 경로를 실제로 태운다)
+    const app = await stockApp({ withComputer: true });
+    const turn = await app.gameService.autoTurn(app.code);
+    assert.ok(turn, '자동 진행 차례가 아니다');
+
+    // When (결정을 내린 뒤, 다른 사람 좌석이 예약을 걸어 version을 흔든다)
+    await app.gameService.execute({
+      code: app.code,
+      token: app.guest.token,
+      type: COMMAND_TYPES.QUEUE_ORDER,
+      payload: { kind: 'DEPOSIT', amount: 10_000 },
+    });
+
+    // Then (예약 전에 읽은 토큰으로도 대행이 성공한다)
+    const result = await app.gameService.executeAsServer({
+      code: app.code,
+      seatId: turn.seatId,
+      type: COMMAND_TYPES.CLOSE_TRADING,
+      payload: {},
+      expectedVersion: turn.version,
+    });
+    assert.ok(result.view);
   });
 
   it('좌석당 레이트 리밋을 넘으면 ERR019이고 상태가 그대로다', async () => {

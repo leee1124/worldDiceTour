@@ -108,12 +108,34 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
     const sellable = registry.sellableOf('s1');
 
     // Then
-    // 기존 계약(index/name/refund)은 그대로 두고 자산군 구별 필드만 가산한다.
+    // 기존 계약(index/name/refund)은 그대로 두고 자산군 구별·수량 필드를 가산한다.
+    // `label`/`quantity`/`maxQuantity`/`unitValue`는 자산군이 섞인 목록을 렌더러 하나로
+    // 그릴 수 있게 하기 위한 공통 필드다(부동산은 한 칸이 1건).
     assert.deepEqual(
       sellable.map((asset) => asset.view),
       [
-        { index: 1, name: '하노이', refund: 30_000, assetKind: 'PROPERTY', assetId: '1' },
-        { index: 39, name: '서울', refund: 400_000, assetKind: 'PROPERTY', assetId: '39' },
+        {
+          index: 1,
+          name: '하노이',
+          label: '하노이',
+          refund: 30_000,
+          quantity: 1,
+          maxQuantity: 1,
+          unitValue: 30_000,
+          assetKind: 'PROPERTY',
+          assetId: '1',
+        },
+        {
+          index: 39,
+          name: '서울',
+          label: '서울',
+          refund: 400_000,
+          quantity: 1,
+          maxQuantity: 1,
+          unitValue: 400_000,
+          assetKind: 'PROPERTY',
+          assetId: '39',
+        },
       ],
     );
   });

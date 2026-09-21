@@ -100,10 +100,12 @@ export class GameService {
     if (!seat?.isAutoControlled()) {
       throw new AppError('ERR003', `자동 진행 좌석이 아닙니다: ${seatId}`);
     }
-    if (expectedVersion !== undefined && room.game?.version !== expectedVersion) {
+    // `stateVersion`으로 비교한다 — 예약 주문처럼 게임 상태를 바꾸지 않는 커맨드가
+    // 대행 결정을 무효화하면, 남의 턴에 그것만 반복해 방의 진행을 멈출 수 있다.
+    if (expectedVersion !== undefined && room.game?.stateVersion !== expectedVersion) {
       throw new AppError(
         'ERR005',
-        `자동 진행 버전 불일치: 기대 ${expectedVersion}, 실제 ${room.game?.version}`,
+        `자동 진행 버전 불일치: 기대 ${expectedVersion}, 실제 ${room.game?.stateVersion}`,
       );
     }
     return this.#run(room, seatId, type, payload);
@@ -124,7 +126,8 @@ export class GameService {
       return null;
     }
     const view = toGameViewDto(room.game);
-    return { seatId: seat.id, view, version: view.version };
+    // 드라이버가 되돌려 줄 토큰은 `stateVersion`이다(위 `executeAsServer` 주석 참고).
+    return { seatId: seat.id, view, version: room.game.stateVersion };
   }
 
   /**
