@@ -3,8 +3,8 @@ import { MoneyIntent } from '../shared/MoneyIntent.js';
 import { BankLedger } from './BankLedger.js';
 import { Board } from './Board.js';
 import { Casino } from './Casino.js';
+import { CityTrade } from './CityTrade.js';
 import { Dice } from './Dice.js';
-import { BUILDING_TYPES } from './City.js';
 import {
   ISLAND_RESCUE_FEE,
   LOAN_DEBT,
@@ -84,6 +84,7 @@ export class Game {
   /** @type {Bankruptcy} */ #bankruptcy;
   /** @type {LapIncome} */ #lapIncome;
   /** @type {TicketEffects} */ #ticketEffects = new TicketEffects();
+  /** @type {CityTrade} */ #cityTrade;
   /** @type {Readonly<Record<string, (payload: object) => void>>} */ #handlers;
   #phase;
   #version;
@@ -127,6 +128,7 @@ export class Game {
     this.#netWorth = new NetWorth({ registry: this.#assets });
     this.#bankruptcy = new Bankruptcy({ registry: this.#assets });
     this.#lapIncome = new LapIncome();
+    this.#cityTrade = new CityTrade({ findPlayer: (id) => this.playerById(id) });
     this.#payment = new PaymentFlow({
       treasury: this.#treasury,
       findPlayer: (id) => this.playerById(id),
@@ -410,26 +412,14 @@ export class Game {
   #buy() {
     const player = this.#current;
     const city = this.#board.cityAt(player.position);
-    if (city.isOwned()) {
-      throw DomainError.invalidState(`이미 주인이 있는 칸입니다: ${city.name}`);
-    }
-    if (!player.canPay(city.price)) {
-      throw DomainError.insufficientCash(`매입 대금 ${city.price}원이 부족합니다`);
-    }
-    this.#treasury.payToBank({
-      playerId: player.id,
-      amount: city.price,
-      reason: MONEY_REASONS.PURCHASE,
-      meta: { cityIndex: city.index },
-    });
-    city.buy(player.id);
-    this.#emit(EVENT_TYPES.CITY_PURCHASED, {
-      playerId: player.id,
-      index: city.index,
-      name: city.name,
-      price: city.price,
-    });
+    this.#applyTrade(this.#cityTrade.buy({ player, city }));
     this.#offerBuild(player, city.index);
+  }
+
+  /** 도시 거래 결과(돈 이동 + 이벤트)를 반영한다. */
+  #applyTrade({ intents, events }) {
+    this.#treasury.apply(intents);
+    this.#emitAll(events);
   }
 
   #skipBuy() {
@@ -456,9 +446,8 @@ export class Game {
   }
 
   #build({ buildings }) {
-    const player = this.#current;
     const city = this.#board.cityAt(this.#turn.buildIndex);
-    this.#performBuild(player, city, buildings);
+    this.#applyTrade(this.#cityTrade.build({ player: this.#current, city, buildings }));
     this.#endTurn();
   }
 
@@ -466,40 +455,6 @@ export class Game {
     const player = this.#current;
     this.#emit(EVENT_TYPES.BUILD_DECLINED, { playerId: player.id, index: this.#turn.buildIndex });
     this.#endTurn();
-  }
-
-  /** 고른 건물 조합을 검증하고 짓는다. */
-  #performBuild(player, city, buildings) {
-    if (!city.isOwnedBy(player.id)) {
-      throw DomainError.invalidArgument(`내 도시가 아닙니다: ${city.index}`);
-    }
-    city.assertCanBuild(buildings);
-    const cost = city.costOf(buildings);
-    if (!player.canPay(cost)) {
-      throw DomainError.insufficientCash(`건설비 ${cost}원이 부족합니다`);
-    }
-    this.#treasury.payToBank({
-      playerId: player.id,
-      amount: cost,
-      reason: MONEY_REASONS.BUILD,
-      meta: { cityIndex: city.index },
-    });
-    city.build(buildings);
-    this.#emit(EVENT_TYPES.BUILT, {
-      playerId: player.id,
-      index: city.index,
-      name: city.name,
-      buildings: [...buildings],
-      cost,
-    });
-    if (buildings.includes(BUILDING_TYPES.LANDMARK)) {
-      this.#emit(EVENT_TYPES.LANDMARK_BUILT, {
-        playerId: player.id,
-        index: city.index,
-        name: city.name,
-        cost,
-      });
-    }
   }
 
   #offerStartBuild(player) {
@@ -513,11 +468,11 @@ export class Game {
   }
 
   #startBuild({ cityIndex, buildings }) {
-    const player = this.#current;
     if (!Number.isInteger(cityIndex) || !this.#board.isOwnable(cityIndex)) {
       throw DomainError.invalidArgument(`건설할 칸이 올바르지 않습니다: ${cityIndex}`);
     }
-    this.#performBuild(player, this.#board.cityAt(cityIndex), buildings);
+    const city = this.#board.cityAt(cityIndex);
+    this.#applyTrade(this.#cityTrade.build({ player: this.#current, city, buildings }));
     this.#endTurn();
   }
 
@@ -547,40 +502,7 @@ export class Game {
   #acquire() {
     const player = this.#current;
     const city = this.#board.cityAt(this.#turn.acquireIndex);
-    if (!city.canBeAcquired()) {
-      throw DomainError.invalidState(`인수할 수 없는 칸입니다: ${city.name}`);
-    }
-    const price = city.acquisitionPrice();
-    if (!player.canPay(price)) {
-      throw DomainError.insufficientCash('인수 대금은 보유 현금으로만 지불할 수 있습니다');
-    }
-    const owner = this.playerById(city.ownerId);
-    const meta = { cityIndex: city.index };
-    if (owner && !owner.eliminated) {
-      this.#treasury.transfer({
-        fromId: player.id,
-        toId: owner.id,
-        amount: price,
-        reason: MONEY_REASONS.ACQUISITION,
-        meta,
-      });
-    } else {
-      // 탈락했거나 사라진 소유자에게는 줄 수 없으므로 은행이 받는다.
-      this.#treasury.payToBank({
-        playerId: player.id,
-        amount: price,
-        reason: MONEY_REASONS.ACQUISITION,
-        meta,
-      });
-    }
-    city.transferTo(player.id);
-    this.#emit(EVENT_TYPES.ACQUIRED, {
-      playerId: player.id,
-      index: city.index,
-      name: city.name,
-      fromId: owner?.id ?? null,
-      price,
-    });
+    this.#applyTrade(this.#cityTrade.acquire({ player, city }));
     this.#turn.acquireIndex = null;
     this.#offerBuild(player, city.index);
   }
