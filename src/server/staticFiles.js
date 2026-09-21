@@ -1,4 +1,4 @@
-import { readFile, realpath, stat } from 'node:fs/promises';
+import { readFile, realpath, stat as fsStat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { AppError } from '../application/errors.js';
@@ -24,9 +24,13 @@ const CONTENT_TYPES = Object.freeze({
  *  2) **실제 경로(realpath)** 를 다시 확인해, public/ 안에 있는 심볼릭 링크가 바깥을
  *     가리키는 경우까지 차단한다.
  *
+ * @param {object} [options]
+ * @param {object} [options.logger]
+ * @param {Function} [options.stat] `node:fs/promises`의 `stat` 대체 — 테스트에서 권한 오류(EACCES 등)를
+ *   플랫폼 독립적으로 주입하기 위한 선택적 시드다.
  * @returns {Promise<{content: Buffer, contentType: string}>}
  */
-export async function readStaticFile(rootDir, urlPath, { logger = console } = {}) {
+export async function readStaticFile(rootDir, urlPath, { logger = console, stat: statFn = fsStat } = {}) {
   const decoded = safeDecode(urlPath);
   const relative = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
   const resolvedRoot = path.resolve(rootDir);
@@ -42,7 +46,7 @@ export async function readStaticFile(rootDir, urlPath, { logger = console } = {}
 
   let info;
   try {
-    info = await stat(target);
+    info = await statFn(target);
   } catch (error) {
     // 없는 파일은 흔한 일이므로 조용히, 그 밖의 이유(권한 등)는 사유를 남긴다.
     if (error.code !== 'ENOENT') {
