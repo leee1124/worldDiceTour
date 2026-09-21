@@ -140,19 +140,37 @@ src/
   app.js                     조립 루트(Composition Root)
   domain/                    순수 비즈니스 로직 — node:*/브라우저 API 의존 금지
     game/
-      Game.js                Aggregate Root: 턴 소유권·페이즈 상태기계·모든 돈의 흐름
+      Game.js                Aggregate Root: 턴 소유권·페이즈 상태기계·서브시스템 오케스트레이션
+      Treasury.js            ★ 현금·장부·잭팟을 바꾸는 유일한 곳(모든 돈이 여기를 지난다)
+      RoundClock.js          ★ 라운드 전이 + 라운드 틱 훅 목록(구독 지점)
+      CityTrade.js           도시 매입·건설·인수 규칙
+      TicketEffects.js       행운 티켓 효과 해석(순수)
+      LapIncome.js           출발 통과 1회 정산(월급 → 대출 압류)
+      PendingDecision.js     "지금 내려야 하는 결정"(읽기 모델) 조립
+      payment/               결제·정리·파산·자산군
+        PaymentFlow.js       강제지불 → 정리 → 정산 → 이어하기
+        DebtNote.js          채무 증서 VO(SINKS·CONTINUATIONS)
+        AssetRegistry.js     ★ 자산군 포트 등록/조회(총자산·매각 목록·파산 청산)
+        PropertyAssets.js    보드 어댑터(부동산 자산군)
+        Liquidator.js        매각 순서(자산군 우선순위 → 환급액 낮은 것)
+        NetWorth.js          ★ 총자산/순위 단일 출처(순위와 DTO가 같은 함수를 쓴다)
+        Bankruptcy.js        파산 시 남은 현금 분배 + 전 자산 청산
       Board.js  City.js      40칸 보드, 도시/휴양지(건물·통행료·투자액·인수·매각)
-      Player.js              현금·위치·조난·공항 이동권·연속 더블·대출
+      Player.js              현금 잔액·위치·조난·공항 이동권·연속 더블·대출
       TicketDeck.js          행운 티켓 20장(즉시 효과)
-      Casino.js  Dice.js     홀짝/하이로우세븐/슬롯 + 잭팟, 주사위
-      BankLedger.js          은행 순유입 장부(돈의 보존 불변식)
-      phases.js commands.js events.js   페이즈·커맨드·이벤트 정의(단일 출처)
+      Casino.js  Dice.js     홀짝/하이로우세븐/슬롯 판정(순수) + 잭팟 보관, 주사위
+      BankLedger.js          은행 순유입 장부 + 사유별 내역(돈의 보존 불변식 2단)
+      phases.js commands.js events.js   페이즈·커맨드(+COMMAND_OWNERSHIP)·이벤트(단일 출처)
       data/board.js data/tickets.js     보드 40칸·티켓 20장 데이터
     room/
       Room.js                Aggregate Root: 좌석 한도·호스트 권한·상태 전이·게임 시작
+      FinanceOptions.js      구조화된 options.finance(기본값 전부 꺼짐 + 허용 목록)
       Seat.js  RoomCode.js   좌석(토큰 보관, 비교는 하지 않음), 방 코드 생성/검증
     shared/
       DomainError.js         도메인 사유 코드 + 예외
+      Money.js               금액 상한(MAX_MONEY)·정수 금액 어서션(순수 함수)
+      MoneyIntent.js         ★ 돈 이동 의사 VO + MONEY_REASONS 단일 출처
+      AssetProvider.js       자산군 포트 정의(JSDoc)
       interfaces.js          RandomSource / RoomRepository / EventPublisher / PresenceQuery 포트(JSDoc)
   application/               유스케이스 — 로드 → 인증 → Aggregate 위임 → 저장 → 발행
     RoomService.js  GameService.js
@@ -164,7 +182,7 @@ src/
   infrastructure/            포트 구현
     CryptoRandomSource.js  SeededRandomSource.js  TokenFactory.js
     SeatAuthenticator.js     좌석 토큰 timingSafeEqual 비교
-    RoomSerializer.js        저장 스냅샷 스키마 검증
+    RoomSerializer.js        저장 스냅샷 스키마 검증 + schemaVersion 마이그레이션
     FileRoomRepository.js  InMemoryRoomRepository.js
   server/                    Controller 레이어
     httpServer.js            라우팅·정적 서빙·16KB 본문 제한·보안 헤더·규격 에러 응답
@@ -204,7 +222,8 @@ docs/SPEC.md  docs/API.md
 
 ### 설계 원칙
 
-- **풍부한 도메인 모델**: 규칙 판단은 엔티티/애그리거트 안에 있다(`Player.pay`, `City.tollFor/build/liquidationValue`, `Game`이 페이즈·턴 소유권 강제, `Room`이 호스트 권한·좌석 한도 강제). 서비스는 조합만 한다.
+- **풍부한 도메인 모델**: 규칙 판단은 엔티티/애그리거트와 도메인 서비스 안에 있다(`City.tollFor/build/buildOptions/liquidationValue`, `CityTrade`가 매입·건설·인수 규칙, `TicketEffects`가 티켓 효과, `Liquidator`가 매각 순서, `Game`이 페이즈·턴 소유권 강제, `Room`이 호스트 권한·좌석 한도 강제). 애플리케이션 서비스는 조합만 한다.
+- **돈의 단일 통로**: 모든 돈 이동은 `MoneyIntent` 한 종류로 표현되고 `Treasury.apply()`만 실제로 적용한다(현금·장부·잭팟). 서브시스템은 돈을 만지지 않고 `{ intents, events }`만 돌려준다. 자세한 구조는 [docs/SPEC.md §11](docs/SPEC.md)을 참고.
 - **레이어 분리**: 도메인은 `RandomSource`/`RoomRepository`/`EventPublisher` 포트에만 의존하고 `node:` 모듈을 import하지 않는다. 토큰 비교(`timingSafeEqual`)는 infrastructure에만 있고, 도메인은 이미 해석된 `seatId`만 받는다.
 - **엔티티 미노출**: 서비스는 DTO 평면 객체만 반환하며 좌석 토큰은 DTO·SSE·로그에 절대 싣지 않는다.
 - **에러 규격화**: 클라이언트에는 `{ code, message }`만, 내부 사유는 `console.error`로만. 화면 토스트에는 서버가 준 `message`만 띄운다(모르는 코드도 그대로 안내). 검증 메시지는 외부 입력을 안전하게 문자열화(`safeText`)해 `{"toString":1}` 같은 페이로드가 500으로 번지지 않게 한다.

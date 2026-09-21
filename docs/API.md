@@ -22,6 +22,11 @@
 | 14 | 동작 | `rankings` 정렬에 동점 기준이 추가됐다: 총자산 → **현금** → 좌석 순서 | 같은 상태면 항상 같은 순위가 나온다(종료 모달이 흔들리지 않는다) |
 | 15 | 동작 + **추가 필드** | 채권자가 여러 명인 채무(`한턱 쏘기`)로 파산하면 남은 현금이 **여러 `MONEY_TRANSFERRED` 이벤트로 나뉘어** 발생한다(이전에는 첫 채권자 한 명에게 전액). `BANKRUPT`에 `creditorIds`(배열)가 추가됐다 | 파산 로그 연출은 `MONEY_TRANSFERRED`를 여러 건 받을 수 있다고 가정할 것. 누가 받았는지는 `creditorIds`를 볼 것(`creditorId`는 대표 한 명이라 금액과 짝지으면 어긋난다) |
 | 16 | 동작 | 에러 응답에서 본문을 끝까지 읽지 않은 경우(413/415) 연결이 닫힌다(`connection: close`) | 큰 본문을 보내다 거절당하면 그 연결은 재사용되지 않는다 |
+| 17 | **추가 필드** | `GameViewDto.actingSeatId` — 지금 **결정을 내릴** 좌석. 오늘은 항상 `currentSeatId`와 같다 | 지금은 무시해도 된다. 앞으로 압류 경매처럼 턴 소유자가 아닌 좌석이 결정하는 구간에서만 달라지므로, "내 차례" 판정을 새로 만들 때는 `actingSeatId`를 쓰는 편이 앞날에 안전하다(`currentSeatId`는 계속 턴 소유자다) |
+| 18 | **추가 필드** | `RoomDto.options.finance = { investmentMode, financeSystem, tradeTimerSec, scenario }`. 기본값 `"OFF"` / `"BASIC"` / `0` / `"STANDARD"` | 로비 호스트 도구에 표시만 하면 된다. **지금은 기본값 외의 값을 보내면 `400 ERR001`이다**(해당 기능이 아직 없다). `RoomSummaryDto.options`에는 들어가지 않는다(목록은 `roundLimit`만) |
+| 19 | 동작 | `SET_OPTIONS`에 `finance`를 **넣을 수 있고, 생략하면 기존 값이 유지된다** | 기존 클라이언트(roundLimit만 보내는)는 그대로 동작한다 |
+| 20 | 동작 | 저장 파일에 `schemaVersion: 2`가 생겼다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방(버전 필드 없음)은 서버가 자동으로 승급해 그대로 이어진다 |
+| 21 | **추가 필드** | `pending.sellable` 항목은 부동산일 때 지금과 똑같이 `{ index, name, refund }`다(변경 없음). 앞으로 자산군이 늘면 **항목 모양이 자산군마다 달라진다** | 정리 모달은 `index`가 있는 항목만 보드 칸으로 다루고, 모르는 모양의 항목은 `name`/`refund`만 표시하도록 방어적으로 그릴 것 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -106,6 +111,9 @@
 }
 ```
 
+> 목록 요약의 `options`에는 `roundLimit`만 담긴다(목록을 가볍게 유지한다). 금융 옵션은 방 상세
+> `RoomDto.options.finance`에서 본다.
+
 ### `POST /api/rooms` → 201
 
 방 만들기. 요청 `{ "hostName": "하나" }` (`^[가-힣a-zA-Z0-9 ]{1,10}$`, 공백만인 이름 불가)
@@ -157,12 +165,31 @@
 
 | `type` | 추가 필드 | 설명 | 제약 |
 |---|---|---|---|
-| `ADD_COMPUTER` | `name` | 컴퓨터 좌석 추가 | 대기실, 좌석 4개 미만 |
-| `SET_OPTIONS` | `roundLimit`: `null \| 20 \| 30` | 라운드 제한 | 대기실 |
+| `ADD_COMPUTER` | `name` | 컴퓨터 좌석 추가 | 대기실 좌석 4개 미만 |
+| `SET_OPTIONS` | `roundLimit`: `null \| 20 \| 30`, `finance?`(아래) | 라운드 제한 + 금융 옵션 | 대기실 |
 | `SET_AUTOPILOT` | `seatId`, `enabled`(boolean) | 오프라인 좌석을 서버 자동 진행으로 전환/복귀 | 사람 좌석만. **켜기**는 호스트 + 그 좌석이 오프라인일 때만(`ERR005`), **끄기**는 호스트 또는 그 좌석 본인 토큰(그 외 `ERR003`) |
 | `START` | — | 게임 시작 | 대기실, 좌석 2명 이상 |
 
 `START` 직후 SSE로 `room`과 `game`(events: `[]`)이 함께 방송된다.
+
+**`SET_OPTIONS`의 `finance` (선택)**
+
+```json
+{ "type": "SET_OPTIONS", "roundLimit": 30,
+  "finance": { "investmentMode": "OFF", "financeSystem": "BASIC", "tradeTimerSec": 0, "scenario": "STANDARD" } }
+```
+
+| 키 | 지금 보낼 수 있는 값 | 앞으로 열릴 값(지금은 `ERR001`) |
+|---|---|---|
+| `investmentMode` | `"OFF"` | `"STOCKS"` · `"STOCKS_CRYPTO"` · `"ADVANCED"` |
+| `financeSystem` | `"BASIC"` | `"ADVANCED"` |
+| `tradeTimerSec` | `0` | `30` · `45` |
+| `scenario` | `"STANDARD"` | `"BUBBLE"` · `"DEPRESSION"` |
+
+- `finance`를 **생략하면 기존 값이 유지된다**(기존 클라이언트는 바꿀 것이 없다).
+- 모르는 키, 구현되지 않은 값, 객체가 아닌 값은 모두 `400 ERR001`이다. 켜도 아무 일이 일어나지 않는
+  옵션을 만들지 않기 위한 의도적인 거부이며, 각 기능이 들어올 때 값이 열린다.
+- 옵션은 **대기실에서만** 바꿀 수 있다(`START` 시점의 옵션이 판 내내 고정된다).
 
 **`SET_AUTOPILOT` 상세 (이중 조종 방지)**
 - **켜기(`enabled: true`)**: 호스트 토큰만, 그리고 대상 좌석이 `online: false`일 때만. 접속 중이면 `409 ERR005`. 사람과 서버가 같은 좌석을 동시에 조종하면 커맨드가 경합하기 때문이다.
@@ -221,7 +248,10 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
   "code": "DK7P",
   "status": "LOBBY",
   "hostSeatId": "seat-1",
-  "options": { "roundLimit": null },
+  "options": {
+    "roundLimit": null,
+    "finance": { "investmentMode": "OFF", "financeSystem": "BASIC", "tradeTimerSec": 0, "scenario": "STANDARD" }
+  },
   "maxSeats": 4,
   "seats": [
     { "id": "seat-1", "name": "하나", "kind": "HUMAN", "autopilot": false, "isHost": true, "online": true },
@@ -239,6 +269,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `status` | `LOBBY` → `PLAYING` → `FINISHED` |
 | `hostSeatId` | 호스트 좌석 id. 호스트만 호스트 동작 가능 |
 | `options.roundLimit` | `null`(무제한) / `20` / `30` |
+| `options.finance` | 금융 확장 옵션. 지금은 전부 꺼진 기본값만 가능하다(위 `SET_OPTIONS` 표) |
 | `seats[].kind` | `HUMAN` \| `COMPUTER` |
 | `seats[].autopilot` | 사람 좌석을 서버가 대신 진행 중인지. `true`인 동안 그 좌석의 게임 커맨드는 `ERR003` |
 | `seats[].online` | presence로 확인된 접속 여부(컴퓨터는 항상 true) |
@@ -256,6 +287,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
   "round": 1,
   "roundLimit": null,
   "currentSeatId": "seat-1",
+  "actingSeatId": "seat-1",
   "jackpot": 0,
   "isOver": false,
   "players": [
@@ -284,7 +316,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `phase` | 현재 페이즈(5장) |
 | `round` | 현재 라운드(1부터). 좌석 순서가 한 바퀴 돌 때 +1 |
 | `roundLimit` | `null`이면 무제한 |
-| `currentSeatId` | 지금 차례인 좌석 id. **내 좌석 토큰이 있는 좌석과 같을 때만 행동 버튼 활성화** |
+| `currentSeatId` | 지금 차례인 좌석 id(턴 소유자). **내 좌석 토큰이 있는 좌석과 같을 때만 행동 버튼 활성화** |
+| `actingSeatId` | 지금 **결정을 내릴** 좌석 id. 오늘은 항상 `currentSeatId`와 같다. 앞으로 턴 소유자가 아닌 좌석이 결정하는 구간(압류 경매 등)에서만 달라진다 |
 | `jackpot` | 카지노 잭팟 적립금(원) |
 | `isOver` | 게임 종료 여부 |
 | `players[].cash` | 보유 현금 |

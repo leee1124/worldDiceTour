@@ -24,10 +24,16 @@
 ```
 src/
   domain/            순수 비즈니스 로직 (node/브라우저 API 의존 금지)
-    game/  Game.js(Aggregate Root: 턴/페이즈 상태기계), Player.js, City.js, Board.js,
-           TicketDeck.js, Casino.js, Dice.js, data/board.js, data/tickets.js
-    room/  Room.js(Aggregate Root: 로비/좌석/호스트/게임 시작), Seat.js
-    shared/ DomainError.js, RandomSource·Repository 인터페이스(JSDoc typedef)
+    game/  Game.js(Aggregate Root: 턴/페이즈 상태기계 + 서브시스템 오케스트레이션)
+           Treasury.js(돈 이동의 유일한 통로), RoundClock.js(라운드 전이 + 틱 훅)
+           CityTrade.js(매입·건설·인수), TicketEffects.js, LapIncome.js, PendingDecision.js
+           payment/ PaymentFlow.js, DebtNote.js, AssetRegistry.js, PropertyAssets.js,
+                    Liquidator.js, NetWorth.js, Bankruptcy.js
+           Player.js, City.js, Board.js, TicketDeck.js, Casino.js, Dice.js, BankLedger.js
+           phases.js, commands.js, events.js, data/board.js, data/tickets.js
+    room/  Room.js(Aggregate Root: 로비/좌석/호스트/게임 시작), FinanceOptions.js, Seat.js
+    shared/ DomainError.js, Money.js, MoneyIntent.js, AssetProvider.js,
+            RandomSource·Repository 인터페이스(JSDoc typedef)
   application/
     RoomService.js     방 생성/참가/좌석 추가·제거/시작/컴퓨터 전환 유스케이스
     GameService.js     게임 커맨드 유스케이스 (조합만 담당)
@@ -36,6 +42,7 @@ src/
     errors.js          규격화된 에러 { code, message }
   infrastructure/
     CryptoRandomSource.js   node:crypto 기반 (RandomSource 구현)
+    RoomSerializer.js       스냅샷 스키마 검증 + schemaVersion 마이그레이션
     FileRoomRepository.js   JSON 파일 저장 (RoomRepository 구현, 역직렬화 시 스키마 검증)
     InMemoryRoomRepository.js (테스트용)
   server/             Controller 레이어
@@ -48,7 +55,8 @@ server.js, tests/
 ```
 
 - 도메인은 `RandomSource`(`nextInt(min,max)`), `RoomRepository`(`save/findByCode/findAll/delete`) 인터페이스에만 의존. 테스트는 결정적 가짜 구현 주입.
-- 비즈니스 로직은 엔티티 안에 캡슐화(빈약한 도메인 모델 금지). Service는 조합만.
+- 비즈니스 로직은 엔티티/도메인 서비스 안에 캡슐화(빈약한 도메인 모델 금지). 애플리케이션 Service는 조합만.
+- **모든 돈 이동은 `MoneyIntent` 한 종류로 표현되고 `Treasury` 한 곳에서만 적용된다.** 11장 참고.
 - 에러 응답은 `{ code: "ERR0xx", message }` 규격만 반환. 스택/내부 메시지는 서버 로그로만. 빈 catch 금지.
 - 클라이언트는 서버에서 온 문자열(이름 등)을 `textContent`로만 출력(innerHTML에 외부 문자열 금지).
 
@@ -292,3 +300,109 @@ server.js, tests/
 | D19 | 순위 동점 처리 | 총자산이 같으면 **현금**이 많은 쪽, 그마저 같으면 **좌석 순서**. 같은 상태면 언제나 같은 순위가 나온다 |
 | D20 | 채권자가 여러 명인 채무(`한턱 쏘기`)로 파산할 때 | 남은 현금을 받을 사람 수로 **고르게 나누고(내림)**, 나머지는 좌석 순서가 앞선 채권자에게 준다. 나눠 준 합계는 남은 현금과 정확히 같다(돈의 보존 불변식 유지). 파산자 자신이 채권자로 기록된 손상 스냅샷에서는 자기에게 돌려주지 않고 은행으로 보낸다 |
 | D21 | 방 정리와 동시 요청 | 오래된 방·방치된 대기실 정리는 **그 방의 잠금을 잡고 조건을 다시 확인한 뒤** 지운다. 목록을 읽은 뒤 삭제 직전에 들어온 커맨드·참가가 사라지거나 방이 되살아나는 일을 막는다 |
+
+---
+
+## 11. 금융 확장 대비 구조 (브랜치 0 — `refactor/game-money-seams`)
+
+주식·대출·코인·파생·성적표를 **가산만으로** 얹을 수 있도록 미리 뽑아 둔 시임(seam)이다.
+게임 규칙은 하나도 바뀌지 않았다 — 같은 시드의 진행·최종 순위·이벤트 순서가 리팩터 전과
+바이트 단위로 같다는 것을 `tests/e2e/goldenReplay.test.js`(골든 리플레이)가 증명한다.
+
+god object를 피하는 세 가지 규칙:
+
+- **R1. Game은 규칙을 모른다.** Game은 위임만 한다. 가격·심사·정리 순서 규칙은 해당 엔티티/도메인 서비스 안에 있다.
+- **R2. 서브시스템은 돈을 직접 만지지 않는다.** 모든 서브시스템 메서드는 `{ intents, events }`만 돌려주고, `Treasury.apply(intents)`만 실제로 옮긴다.
+- **R3. 확장은 포트 등록으로.** 새 자산군은 `AssetRegistry.register(...)` 한 줄이면 총자산·정리 매각·파산 청산·순위에 동시에 반영된다.
+
+### 11.1 Treasury와 MoneyIntent — 돈 이동의 유일한 통로
+
+```js
+MoneyIntent = { playerId, amount, counterparty, otherPlayerId, reason, meta }
+//  amount  +면 수령, −면 지불 (원 단위 정수, |amount| ≤ MAX_MONEY = 1조)
+//  counterparty  BANK | EXCHANGE | JACKPOT | PLAYER
+//  reason        MONEY_REASONS (shared/MoneyIntent.js 단일 출처)
+```
+
+- `Treasury.apply(intents)` **한 번이 원자적인 한 건의 이동**이다. 파산 분배나 「생일 축하」처럼
+  지불과 수령이 짝을 이루는 흐름은 반드시 한 번의 `apply()`로 묶는다 — 불변식은 호출 경계에서 검사한다.
+- `counterparty ∈ {BANK, EXCHANGE}`만 장부에 기록한다(거래소도 은행 창구다). 좌석 간 이동과
+  잭팟 이동은 총합을 바꾸지 않으므로 기록하지 않는다.
+- `Player.pay/receive`, `BankLedger` 기록, `Casino.accumulate/payOut`은 **`Treasury`만 호출한다.**
+  `tests/unit/moneyPaths.test.js`가 `src/` 전체를 훑어 이 규칙을 강제한다(새 파일이 생겨도 자동으로).
+- `Casino.play()`는 **판정만 하는 순수 함수**다(잭팟을 바꾸지 않는다). 무엇을 어떻게 옮길지만 알려준다.
+
+**돈의 보존 불변식이 2단이 됐다** (`moneyReport()`):
+
+1. `총현금 + 잭팟 = 초기총액 + 은행순유입` (기존, D14)
+2. `은행순유입 = Σ 사유별 내역(breakdown)` — 어긋나면 **어떤 흐름이 장부를 우회했는지** 바로 특정된다.
+
+> 예외: `schemaVersion` 1 시절 저장된 방은 과거 순유입의 사유를 되살릴 수 없어 `breakdown`이 비어
+> 있다. 그 방만 `breakdownBalanced === false`이고(`ledger.unattributedNet`으로 드러난다),
+> 1번 불변식은 그대로 성립한다.
+
+### 11.2 RoundClock — 라운드 전이와 틱 훅
+
+`RoundClock.advance()`의 순서를 명시적으로 고정한다. 시장·대출·파생·리포트는
+`Game.registerRoundTickHook(hook)`으로 **구독만** 한다.
+
+```
+1) 다음 생존 좌석 탐색 (배열 인덱스가 끝을 넘으면 = 라운드 경계. 탈락자 수와 무관하게 정확)
+2) 못 찾으면 GAME_OVER(LAST_SURVIVOR)
+3) 한 바퀴를 돌지 않았으면 → 턴 시작. 틱 없음
+4) 한 바퀴를 돌았으면 → round += 1, ROUND_ADVANCED 발행
+5) 라운드 제한 도달 → GAME_OVER(ROUND_LIMIT).  ★ 틱을 돌리지 않는다
+6) 틱 훅 실행 (등록 순서)
+7) 턴 시작
+```
+
+- **더블 추가 턴에는 틱이 없다** — `#endTurn`이 `advance()`를 부르지 않으므로 구조적으로 보장된다.
+- **라운드 제한으로 끝나는 전이에서 틱이 없는 이유**(5번이 6번보다 먼저): 틱은 "이제 시작할 라운드"에
+  속한다. 절대 플레이되지 않는 라운드의 사건으로 최종 순위가 뒤집히면 부당하다.
+- 훅은 `{ intents, events }`만 돌려준다(R2). 적용은 Game이 `Treasury`로 한다.
+
+### 11.3 AssetRegistry와 자산군 포트(AssetProvider)
+
+```js
+AssetProvider = { kind, liquidationPriority, listOf(playerId), valueOf(playerId),
+                  liquidate({playerId, assetId, quantity}), releaseAllOf(playerId) }
+```
+
+- `liquidationPriority`는 **작을수록 먼저 팔린다**(설계 순서: 파생 → 코인 → 주식 → 예금 → 부동산).
+  부동산(`PropertyAssets`)은 100으로 가장 뒤다.
+- 자동매각 순서는 `Liquidator`에 세 줄로 고정돼 있다: 자산군 우선순위 → 환급액 낮은 것 → 목록 순서.
+- **총자산은 `NetWorth` 한 곳에서만 계산한다.** `Game.rankings()`와 `application/dto.js`의
+  `totalAssets`가 같은 함수를 쓴다(예전에는 같은 공식이 두 곳에 복제돼 있었다).
+- `Game.registerAssetProvider(provider)` 한 줄로 매각 목록·자동매각 순서·파산 청산·총자산에
+  동시에 들어온다. `tests/unit/game.assetProvider.test.js`가 가짜 예금 자산군으로 이를 증명한다
+  (Game.js를 고치지 않는다).
+
+### 11.4 결제 흐름과 채무 증서
+
+- `PaymentFlow`: 강제지불 → (부족하면) `AWAIT_LIQUIDATION` → 정산 → 이어하기. 페이즈 전이는 하지
+  않고 "무엇이 필요한지"(결과 종류 + 발행할 이벤트 + 이어갈 흐름)만 돌려준다.
+- `DebtNote`(VO): 합계·대표 채권자·돈 이동 의사·저장 형태를 스스로 안다. 받을 사람이 탈락했으면
+  은행이 받는다(탈락 좌석에 주면 `eliminate()`에서 그 돈이 사라진다).
+- `Bankruptcy`: 남은 현금 분배(D20)와 전 자산군 청산.
+- `LapIncome`: 출발 통과 1회 정산. 지금은 월급 + 대출 압류뿐이며, **배당·분할상환이 붙을 지점**이다.
+
+### 11.5 행동 주체(acting seat)와 커맨드 표
+
+- `COMMAND_PHASES`(어떤 페이즈인가) + `COMMAND_OWNERSHIP`(누가 보낼 수 있는가) 이중 검증.
+  지금은 모든 커맨드가 `CURRENT_PLAYER`다.
+- `Game.actingSeatId`는 **지금 결정을 내릴 좌석**이며 오늘은 항상 턴 소유자와 같다. 앞으로 압류 경매처럼
+  턴 소유자가 아닌 좌석이 결정하는 구간이 생기면 이 값만 달라지고 `currentSeatId`는 턴 소유자로 남는다
+  — 자동 진행 드라이버·SSE·뮤텍스 모델을 흔들지 않는다. DTO에 `view.actingSeatId`로 실린다.
+
+### 11.6 방 옵션과 저장 스키마
+
+- `options.finance = { investmentMode, financeSystem, tradeTimerSec, scenario }`, 기본값은 전부 꺼짐
+  (`OFF` / `BASIC` / `0` / `STANDARD`). **아직 구현되지 않은 값은 거부한다**(`ERR001`) — 켤 수는 있는데
+  아무 일도 일어나지 않는 옵션을 만들지 않는다. 기능이 들어올 때 `ALLOWED_FINANCE_OPTIONS`에 값을 추가한다.
+- 옵션은 **대기실에서만** 바꿀 수 있다. `START` 시점의 옵션이 판 내내 고정된다 — 밸런스·불변식이 판
+  중간에 바뀌면 안 된다.
+- `schemaVersion: 2`. 없으면 1로 보고 `migrateRoomSnapshot()`이 단계별로 올린다(v1 → v2는 금융 옵션
+  기본값 채우기). **미래 버전은 거부한다** — 모르는 필드를 무시하고 진행하면 그 방을 덮어써서 잃는다.
+  `deserializeRoom` = 승급 → 검증 → 복원.
+- 검증기는 서브시스템별로 쪼개져 있다(`GAME_SUBSYSTEM_VALIDATORS`). 다음 Phase는 이 목록에 한 줄만
+  추가한다.
