@@ -10,8 +10,13 @@
  *       모두 포트를 붙일 수 있다. 그 밖의 이름은 `ALLOWED_HOSTS`에 정확히 적어야 허용된다.
  */
 
-/** 점 없는 단일 라벨 호스트명(`mypc`, `my-pc-2`). */
-const SINGLE_LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+/**
+ * 점 없는 단일 라벨 호스트명(`mypc`, `my-pc-2`, `pc1`).
+ * **숫자만으로 된 라벨은 제외한다** — `2130706433`처럼 IPv4를 정수로 적은 표기는
+ * 실제 기기 이름이 아니고, IP 표기는 위의 점 4개 형식으로만 받는다.
+ * 숫자만으로 된 이름을 꼭 써야 한다면 `ALLOWED_HOSTS`에 정확히 적는다.
+ */
+const SINGLE_LABEL = /^(?=.*[a-z-])[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 /** mDNS 이름(`mypc.local`). */
 const MDNS_NAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.local$/;
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
@@ -44,7 +49,13 @@ export function isAllowedHost(hostHeader, { allowedHosts = [] } = {}) {
     return false;
   }
   const { host } = split;
-  if (host === 'localhost' || host === '[::1]' || host === '::1') {
+  // `ALLOWED_HOSTS`에 포트 없이 적었더라도 허용한다 — 브라우저는 항상 포트를 붙여 보내므로
+  // 포트까지 정확히 적게 강요하면 `ALLOWED_HOSTS=game.example.com`이 모든 요청을 막는다.
+  if (allowedHosts.includes(host)) {
+    return true;
+  }
+  // `::1`은 Host 문법상 대괄호가 필수이므로 여기서는 대괄호 형태만 본다.
+  if (host === 'localhost' || host === '[::1]') {
     return true;
   }
   if (IPV4.test(host)) {

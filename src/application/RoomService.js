@@ -231,11 +231,12 @@ export class RoomService {
     if (summaries.length < this.#maxRooms) {
       return;
     }
-    const now = this.#clock.now();
     let remaining = summaries.length;
     for (const summary of summaries) {
-      if (summary.status === ROOM_STATUS.LOBBY && now - summary.updatedAt > IDLE_LOBBY_MS) {
-        await this.#deleteRoom(summary.code);
+      if (summary.status !== ROOM_STATUS.LOBBY) {
+        continue;
+      }
+      if (await this.#deleteIfStillIdle(summary.code)) {
         remaining -= 1;
       }
     }
@@ -277,12 +278,44 @@ export class RoomService {
     const rooms = await this.#repository.findAll();
     const removed = [];
     for (const room of rooms) {
-      if (room.isStale(now)) {
-        await this.#deleteRoom(room.code);
+      if (!room.isStale(now)) {
+        continue;
+      }
+      if (await this.#deleteIfStale(room.code)) {
         removed.push(room.code);
       }
     }
     return removed;
+  }
+
+  /**
+   * 방치된 방을 **그 방의 잠금 안에서 다시 확인한 뒤** 지운다.
+   *
+   * 목록을 읽은 시점과 지우는 시점 사이에 그 방에 커맨드·참가가 들어올 수 있다. 잠금 없이 지우면
+   * 방금 커밋된 수가 사라지거나(진행 중인 방), 참가가 방을 되살려 스트림만 끊긴 유령 방이 남는다.
+   * @returns {Promise<boolean>} 실제로 지웠는지
+   */
+  #deleteIfStale(code) {
+    return this.#deleteUnderLock(code, (room, now) => room.isStale(now));
+  }
+
+  /** 상한 정리용: 여전히 "방치된 대기실"일 때만 지운다. */
+  #deleteIfStillIdle(code) {
+    return this.#deleteUnderLock(
+      code,
+      (room, now) => room.isLobby() && now - room.updatedAt > IDLE_LOBBY_MS,
+    );
+  }
+
+  #deleteUnderLock(code, stillDeletable) {
+    return this.#mutex.runExclusive(code, async () => {
+      const room = await this.#repository.findByCode(code);
+      if (!room || !stillDeletable(room, this.#clock.now())) {
+        return false;
+      }
+      await this.#deleteRoom(code);
+      return true;
+    });
   }
 
   /**

@@ -30,10 +30,6 @@ export class InMemoryRoomRepository {
     return (await this.findAll()).map((room) => room.toSummary());
   }
 
-  async countRooms() {
-    return this.#rooms.size;
-  }
-
   async findAll() {
     const rooms = [];
     for (const [code, text] of [...this.#rooms.entries()]) {

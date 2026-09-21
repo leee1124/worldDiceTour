@@ -480,6 +480,70 @@ describe('RoomService(방 유스케이스)', () => {
       assert.deepEqual(fixture.publisher.closed, [oldRoom.room.code]);
     });
 
+    it('정리 도중 방이 활동하면 지우지 않는다(방 잠금 안에서 다시 확인)', async () => {
+      // Given (정리 판단 시점에는 방치 상태였지만, 삭제 직전에 커맨드가 들어온 상황)
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+        mutex: fixture.repository.mutexForTest ?? undefined,
+      });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      now += day + 1_000;
+
+      // 정리가 방 목록을 읽은 뒤, 삭제 직전에 방이 갱신되도록 저장소에 끼어든다.
+      const realFindAll = fixture.repository.findAll.bind(fixture.repository);
+      fixture.repository.findAll = async () => {
+        const rooms = await realFindAll();
+        // 목록을 넘겨준 직후 방이 활동한다(= updatedAt이 새로워진다).
+        const active = await fixture.repository.findByCode(host.room.code);
+        active.touch(now + 1);
+        await fixture.repository.save(active);
+        return rooms;
+      };
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then (막 활동한 방은 살아남는다)
+      assert.deepEqual(removed, []);
+      assert.notEqual(await fixture.repository.findByCode(host.room.code), null);
+    });
+
+    it('정말 방치된 방은 잠금 안에서 다시 확인해도 지운다', async () => {
+      // Given
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      now += day + 1_000;
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(removed, [host.room.code]);
+      assert.equal(await fixture.repository.findByCode(host.room.code), null);
+    });
+
     it('정리할 방이 없으면 빈 목록을 돌려준다', async () => {
       // Given
       const { roomService } = createAppFixture({ random: codeRandom() });

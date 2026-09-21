@@ -725,6 +725,136 @@ describe('AutoPlayerDriver(자동 진행 스케줄러)', () => {
     });
   });
 
+  describe('결정 자체가 터지는 경우', () => {
+    it('정책이 예외를 던져도 프로세스로 새지 않고 재시도·멈춤으로 처리된다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const stalled = [];
+      const errors = [];
+      let decided = 0;
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        retryDelaysMs: [0],
+        policy: {
+          decide: () => {
+            decided += 1;
+            throw new TypeError('정책 내부 오류');
+          },
+        },
+        logger: { error: (message) => errors.push(message) },
+        gameService: {
+          autoTurn: async () => ({ seatId: 's1', view: {}, version: 0 }),
+          publishAutoStalled: async (code) => stalled.push(code),
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then (최초 1회 + 재시도 1회 → 멈춤 신호)
+      assert.equal(decided, 2);
+      assert.deepEqual(stalled, ['AAAA']);
+      assert.ok(errors.some((message) => /정책 내부 오류/.test(message)), errors.join('\n'));
+    });
+
+    it('스텝이 거부돼도 처리되지 않은 거부(unhandled rejection)가 남지 않는다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const rejections = [];
+      const onRejection = (reason) => rejections.push(reason);
+      process.on('unhandledRejection', onRejection);
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        retryDelaysMs: [],
+        policy: { decide: () => ({ type: 'ROLL' }) },
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => ({ seatId: 's1', view: {}, version: 0 }),
+          executeAsServer: async () => {
+            throw new Error('실행 실패');
+          },
+          publishAutoStalled: async () => {
+            throw new Error('알림도 실패');
+          },
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      // Then
+      process.off('unhandledRejection', onRejection);
+      assert.deepEqual(rejections, []);
+    });
+
+    it('자동 진행 한도를 넘겨 멈출 때도 멈춤 신호를 보낸다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const stalled = [];
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        policy: { decide: () => ({ type: 'ROLL' }) },
+        logger: { error: () => {} },
+        maxStepsPerRoom: 2,
+        gameService: {
+          autoTurn: async () => ({ seatId: 's1', view: {}, version: 0 }),
+          executeAsServer: async () => {
+            driver.schedule('AAAA');
+          },
+          publishAutoStalled: async (code) => stalled.push(code),
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then (조용히 멈추지 않고 호스트가 알 수 있게 한다)
+      assert.deepEqual(stalled, ['AAAA']);
+    });
+
+    it('스텝이 끝나지 않으면 재예약을 무한히 반복하지 않는다', async () => {
+      // Given (첫 스텝이 끝나지 않는 상황)
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const errors = [];
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        maxDeferrals: 3,
+        policy: { decide: () => null },
+        retryDelaysMs: [],
+        logger: { error: (message) => errors.push(message) },
+        gameService: {
+          autoTurn: async () => {
+            await gate;
+            return null;
+          },
+          publishAutoStalled: async () => {},
+        },
+      });
+
+      // When (진행 중인 스텝 위로 계속 예약이 발사된다)
+      driver.schedule('AAAA');
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      driver.schedule('AAAA');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Then (미룸 한도에 닿아 예약을 포기한다)
+      assert.ok(
+        errors.some((message) => /미뤘습니다/.test(message)),
+        `미룸 한도 로그가 없습니다: ${errors.join(' | ')}`,
+      );
+      release();
+      await driver.whenIdle();
+    });
+  });
+
   describe('낙관적 동시성(버전 확인)', () => {
     it('버전이 다르면 서버 대행을 거부하고 상태를 바꾸지 않는다', async () => {
       // Given

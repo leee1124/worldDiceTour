@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -192,16 +192,21 @@ describe('FileRoomRepository(파일 저장소)', () => {
       assert.equal('game' in summary, false);
     });
 
-    it('방 개수를 색인에서 바로 알려준다', async () => {
+    it('삭제한 방은 요약 색인과 개수에서 함께 빠진다', async () => {
       // Given
       const repository = newRepository();
       await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
       await repository.save(Room.create({ code: 'DEF2', hostName: '두리', token: 'b'.repeat(64), now: NOW }));
+      assert.equal((await repository.findAllSummaries()).length, 2);
 
-      // When / Then
-      assert.equal(await repository.countRooms(), 2);
+      // When
       await repository.delete('AB2C');
-      assert.equal(await repository.countRooms(), 1);
+
+      // Then
+      assert.deepEqual(
+        (await repository.findAllSummaries()).map((summary) => summary.code),
+        ['DEF2'],
+      );
     });
 
     it('저장 디렉터리가 없어도 첫 저장에서 만들어 준다', async () => {
@@ -218,6 +223,45 @@ describe('FileRoomRepository(파일 저장소)', () => {
 
       // Then
       assert.equal((await repository.findByCode('AB2C')).code, 'AB2C');
+    });
+  });
+
+  describe('저장 경로가 사라지거나 막혔을 때', () => {
+    it('저장 디렉터리가 런타임에 사라지면 다시 만들어 저장한다', async () => {
+      // Given
+      const repository = newRepository();
+      await repository.init();
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+
+      // When (외부에서 디렉터리를 지운 뒤 다시 저장한다)
+      await rm(directory, { recursive: true, force: true });
+      await repository.save(Room.create({ code: 'DEF2', hostName: '두리', token: 'b'.repeat(64), now: NOW }));
+
+      // Then (재시작 없이 스스로 복구한다)
+      assert.equal((await repository.findByCode('DEF2')).code, 'DEF2');
+    });
+
+    it('삭제가 실패하면 색인에서 지우지 않는다(목록과 디스크가 어긋나지 않게)', async () => {
+      // Given (디렉터리를 읽기 전용으로 만들어 unlink를 실패시킨다)
+      const logs = [];
+      const repository = new FileRoomRepository({
+        directory,
+        random: new FakeRandomSource(),
+        logger: { error: (message) => logs.push(message) },
+      });
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+      await chmod(directory, 0o500);
+
+      // When
+      await repository.delete('AB2C');
+
+      // Then (파일이 남아 있으므로 색인에도 남아 있어야 한다)
+      await chmod(directory, 0o755);
+      assert.ok(logs.some((message) => /삭제 실패/.test(message)), logs.join(' | '));
+      assert.deepEqual(
+        (await repository.findAllSummaries()).map((summary) => summary.code),
+        ['AB2C'],
+      );
     });
   });
 
@@ -297,6 +341,25 @@ describe('FileRoomRepository(파일 저장소)', () => {
       const entries = await readdir(directory);
       assert.deepEqual(entries, ['AB2C.json.corrupt']);
       assert.ok(logs.some((message) => /격리/.test(message)), logs.join('\n'));
+    });
+
+    it('두 번 손상돼도 먼저 격리한 파일을 덮어쓰지 않는다', async () => {
+      // Given (같은 코드가 손상 → 격리 → 다시 손상)
+      const repository = newRepository();
+      await writeFile(path.join(directory, 'AB2C.json'), 'first-broken', 'utf8');
+      await repository.findByCode('AB2C');
+      await writeFile(path.join(directory, 'AB2C.json'), 'second-broken', 'utf8');
+
+      // When
+      await repository.findByCode('AB2C');
+
+      // Then (진단용 원본이 둘 다 남아 있다)
+      const quarantined = (await readdir(directory)).filter((entry) => entry.includes('.corrupt'));
+      assert.equal(quarantined.length, 2, `격리 파일: ${quarantined.join(', ')}`);
+      const contents = await Promise.all(
+        quarantined.map((entry) => readFile(path.join(directory, entry), 'utf8')),
+      );
+      assert.deepEqual(contents.sort(), ['first-broken', 'second-broken']);
     });
 
     it('격리된 파일은 같은 코드로 방을 다시 만들 수 있게 비켜준다', async () => {

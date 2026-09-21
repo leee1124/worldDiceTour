@@ -53,8 +53,9 @@ npm start        # = node server.js
   `169.254.0.0/16`, 점이 없는 단일 라벨 호스트명(`mypc`), `*.local`(mDNS). 모두 포트를 붙일 수 있다.
 - 그 밖의 이름으로 접속해야 한다면(예: 사내 DNS 이름) 정확한 값을 환경변수에 적는다.
   ```bash
-  ALLOWED_HOSTS="game.mylan.example:5173,myhost.test" npm start
+  ALLOWED_HOSTS="game.mylan.example,myhost.test" npm start
   ```
+  항목은 포트를 붙여도, 붙이지 않아도 맞는다(대소문자 무시).
 - 허용 목록에 없으면 `403 ERR015`.
 
 또한 본문이 있는 요청은 `Content-Type: application/json`이어야 한다(`; charset=utf-8` 같은 파라미터는

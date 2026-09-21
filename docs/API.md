@@ -20,7 +20,7 @@
 | 12 | **새 에러 코드** | `ERR016`(503) — SSE 구독자 상한(방당 16, 전체 128) 초과. **이벤트 스트림이 아니라 JSON**으로 온다 | `EventSource`가 바로 끊기면 재접속을 무한 반복하지 말고 잠시 뒤 재시도할 것 |
 | 13 | **새 에러 코드** | `ERR017`(503) — 서버 방 개수 상한(200) 초과 | 방 만들기 실패 안내를 띄우고 잠시 후 재시도를 권할 것 |
 | 14 | 동작 | `rankings` 정렬에 동점 기준이 추가됐다: 총자산 → **현금** → 좌석 순서 | 같은 상태면 항상 같은 순위가 나온다(종료 모달이 흔들리지 않는다) |
-| 15 | 동작 | 채권자가 여러 명인 채무(`한턱 쏘기`)로 파산하면 남은 현금이 **여러 `MONEY_TRANSFERRED` 이벤트로 나뉘어** 발생한다(이전에는 첫 채권자 한 명에게 전액) | 파산 로그 연출은 `MONEY_TRANSFERRED`를 여러 건 받을 수 있다고 가정할 것. `BANKRUPT.creditorId`는 대표 한 명이다 |
+| 15 | 동작 + **추가 필드** | 채권자가 여러 명인 채무(`한턱 쏘기`)로 파산하면 남은 현금이 **여러 `MONEY_TRANSFERRED` 이벤트로 나뉘어** 발생한다(이전에는 첫 채권자 한 명에게 전액). `BANKRUPT`에 `creditorIds`(배열)가 추가됐다 | 파산 로그 연출은 `MONEY_TRANSFERRED`를 여러 건 받을 수 있다고 가정할 것. 누가 받았는지는 `creditorIds`를 볼 것(`creditorId`는 대표 한 명이라 금액과 짝지으면 어긋난다) |
 | 16 | 동작 | 에러 응답에서 본문을 끝까지 읽지 않은 경우(413/415) 연결이 닫힌다(`connection: close`) | 큰 본문을 보내다 거절당하면 그 연결은 재사용되지 않는다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
@@ -442,7 +442,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `LIQUIDATION_REQUIRED` | `playerId`, `amountDue`, `creditorId`, `reason` | 정리 페이즈 진입 |
 | `PROPERTY_SOLD` | `playerId`, `index`, `name`, `refund` | 자산 매각 |
 | `DEBT_SETTLED` | `playerId`, `amount` | 정리 후 채무 정산 완료 |
-| `BANKRUPT` | `playerId`, `creditorId`, `paidAmount`, `releasedIndexes` | 파산(초기화된 칸 목록 포함). 채권자가 여러 명이면 `creditorId`는 좌석 순서가 앞선 한 명이고, 실제 분배 내역은 함께 발생하는 `MONEY_TRANSFERRED` 이벤트들에 담긴다 |
+| `BANKRUPT` | `playerId`, `creditorId`, `creditorIds`, `paidAmount`, `releasedIndexes` | 파산(초기화된 칸 목록 포함). `creditorIds`는 실제로 돈을 받은 좌석 전원(좌석 순서, 은행 채무면 `[]`), `creditorId`는 그중 대표 한 명이다. **`creditorId`와 `paidAmount`를 짝지어 한 명에게 전액이 갔다고 보면 안 된다** — 분배 내역은 함께 발생하는 `MONEY_TRANSFERRED` 이벤트들에 있다 |
 
 ### 행운 티켓 효과(`TICKET_DRAWN.effect.type`)
 

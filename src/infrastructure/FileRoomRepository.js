@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
@@ -51,11 +51,28 @@ export class FileRoomRepository {
 
   async save(room) {
     await this.#ensureDirectory();
+    try {
+      await this.#writeRoom(room);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+      // 디렉터리가 런타임에 사라졌다. 약속을 버리고 한 번 다시 만들어 재시도한다
+      // (예전처럼 저장마다 mkdir을 하지 않으면서도 스스로 복구되게).
+      this.#logger.error(`[FileRoomRepository] 저장 디렉터리가 사라져 다시 만듭니다: ${this.#directory}`);
+      this.#ready = null;
+      await this.#ensureDirectory();
+      await this.#writeRoom(room);
+    }
+    this.#summaries.set(room.code, room.toSummary());
+  }
+
+  /** 임시 파일에 쓴 뒤 이름을 바꿔 부분 저장이 보이지 않게 한다. */
+  async #writeRoom(room) {
     const target = this.#pathOf(room.code);
     const temporary = `${target}.tmp`;
     await writeFile(temporary, serializeRoom(room), 'utf8');
     await rename(temporary, target);
-    this.#summaries.set(room.code, room.toSummary());
   }
 
   async findByCode(code) {
@@ -83,7 +100,7 @@ export class FileRoomRepository {
    */
   async #quarantine(code, reason) {
     const source = this.#pathOf(code);
-    const target = `${source}${CORRUPT_SUFFIX}`;
+    const target = await this.#freeQuarantinePath(source);
     try {
       await rename(source, target);
       this.#logger.error(
@@ -92,6 +109,23 @@ export class FileRoomRepository {
     } catch (error) {
       this.#logger.error(`[FileRoomRepository] 손상 파일 격리 실패 ${code}: ${error.message}`);
     }
+  }
+
+  /**
+   * 격리 파일 경로. 기본은 `<CODE>.json.corrupt`지만 이미 있으면 덮어쓰지 않고
+   * 시간을 붙인 이름을 쓴다 — 먼저 격리한 원본도 진단용으로 남겨야 한다.
+   */
+  async #freeQuarantinePath(source) {
+    const base = `${source}${CORRUPT_SUFFIX}`;
+    try {
+      await stat(base);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return base;
+      }
+      this.#logger.error(`[FileRoomRepository] 격리 파일 확인 실패 ${base}: ${error.message}`);
+    }
+    return `${base}.${Date.now()}`;
   }
 
   async findAll() {
@@ -110,23 +144,20 @@ export class FileRoomRepository {
     return [...this.#summaries.values()];
   }
 
-  /** 저장된 방 개수(색인 기준). */
-  async countRooms() {
-    return this.#summaries.size;
-  }
-
   async delete(code) {
     if (!isValidRoomCode(code)) {
       return;
     }
-    this.#summaries.delete(code);
     try {
       await unlink(this.#pathOf(code));
     } catch (error) {
       if (error.code !== 'ENOENT') {
+        // 파일이 남아 있는데 색인에서 지우면 목록·개수 상한이 디스크와 어긋난다.
         this.#logger.error(`[FileRoomRepository] 방 파일 삭제 실패 ${code}: ${error.message}`);
+        return;
       }
     }
+    this.#summaries.delete(code);
   }
 
   async #listCodes() {

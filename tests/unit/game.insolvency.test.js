@@ -565,7 +565,11 @@ describe('Game(파산 선언)', () => {
         ['s3', 500],
       ],
     );
-    assert.equal(findEvent(events, EVENT_TYPES.BANKRUPT).paidAmount, 1_000);
+    const bankrupt = findEvent(events, EVENT_TYPES.BANKRUPT);
+    assert.equal(bankrupt.paidAmount, 1_000);
+    // 대표 채권자 한 명(기존 필드)과 실제 수령자 전원(추가 필드)을 함께 알려준다.
+    assert.equal(bankrupt.creditorId, 's2');
+    assert.deepEqual(bankrupt.creditorIds, ['s2', 's3']);
     assertMoneyConserved(game, '여러 채권자 파산');
   });
 
@@ -631,12 +635,14 @@ describe('Game(파산 선언)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When
-    game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+    const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
 
     // Then
     assert.equal(game.playerById('s1').eliminated, true);
     assert.equal(game.playerById('s2').cash, STARTING_CASH);
     assert.equal(game.board.cityAt(1).isOwned(), false);
+    // 은행 채무에는 플레이어 채권자가 없다.
+    assert.deepEqual(findEvent(events, EVENT_TYPES.BANKRUPT).creditorIds, []);
     assertMoneyConserved(game, '은행 채무 파산');
   });
 });

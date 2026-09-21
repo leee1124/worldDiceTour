@@ -1222,7 +1222,9 @@ export class Game {
     this.#phase = PHASES.AWAIT_ROLL;
     this.#emit(EVENT_TYPES.BANKRUPT, {
       playerId: player.id,
+      // 대표 채권자(기존 계약). 여러 명일 수 있으므로 전원은 creditorIds로 함께 알린다.
       creditorId,
+      creditorIds: creditors.map((creditor) => creditor.id),
       paidAmount: remaining,
       releasedIndexes,
     });
