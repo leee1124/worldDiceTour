@@ -8,7 +8,7 @@
 
 import { button, el, setText, toggleClass } from '../dom.js';
 import { currentLocationLabel } from '../domain/locationLabel.js';
-import { isMySeat, seatNameOf, slotOf, spaceNameOf } from '../store.js';
+import { isMySeat, seatNameOf, slotOf, spaceOf } from '../store.js';
 import { createDicePair } from './diceView.js';
 
 export function createStatusStrip({ onFindMe, onToggleZoom }) {
@@ -67,7 +67,7 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
       toggleClass(element, 'status-strip--my-turn', mine && !view.isOver);
 
       const current = view.players.find((player) => player.seatId === view.currentSeatId) ?? null;
-      setText(locationNode, currentLocationLabel(current ? spaceNameOf(state, current.position) : null));
+      setText(locationNode, currentLocationLabel(current ? spaceOf(state, current.position)?.name ?? null : null));
 
       // 이 기기에 좌석이 없으면(순수 관전) "내 위치"는 의미가 없다.
       findButton.disabled = state.mySeats.length === 0;

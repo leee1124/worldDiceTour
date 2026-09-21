@@ -69,6 +69,8 @@ export function createBoardView({ onCellActivate }) {
   const tokens = new Map();
   /** 강조 타이머(중복 실행 시 이전 것을 취소한다). */
   const highlightTimers = new Map();
+  /** 지금 이동 연출이 재생 중인 좌석. 렌더가 이 말을 끌어다 놓지 못하게 막는다. */
+  const movingSeats = new Set();
   let boardBuilt = false;
   let travelMode = { active: false, forbidden: [], locked: false };
   let selectedIndex = null;
@@ -253,51 +255,125 @@ export function createBoardView({ onCellActivate }) {
     }
   }
 
+  /** 말을 슬롯으로 옮기고, 떠난 슬롯과 도착한 슬롯의 겹침 배치를 다시 잡는다. */
+  function reseatToken(token, slot) {
+    const previousSlot = token.parentElement;
+    slot.appendChild(token);
+    layoutTokensIn(slot);
+    if (previousSlot && previousSlot !== slot) {
+      layoutTokensIn(previousSlot);
+    }
+  }
+
+  /**
+   * 한 칸 건너뛰기. FLIP(먼저 옮기고, 원래 자리에서 출발한 것처럼 되돌린 뒤 풀기)으로
+   * 실제로 칸과 칸 사이를 지나가는 모습을 만든다.
+   */
+  async function hopOneCell(token, cell, { animate, stepMs, style }) {
+    if (!animate) {
+      reseatToken(token, cell.tokens);
+      return;
+    }
+
+    // 모션 축소: 튀는 대신 칸마다 짧게 사라졌다 나타난다(칸을 건너뛰지는 않는다).
+    if (style === 'fade' || prefersReducedMotion()) {
+      token.classList.add('token--fade');
+      await wait(Math.max(20, Math.round(stepMs / 2)));
+      reseatToken(token, cell.tokens);
+      token.classList.remove('token--fade');
+      await wait(Math.max(20, Math.round(stepMs / 2)));
+      return;
+    }
+
+    const before = token.getBoundingClientRect();
+    reseatToken(token, cell.tokens);
+    const after = token.getBoundingClientRect();
+    const dx = before.left - after.left;
+    const dy = before.top - after.top;
+    if (dx === 0 && dy === 0) {
+      await wait(stepMs);
+      return;
+    }
+    token.style.transition = 'none';
+    token.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    await nextFrame();
+    token.style.transition = `transform ${stepMs}ms cubic-bezier(0.3, 1.5, 0.5, 1)`;
+    token.style.transform = 'translate3d(0, 0, 0)';
+    token.style.setProperty('--hop-ms', `${stepMs}ms`);
+    token.classList.add('token--hopping');
+    await wait(stepMs);
+    token.classList.remove('token--hopping');
+    token.style.transition = '';
+    token.style.transform = '';
+  }
+
+  /**
+   * 서버 뷰의 위치대로 말을 놓는다.
+   *
+   * 두 가지를 반드시 지킨다.
+   * 1. **이미 제자리에 있는 말은 건드리지 않는다.** 떼었다 붙이면 DOM이 새로 연결되면서
+   *    통통 튀는 애니메이션이 매 렌더마다 처음부터 다시 시작한다.
+   * 2. **연출이 재생 중인 말은 건드리지 않는다.** 렌더는 잠금·연결 상태·방 이벤트로도 일어나므로,
+   *    걷는 도중에 최종 위치로 끌어다 놓으면 남은 경로를 거꾸로 되짚는 것처럼 보인다.
+   */
   function placeTokens(state) {
     const view = state.view;
     for (const cell of cells.values()) {
-      clear(cell.tokens);
       toggleClass(cell.root, 'cell--turn-here', false);
     }
+    const touchedSlots = new Set();
     for (const player of view.players) {
       let token = tokens.get(player.seatId);
       if (!token) {
         token = buildToken(state, player);
       }
       const isCurrent = player.seatId === view.currentSeatId && !view.isOver;
-      toggleClass(token, 'token--eliminated', player.eliminated);
       toggleClass(token, 'token--turn', isCurrent);
       toggleClass(token, 'token--mine', isMySeat(state, player.seatId));
       toggleClass(token, 'token--island', player.islandRemainingTurns > 0);
       if (player.eliminated) {
+        const slot = token.parentElement;
         token.remove();
+        if (slot) {
+          touchedSlots.add(slot);
+        }
         continue;
       }
       const cell = cells.get(player.position);
       if (!cell) {
         continue;
       }
-      cell.tokens.appendChild(token);
       if (isCurrent) {
         // 지금 차례인 사람이 선 칸은 테두리가 숨을 쉬어서 멀리서도 찾을 수 있다.
         toggleClass(cell.root, 'cell--turn-here', true);
       }
+      if (movingSeats.has(player.seatId) || token.parentElement === cell.tokens) {
+        continue;
+      }
+      const previousSlot = token.parentElement;
+      cell.tokens.appendChild(token);
+      touchedSlots.add(cell.tokens);
+      if (previousSlot) {
+        touchedSlots.add(previousSlot);
+      }
     }
-    for (const cell of cells.values()) {
-      layoutTokensIn(cell.tokens);
+    for (const slot of touchedSlots) {
+      layoutTokensIn(slot);
     }
   }
 
   /** 클래스를 잠깐 붙였다 뗀다(같은 대상에 다시 걸면 타이머를 새로 시작한다). */
   function flash(node, className, duration, key) {
-    if (!node) {
-      return;
-    }
+    // 대상이 없더라도 **이전 강조는 먼저 끈다** — 아니면 엉뚱한 말이 계속 반짝인다.
     const timerKey = key ?? className;
     const previous = highlightTimers.get(timerKey);
     if (previous) {
       window.clearTimeout(previous.timer);
       previous.node.classList.remove(className);
+      highlightTimers.delete(timerKey);
+    }
+    if (!node) {
+      return;
     }
     node.classList.add(className);
     const timer = window.setTimeout(() => {
@@ -362,50 +438,12 @@ export function createBoardView({ onCellActivate }) {
       if (!token || !cell) {
         return;
       }
-      const previousSlot = token.parentElement;
-      const reseat = () => {
-        cell.tokens.appendChild(token);
-        layoutTokensIn(cell.tokens);
-        if (previousSlot && previousSlot !== cell.tokens) {
-          layoutTokensIn(previousSlot);
-        }
-      };
-
-      if (!animate) {
-        reseat();
-        return;
+      movingSeats.add(seatId);
+      try {
+        await hopOneCell(token, cell, { animate, stepMs, style });
+      } finally {
+        movingSeats.delete(seatId);
       }
-
-      // 모션 축소: 튀는 대신 칸마다 짧게 사라졌다 나타난다(칸을 건너뛰지는 않는다).
-      if (style === 'fade' || prefersReducedMotion()) {
-        token.classList.add('token--fade');
-        await wait(Math.max(20, Math.round(stepMs / 2)));
-        reseat();
-        token.classList.remove('token--fade');
-        await wait(Math.max(20, Math.round(stepMs / 2)));
-        return;
-      }
-
-      const before = token.getBoundingClientRect();
-      reseat();
-      const after = token.getBoundingClientRect();
-      const dx = before.left - after.left;
-      const dy = before.top - after.top;
-      if (dx === 0 && dy === 0) {
-        await wait(stepMs);
-        return;
-      }
-      token.style.transition = 'none';
-      token.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
-      await nextFrame();
-      token.style.transition = `transform ${stepMs}ms cubic-bezier(0.3, 1.5, 0.5, 1)`;
-      token.style.transform = 'translate3d(0, 0, 0)';
-      token.style.setProperty('--hop-ms', `${stepMs}ms`);
-      token.classList.add('token--hopping');
-      await wait(stepMs);
-      token.classList.remove('token--hopping');
-      token.style.transition = '';
-      token.style.transform = '';
     },
 
     /**
@@ -417,22 +455,22 @@ export function createBoardView({ onCellActivate }) {
       if (!token) {
         return;
       }
-      const previousSlot = token.parentElement;
-      const half = scaled(MOVE_TIMING.teleportMs / 2);
-      token.classList.add('token--lift');
-      await wait(half);
-      const cell = cells.get(index);
-      if (cell) {
-        cell.tokens.appendChild(token);
-        layoutTokensIn(cell.tokens);
-        if (previousSlot && previousSlot !== cell.tokens) {
-          layoutTokensIn(previousSlot);
+      movingSeats.add(seatId);
+      try {
+        const half = scaled(MOVE_TIMING.teleportMs / 2);
+        token.classList.add('token--lift');
+        await wait(half);
+        const cell = cells.get(index);
+        if (cell) {
+          reseatToken(token, cell.tokens);
         }
+        token.classList.remove('token--lift');
+        token.classList.add('token--drop');
+        await wait(half);
+        token.classList.remove('token--drop');
+      } finally {
+        movingSeats.delete(seatId);
       }
-      token.classList.remove('token--lift');
-      token.classList.add('token--drop');
-      await wait(half);
-      token.classList.remove('token--drop');
     },
 
     async flashCell(index) {
@@ -455,8 +493,38 @@ export function createBoardView({ onCellActivate }) {
       flash(tokens.get(seatId) ?? null, 'token--found', FIND_MS, 'find-token');
       if (Number.isInteger(index)) {
         flash(cells.get(index)?.root ?? null, 'cell--found', FIND_MS, 'find-cell');
-        cells.get(index)?.root.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        cells.get(index)?.root.scrollIntoView({
+          block: 'nearest',
+          inline: 'nearest',
+          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
       }
+    },
+
+    /**
+     * 다른 방으로 옮길 때 보드를 비운다.
+     * (말·강조 타이머·확대 상태가 남으면 새 방에 이전 방의 흔적이 보인다.)
+     */
+    reset() {
+      for (const { timer, node } of highlightTimers.values()) {
+        window.clearTimeout(timer);
+        node.classList.remove('token--found', 'cell--found', 'cell--spotlight');
+      }
+      highlightTimers.clear();
+      movingSeats.clear();
+      for (const token of tokens.values()) {
+        token.remove();
+      }
+      tokens.clear();
+      clear(boardNode);
+      clear(tokenLayer);
+      cells.clear();
+      boardBuilt = false;
+      selectedIndex = null;
+      travelMode = { active: false, forbidden: [], locked: false };
+      toggleClass(stage, 'board-stage--zoom', false);
+      toggleClass(stage, 'board-stage--picking', false);
+      toggleClass(stage, 'board-stage--locked', false);
     },
 
     tokenCenter(seatId) {

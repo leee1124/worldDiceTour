@@ -191,7 +191,8 @@ export function createCasinoView({ onBet, onLeave }) {
   function renderStage() {
     reelBox.hidden = activeGame !== 'SLOT';
     diceBox.hidden = activeGame === 'SLOT';
-    casinoDice[1].hidden = activeGame === 'ODD_EVEN';
+    // 홀짝은 주사위 한 개만 쓴다. (createCasinoDie는 요소가 아니라 래퍼를 돌려주므로 .element를 숨긴다.)
+    casinoDice[1].element.hidden = activeGame === 'ODD_EVEN';
   }
 
   function renderBet() {

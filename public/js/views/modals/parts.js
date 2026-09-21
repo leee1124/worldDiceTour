@@ -29,9 +29,19 @@ export function infoRow(label, value) {
  * 건물은 보드 칸과 **같은 배지 언어**(별·빌·호 세 자리 + 금색 랜드마크 리본)로 그려서
  * 모달에서 본 표시와 보드에서 본 표시가 어긋나지 않게 한다.
  */
-export function citySummary({ name, kind, buildings = [], landmark = false, ownerName = null }) {
+export function citySummary({
+  name,
+  kind,
+  buildings = [],
+  landmark = false,
+  ownerName = null,
+  // 칸 상세 시트처럼 아래에 "지음/안 지음" 목록을 따로 보여 주는 곳에서는 배지 줄을 접는다.
+  showBuildings = true,
+}) {
   const view = buildingSlotView({ kind: kind ?? 'CITY', buildings, landmark });
-  const builds = view.landmark
+  const builds = !showBuildings
+    ? []
+    : view.landmark
     ? [
         el('span', { class: 'build-landmark' }, [
           el('span', { class: 'build-landmark-star', text: '★' }),
@@ -55,7 +65,9 @@ export function citySummary({ name, kind, buildings = [], landmark = false, owne
       el('span', { class: 'city-summary-kind', text: spaceKindLabel(kind ?? 'CITY') }),
     ]),
     ownerName ? el('p', { class: 'city-summary-owner', text: `소유: ${ownerName}` }) : null,
-    el(
+    !showBuildings
+      ? null
+      : el(
       'div',
       { class: 'city-summary-builds' },
       builds.length > 0 ? builds : [el('span', { class: 'city-summary-empty', text: '건물 없음' })],

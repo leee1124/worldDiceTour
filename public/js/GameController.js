@@ -507,6 +507,9 @@ export function createGameController({ appRoot, overlayRoot }) {
     // 방마다 view.version이 1부터 다시 시작하므로 버전 기억까지 비운다.
     queue.forget();
     logView.clear();
+    // 이전 방의 말·주사위 눈이 새 방에 남지 않게 보드도 비우고 다시 만든다.
+    boardView.reset();
+    centerView.resetDice();
     gameOverReason = null;
 
     try {
@@ -618,6 +621,9 @@ export function createGameController({ appRoot, overlayRoot }) {
     disconnectStream();
     roomCode = null;
     queue.forget();
+    // 보드·주사위에는 이전 방의 말과 눈이 남아 있다 — 방을 떠날 때 함께 비운다.
+    boardView.reset();
+    centerView.resetDice();
     gameOverReason = null;
     commandLock.onResync();
     modalHost.closeAll();

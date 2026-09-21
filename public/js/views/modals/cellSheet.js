@@ -79,6 +79,8 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
               buildings: space.buildings ?? [],
               landmark: Boolean(space.landmark),
               ownerName: space.ownerId ? ownerName : null,
+              // 바로 아래에서 3종을 "지음/안 지음"으로 자세히 보여 주므로 요약 배지는 접는다.
+              showBuildings: false,
             })
           : null,
         // 소유자는 맨 위에 못 박는다(보드에서는 색으로만 보이던 정보).

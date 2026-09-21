@@ -11,7 +11,7 @@ import { phasePrompt } from '../domain/labels.js';
 import { currentLocationLabel } from '../domain/locationLabel.js';
 import { countTo, DURATIONS } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
-import { isMySeatOnAutopilot, isMyTurn, seatNameOf, slotOf, spaceNameOf } from '../store.js';
+import { isMySeatOnAutopilot, isMyTurn, seatNameOf, slotOf, spaceOf } from '../store.js';
 import { createDicePair } from './diceView.js';
 
 /** 페이즈별 "결정 창 열기" 버튼 문구. */
@@ -179,11 +179,14 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
       toggleClass(turnTagNode, 'turn-tag--mine', myTurn);
       toggleClass(element, 'board-core--my-turn', myTurn);
 
+      // 이 줄은 aria-live 영역 안이다 — 값이 그대로면 다시 쓰지 않는다(같은 문장을 반복해 읽지 않게).
       const currentPlayer = view.players.find((player) => player.seatId === view.currentSeatId) ?? null;
-      setText(
-        locationNode,
-        currentLocationLabel(currentPlayer ? spaceNameOf(state, currentPlayer.position) : null),
+      const locationText = currentLocationLabel(
+        currentPlayer ? spaceOf(state, currentPlayer.position)?.name ?? null : null,
       );
+      if (locationNode.textContent !== locationText) {
+        setText(locationNode, locationText);
+      }
 
       const prompt = phasePrompt(view.isOver ? 'GAME_OVER' : view.phase);
       setText(promptTitle, myTurn || view.isOver ? prompt.title : `${currentName}의 차례입니다`);
@@ -195,6 +198,14 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
     /** 같은 눈을 함께 보여 줄 주사위 묶음을 등록한다(모바일 상황판). */
     attachDiceMirror(pair) {
       diceMirrors.push(pair);
+    },
+
+    /** 다른 방으로 옮길 때: 이전 방의 눈이 남아 있으면 안 된다. */
+    resetDice() {
+      dice.reset();
+      for (const mirror of diceMirrors) {
+        mirror.reset();
+      }
     },
 
     /** 서버가 정한 눈으로 주사위 연출을 재생한다(난수는 클라이언트가 만들지 않는다). */

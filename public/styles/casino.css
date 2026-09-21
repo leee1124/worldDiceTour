@@ -256,14 +256,7 @@
   color: var(--neon-pink);
 }
 
-.die--casino .pip {
-  background: transparent;
-}
-
-.die--casino[data-face] .die-pips .pip {
-  /* 켜진 눈만 board.css의 규칙이 칠한다(여기서는 색만 덮어쓴다). */
-  background-color: transparent;
-}
+/* 켜진 눈의 색은 board.css의 `data-face` 규칙이 정한다(카지노에서도 같은 눈 색을 쓴다). */
 
 /* ── 결과 배너 ──────────────────────────────────────────────── */
 

@@ -8,7 +8,7 @@ import { formatWon } from '../format.js';
 import { playerCellLabel } from '../domain/locationLabel.js';
 import { countTo } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
-import { isHostSeatMine, isMySeat, slotOf, spaceNameOf } from '../store.js';
+import { isHostSeatMine, isMySeat, slotOf, spaceOf } from '../store.js';
 
 function badge(text, tone) {
   return el('span', { class: ['badge', `badge--${tone}`], text });
@@ -41,6 +41,8 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
     const head = button(
       {
         class: 'player-head player-head--locate',
+        // 버튼 이름은 "무엇을 하는지"까지 담는다(내용만으로는 이름·금액만 읽힌다).
+        'aria-label': `${player.name} · ${slot.shapeLabel} 모양 말 — 보드에서 위치 보기`,
         title: `${player.name}의 말 위치 보기`,
         on: { click: () => onFocusPlayer(player.seatId) },
       },
@@ -71,7 +73,7 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
       tools,
     ]);
 
-    cards.set(player.seatId, { root, cash, assets, badges, tools, holdings, location });
+    cards.set(player.seatId, { root, cash, assets, badges, tools, holdings, location, head });
     return root;
   }
 
@@ -178,15 +180,18 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
 
         setText(card.assets, formatWon(player.totalAssets));
         // 카드마다 "지금 어느 칸에 서 있는지"를 글자로 적어 둔다.
+        // 칸 이름은 **찾지 못하면 null**로 넘긴다(대체 문구는 locationLabel이 한 곳에서 만든다).
         setText(
           card.location,
           playerCellLabel({
             index: player.position,
-            spaceName: spaceNameOf(state, player.position),
+            spaceName: spaceOf(state, player.position)?.name ?? null,
             islandRemainingTurns: player.islandRemainingTurns,
             eliminated: player.eliminated,
           }),
         );
+        // 보드에 없는 말은 찾아 줄 수 없다.
+        card.head.disabled = Boolean(player.eliminated);
         setText(card.holdings, `도시 ${player.cityCount} · 휴양지 ${player.resortCount}`);
         renderBadges(card.badges, state, player, seat);
         renderTools(card.tools, state, player, seat);
