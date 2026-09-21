@@ -77,6 +77,39 @@ describe('시장 스냅샷 왕복', () => {
     assert.equal(view.budget.ordersLeft, 1, '남은 창구 예산이 유지된다');
   });
 
+  it('거래 도중 재접속해도 남은 예산으로 그대로 이어서 플레이할 수 있다', () => {
+    // Given (커맨드마다 방이 저장되므로 창구 도중의 재접속은 언제든 일어난다)
+    const room = playingStockRoom();
+    const beforeBudget = room.game.marketView({ actingSeatId: 'seat-1' }).budget;
+
+    // When (저장 → 복원 후 같은 창구를 이어서 쓴다)
+    const restored = deserializeRoom(JSON.parse(serializeRoom(room)), new ScriptedRandomSource());
+    const afterBudget = restored.game.marketView({ actingSeatId: 'seat-1' }).budget;
+    restored.executeCommand({
+      seatId: 'seat-1',
+      type: COMMAND_TYPES.SELL_STOCK,
+      payload: { instrumentId: 'AIR', quantity: 10 },
+      now: NOW,
+    });
+
+    // Then (예산이 되살아나지 않았고, 3번째 주문이라 창구가 자동으로 닫힌다)
+    assert.deepEqual(afterBudget, beforeBudget, '재접속이 예산을 되돌렸다');
+    assert.equal(restored.game.phase, PHASES.AWAIT_ROLL, '예산 소진 자동 마감이 이어지지 않았다');
+    assert.equal(restored.game.moneyReport().balanced, true);
+
+    // When (그다음 턴 진행도 정상이다)
+    const events = restored.executeCommand({
+      seatId: 'seat-1',
+      type: COMMAND_TYPES.ROLL,
+      payload: {},
+      now: NOW,
+    });
+
+    // Then
+    assert.ok(events.some((event) => event.type === 'DICE_ROLLED'));
+    assert.equal(restored.game.moneyReport().balanced, true);
+  });
+
   it('스냅샷은 현재 스키마 버전을 담고 검증을 통과한다', () => {
     // Given
     const snapshot = playingStockRoom().toSnapshot();
