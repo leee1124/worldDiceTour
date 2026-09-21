@@ -22,6 +22,7 @@
 | 14 | 동작 | `rankings` 정렬에 동점 기준이 추가됐다: 총자산 → **현금** → 좌석 순서 | 같은 상태면 항상 같은 순위가 나온다(종료 모달이 흔들리지 않는다) |
 | 15 | 동작 + **추가 필드** | 채권자가 여러 명인 채무(`한턱 쏘기`)로 파산하면 남은 현금이 **여러 `MONEY_TRANSFERRED` 이벤트로 나뉘어** 발생한다(이전에는 첫 채권자 한 명에게 전액). `BANKRUPT`에 `creditorIds`(배열)가 추가됐다 | 파산 로그 연출은 `MONEY_TRANSFERRED`를 여러 건 받을 수 있다고 가정할 것. 누가 받았는지는 `creditorIds`를 볼 것(`creditorId`는 대표 한 명이라 금액과 짝지으면 어긋난다) |
 | 16 | 동작 | 에러 응답에서 본문을 끝까지 읽지 않은 경우(413/415) 연결이 닫힌다(`connection: close`) | 큰 본문을 보내다 거절당하면 그 연결은 재사용되지 않는다 |
+| 17 | 동작 + **추가 필드** + **새 이벤트** | **바퀴(lap)별 건설 제한**(명세 4장). 플레이어마다 바퀴 수가 있고 **1바퀴 별장 / 2바퀴 빌딩 / 3바퀴부터 호텔**만 지을 수 있다. 추가 필드: `GameViewDto.players[].lap`(정수, 1부터), 건설 관련 `pending`의 `lockedOptions`, 그리고 `options[]`·`lockedOptions[]` 각 항목의 `locked`(boolean)·`unlockLap`(정수). 새 이벤트 `LAP_ADVANCED { playerId, lap }`. **`options`의 뜻은 그대로다** — 여전히 "지금 고를 수 있는 건물"만 들어 있으므로 예전 클라이언트도 잘못된 건물을 고르지 않는다 | 잠긴 건물을 보여 주려면 `lockedOptions`를 읽어 비활성 행으로 그리고 `unlockLap`으로 "n바퀴부터"를 안내할 것. `options`에 없는 건물을 BUILD/START_BUILD로 보내면 `400 ERR001`이고 상태는 바뀌지 않는다. 플레이어 패널에는 `players[].lap`을 함께 보여 줄 것 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -260,7 +261,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
   "isOver": false,
   "players": [
     {
-      "seatId": "seat-1", "name": "하나", "cash": 2972000, "position": 3,
+      "seatId": "seat-1", "name": "하나", "cash": 2972000, "position": 3, "lap": 2,
       "eliminated": false, "islandRemainingTurns": 0, "airportPending": false,
       "loanUsed": false, "loanDebt": 0, "cityCount": 0, "resortCount": 0, "totalAssets": 2972000
     }
@@ -289,6 +290,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `isOver` | 게임 종료 여부 |
 | `players[].cash` | 보유 현금 |
 | `players[].position` | 보드 칸 번호(0~39) |
+| `players[].lap` | 지금 몇 바퀴째인지(1부터). 출발 칸을 앞으로 지나거나 도착해 **월급을 받는 순간마다 +1**(월급이 대출로 압류돼도 +1, 뒤로 밀려 도착하거나 조난 이송이면 그대로). 이 값이 지을 수 있는 건물을 정한다: 1바퀴 별장 / 2바퀴 빌딩 / 3바퀴부터 호텔 |
 | `players[].eliminated` | 파산 탈락 |
 | `players[].islandRemainingTurns` | 조난 섬에 남은 턴(0이면 자유) |
 | `players[].airportPending` | 다음 자기 턴에 공항 이동권을 쓸 수 있는지 |
@@ -332,9 +334,9 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `ROLL` | 주사위 2개. 더블이면 턴 종료 후 한 번 더(같은 좌석 `AWAIT_ROLL`), 3연속 더블이면 이동 없이 조난 섬 |
 | `BUY` | 빈 칸 매입. 현금 부족 시 `ERR008`. 매입 직후 같은 턴에 `AWAIT_BUILD`(건설 기회) |
 | `SKIP_BUY` | 매입 포기 → 턴 종료 |
-| `BUILD` | `buildings`는 `pending.options[].type` 중에서만 고른다. 중복 불가. `LANDMARK`는 **단독으로만**(3종을 이미 가진 기회일 때) |
+| `BUILD` | `buildings`는 `pending.options[].type` 중에서만 고른다. 중복 불가. `LANDMARK`는 **단독으로만**(3종을 이미 가진 기회일 때). `pending.lockedOptions`에 있는 건물(바퀴 미달)을 담으면 `400 ERR001`이고 상태는 그대로다 |
 | `SKIP_BUILD` | 건설 포기 |
-| `START_BUILD` | 출발 칸 보너스. `pending.candidates` 중 하나의 `index`와 그 후보의 `options`에서 고른 건물 |
+| `START_BUILD` | 출발 칸 보너스. `pending.candidates` 중 하나의 `index`와 그 후보의 `options`에서 고른 건물. 그 후보의 `lockedOptions`에 있는 건물을 담으면 `400 ERR001` |
 | `SKIP_START_BUILD` | 보너스 포기 |
 | `ACQUIRE` | 통행료를 낸 남의 도시를 `pending.price`(= invested × 2)에 인수. **보유 현금만** 사용(부족하면 `ERR008`). 인수 후 `AWAIT_BUILD`. 통행료를 정리 페이즈로 낸 턴에는 이 페이즈에 오지 않는다 |
 | `SKIP_ACQUIRE` | 인수 포기 |
@@ -358,8 +360,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `kind` | 필드 |
 |---|---|
 | `BUY` | `index`, `name`, `price` |
-| `BUILD` | `index`, `name`, `options: [{ type, cost }]`, `buildings`(이미 지은 것), `landmark` |
-| `START_BUILD` | `candidates: [{ index, name, price, options: [{ type, cost }] }]` |
+| `BUILD` | `index`, `name`, `options: [{ type, cost, locked, unlockLap }]`, `lockedOptions: [{ type, cost, locked, unlockLap }]`, `buildings`(이미 지은 것), `landmark` |
+| `START_BUILD` | `candidates: [{ index, name, price, options: [{ type, cost, locked, unlockLap }], lockedOptions: [...] }]` |
 | `ACQUIRE` | `index`, `name`, `ownerId`, `price` |
 | `CASINO` | `roundsLeft`, `limits: { min, max, unit }`, `jackpot` |
 | `ISLAND` | `remainingTurns`, `fee`(200000), `canPayFee` |
@@ -367,6 +369,32 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ index, name, refund }]` |
 
 `AWAIT_ROLL`과 `GAME_OVER`에서는 `pending`이 `null`이다.
+
+### 건설 선택지와 바퀴 제한 (`options` / `lockedOptions`)
+
+건설 관련 `pending`(`BUILD`의 본문과 `START_BUILD`의 각 후보)은 선택지를 **두 목록으로 나눠** 보낸다.
+
+| 필드 | 뜻 |
+|---|---|
+| `options` | **지금 고를 수 있는 건물**만. 뜻이 바뀌지 않았으므로 이 목록만 쓰는 예전 클라이언트도 그대로 동작한다. 항목마다 `locked: false`와 `unlockLap`이 함께 온다(추가 필드) |
+| `lockedOptions` | **바퀴가 모자라 아직 못 짓는 건물**(`locked: true`). 화면에 비활성 행으로 보여 주기 위한 정보이며, 여기 있는 건물을 커맨드에 담으면 `400 ERR001`이다 |
+| `locked` | 그 항목을 지금 고를 수 있는지(`options`는 항상 `false`, `lockedOptions`는 항상 `true`) |
+| `unlockLap` | 그 건물이 열리는 바퀴(별장 1 · 빌딩 2 · 호텔 3). 랜드마크는 바퀴로 막지 않으므로 `1` |
+
+- 두 목록에는 **이미 지은 건물이 들어가지 않는다.** 랜드마크 업그레이드 기회(`options`가 `[{ type: "LANDMARK", … }]`)에서는 `lockedOptions`가 항상 빈 배열이다.
+- 그 바퀴에 **고를 수 있는 것이 하나도 없으면 건설 기회 자체가 열리지 않는다**(페이즈가 `AWAIT_BUILD`로 가지 않고 턴이 끝난다). `START_BUILD`의 `candidates`에도 그런 도시는 올라오지 않으며, 후보가 하나도 없으면 보너스를 자동으로 건너뛴다.
+- 예: 1바퀴 플레이어가 방콕(70,000원)을 막 매입한 직후
+  ```json
+  {
+    "kind": "BUILD", "index": 3, "name": "방콕",
+    "options": [{ "type": "VILLA", "cost": 21000, "locked": false, "unlockLap": 1 }],
+    "lockedOptions": [
+      { "type": "BUILDING", "cost": 42000, "locked": true, "unlockLap": 2 },
+      { "type": "HOTEL", "cost": 63000, "locked": true, "unlockLap": 3 }
+    ],
+    "buildings": [], "landmark": false
+  }
+  ```
 
 ---
 
@@ -381,6 +409,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `DICE_ROLLED` | `playerId`, `die1`, `die2`, `sum`, `isDouble` | 주사위 연출 |
 | `MOVED` | `playerId`, `from`, `to`, `steps`, `passedStart` | 말 이동. `steps`가 `null`이면 순간이동(조난 이송) |
 | `LANDED` | `playerId`, `index`, `kind`, `name` | 도착 칸 |
+| `LAP_ADVANCED` | `playerId`, `lap` | **한 바퀴 완주**(출발 칸을 앞으로 지나거나 도착). 새 바퀴 수를 담으며 `SALARY_PAID`/`SALARY_SEIZED`보다 **먼저** 온다. 월급이 전액 압류되면 `SALARY_PAID`가 없으므로 "바퀴가 올랐는지"는 이 이벤트로 판단할 것. 한 커맨드에 두 번 오지 않는다 |
 | `EXTRA_TURN` | `playerId` | 더블로 한 번 더 |
 | `TURN_ENDED` | `playerId` | 턴 종료 |
 | `ROUND_ADVANCED` | `round` | 라운드 증가 |
