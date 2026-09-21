@@ -1038,8 +1038,11 @@ export class Game {
 
   #beginTurn() {
     const player = this.#current;
-    // 이전 턴의 흔적(건설/인수 대상 칸까지)을 남기지 않는다.
+    // 이전 턴의 흔적(건설/인수 대상 칸, 못 갚은 채무까지)을 남기지 않는다.
+    // 정상 흐름에서는 채무가 이미 정산·파산으로 지워져 있지만, 손상된 상태가 다음 턴으로
+    // 새어 나가지 않도록 여기서 한 번 더 확실히 비운다.
     this.#turn = { ...EMPTY_TURN };
+    this.#payment.clear();
     player.resetDoubles();
     this.#emit(EVENT_TYPES.TURN_STARTED, { playerId: player.id, round: this.#clock.round });
 
