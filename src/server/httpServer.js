@@ -128,7 +128,7 @@ async function handleStatic(request, response, url, { publicDir, logger }) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       throw new AppError('ERR014', `허용되지 않은 메서드: ${request.method}`);
     }
-    const { content, contentType } = await readStaticFile(publicDir, url.pathname);
+    const { content, contentType } = await readStaticFile(publicDir, url.pathname, { logger });
     response.writeHead(200, {
       ...SECURITY_HEADERS,
       'content-type': contentType,

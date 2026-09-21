@@ -3,7 +3,7 @@ import { BUILDING_TYPES } from '../domain/game/City.js';
 import { CASINO_GAMES, HIGH_LOW_SEVEN_CHOICES, ODD_EVEN_CHOICES } from '../domain/game/Casino.js';
 import { BOARD_SIZE } from '../domain/game/data/board.js';
 import { ALLOWED_ROUND_LIMITS } from '../domain/room/Room.js';
-import { HOST_ACTIONS } from '../application/RoomService.js';
+import { HOST_ACTIONS } from '../application/hostActions.js';
 import { AppError } from '../application/errors.js';
 
 /** 좌석/방 이름. */

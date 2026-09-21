@@ -276,6 +276,31 @@ describe('Game(게임 시작과 턴 진행)', () => {
       assert.equal(game.playerById('s1').consecutiveDoubles, 2);
     });
 
+    it('턴이 시작되면 턴 임시 상태가 완전히 초기화된다', () => {
+      // Given (방콕을 매입해 건설 기회를 받고 건설까지 마친다)
+      const game = buildGame({
+        cash: { s1: 1_000_000 },
+        random: new FakeRandomSource([1, 2, 1, 2]),
+      });
+      game.execute('s1', COMMAND_TYPES.ROLL);
+      game.execute('s1', COMMAND_TYPES.BUY);
+      assert.equal(game.phase, PHASES.AWAIT_BUILD);
+      assert.equal(game.toSnapshot().turn.buildIndex, 3, '건설 대상 칸이 기록돼 있다');
+
+      // When (건설로 턴을 끝내고 다음 플레이어 턴이 시작된다)
+      game.execute('s1', COMMAND_TYPES.BUILD, { buildings: ['VILLA'] });
+
+      // Then (이전 턴의 흔적이 남지 않는다)
+      assert.equal(game.currentPlayerId, 's2');
+      assert.deepEqual(game.toSnapshot().turn, {
+        rollWasDouble: false,
+        casinoRoundsLeft: 0,
+        debt: null,
+        buildIndex: null,
+        acquireIndex: null,
+      });
+    });
+
     it('3연속 더블이면 이동 없이 조난 섬으로 이송된다', () => {
       // Given
       const game = buildGame({

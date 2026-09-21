@@ -107,11 +107,3 @@ export function toGameViewDto(game) {
     rankings: game.isOver() ? game.rankings() : null,
   };
 }
-
-/** 방 + (진행 중이면) 게임 스냅샷을 함께 담은 응답. */
-export function toRoomStateDto(room, presence) {
-  return {
-    room: toRoomDto(room, presence),
-    game: room.game ? toGameViewDto(room.game) : null,
-  };
-}

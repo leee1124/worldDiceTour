@@ -1,16 +1,9 @@
 import { MAX_SEATS, ROOM_STATUS, Room } from '../domain/room/Room.js';
 import { generateRoomCode, isValidRoomCode } from '../domain/room/RoomCode.js';
 import { AppError } from './errors.js';
+import { HOST_ACTIONS } from './hostActions.js';
 import { KeyedMutex } from './KeyedMutex.js';
 import { toRoomDto, toRoomSummaryDto, toGameViewDto } from './dto.js';
-
-/** 호스트 전용 동작 종류. */
-export const HOST_ACTIONS = Object.freeze({
-  ADD_COMPUTER: 'ADD_COMPUTER',
-  SET_OPTIONS: 'SET_OPTIONS',
-  START: 'START',
-  SET_AUTOPILOT: 'SET_AUTOPILOT',
-});
 
 /** 서버가 동시에 들고 있을 수 있는 최대 방 개수(플러딩 방어). */
 export const MAX_ROOMS = 200;

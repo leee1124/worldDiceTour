@@ -401,6 +401,67 @@ describe('Game(대출)', () => {
   });
 });
 
+describe('Game(순위 동점 처리)', () => {
+  it('총자산이 같으면 현금이 많은 쪽이 앞선다', () => {
+    // Given (총자산 1,000,000원 동점: s1은 전액 현금, s2는 현금 200,000 + 서울 800,000)
+    const game = buildGame({
+      cash: { s1: 1_000_000, s2: 200_000 },
+      cities: [{ index: 39, ownerId: 's2' }],
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const rankings = game.rankings();
+
+    // Then
+    assert.equal(rankings[0].totalAssets, rankings[1].totalAssets);
+    assert.deepEqual(
+      rankings.map((entry) => entry.playerId),
+      ['s1', 's2'],
+    );
+  });
+
+  it('총자산과 현금이 모두 같으면 좌석 순서를 따른다', () => {
+    // Given
+    const game = buildGame({
+      seats: [
+        { id: 's1', name: '하나' },
+        { id: 's2', name: '두리' },
+        { id: 's3', name: '세찌' },
+      ],
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const rankings = game.rankings();
+
+    // Then
+    assert.deepEqual(
+      rankings.map((entry) => entry.playerId),
+      ['s1', 's2', 's3'],
+    );
+    assert.deepEqual(
+      rankings.map((entry) => entry.rank),
+      [1, 2, 3],
+    );
+  });
+
+  it('현금이 많아도 총자산이 적으면 뒤로 간다', () => {
+    // Given (s1 현금 900,000 / s2 현금 100,000 + 서울 800,000 = 900,000... s2가 더 많게)
+    const game = buildGame({
+      cash: { s1: 900_000, s2: 200_000 },
+      cities: [{ index: 39, ownerId: 's2' }],
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    const rankings = game.rankings();
+
+    // Then (s2 총자산 1,000,000 > s1 900,000)
+    assert.equal(rankings[0].playerId, 's2');
+  });
+});
+
 describe('Game(파산 선언)', () => {
   it('정리 페이즈에서는 언제든 파산을 선언할 수 있다', () => {
     // Given
@@ -472,6 +533,63 @@ describe('Game(파산 선언)', () => {
     // Then
     assert.equal(game.isOver(), true);
     assert.equal(findEvent(events, EVENT_TYPES.GAME_OVER).rankings[0].playerId, 's2');
+  });
+
+  it('여러 사람에게 줄 채무로 파산하면 남은 현금을 고르게 나눈다', () => {
+    // Given (한턱 쏘기 티켓: s2·s3에게 30,000원씩 = 60,000원, 현금은 1,000원뿐)
+    const game = buildGame({
+      seats: [
+        { id: 's1', name: '하나' },
+        { id: 's2', name: '두리' },
+        { id: 's3', name: '세찌' },
+      ],
+      cash: { s1: 1_000 },
+      drawPile: ['T16'],
+      random: new FakeRandomSource([1, 1, 0]),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+    assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then (1,000원을 두 명에게 500원씩)
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 500);
+    assert.equal(game.playerById('s3').cash, STARTING_CASH + 500);
+    assert.equal(game.playerById('s1').cash, 0);
+    const transfers = events.filter((event) => event.type === EVENT_TYPES.MONEY_TRANSFERRED);
+    assert.deepEqual(
+      transfers.map((event) => [event.toId, event.amount]),
+      [
+        ['s2', 500],
+        ['s3', 500],
+      ],
+    );
+    assert.equal(findEvent(events, EVENT_TYPES.BANKRUPT).paidAmount, 1_000);
+    assertMoneyConserved(game, '여러 채권자 파산');
+  });
+
+  it('고르게 나눌 수 없는 잔액은 좌석 순서가 앞선 채권자가 받는다', () => {
+    // Given (현금 1,001원 → 500원씩 나누고 남은 1원은 s2에게)
+    const game = buildGame({
+      seats: [
+        { id: 's1', name: '하나' },
+        { id: 's2', name: '두리' },
+        { id: 's3', name: '세찌' },
+      ],
+      cash: { s1: 1_001 },
+      drawPile: ['T16'],
+      random: new FakeRandomSource([1, 1, 0]),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 501);
+    assert.equal(game.playerById('s3').cash, STARTING_CASH + 500);
+    assertMoneyConserved(game, '나머지 배분');
   });
 
   it('은행에 대한 채무로 파산하면 남은 현금은 은행으로 간다', () => {

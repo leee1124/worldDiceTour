@@ -301,7 +301,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `board[].toll` | 지금 이 칸에 걸리면 낼 통행료 |
 | `board[].acquisitionPrice` | 인수 가격(`invested × 2`). 인수 불가(랜드마크/휴양지/주인 없음)면 `null` |
 | `pending` | 현재 플레이어가 내려야 하는 결정(6장). 결정이 없으면 `null` |
-| `rankings` | 종료 시에만 채워진다: `[{ playerId, name, rank, cash, totalAssets, loanDebt, eliminated }]` |
+| `rankings` | 종료 시에만 채워진다: `[{ playerId, name, rank, cash, totalAssets, loanDebt, eliminated }]`. 정렬은 생존자 → 총자산 → **현금** → 좌석 순서(같은 상태면 항상 같은 순위) |
 
 > 소유 불가능 칸(`START`/`TICKET`/`TAX`/`ISLAND`/`CASINO`/`AIRPORT`)에는 `price` 이하 필드가 없다.
 
@@ -439,7 +439,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `LIQUIDATION_REQUIRED` | `playerId`, `amountDue`, `creditorId`, `reason` | 정리 페이즈 진입 |
 | `PROPERTY_SOLD` | `playerId`, `index`, `name`, `refund` | 자산 매각 |
 | `DEBT_SETTLED` | `playerId`, `amount` | 정리 후 채무 정산 완료 |
-| `BANKRUPT` | `playerId`, `creditorId`, `paidAmount`, `releasedIndexes` | 파산(초기화된 칸 목록 포함) |
+| `BANKRUPT` | `playerId`, `creditorId`, `paidAmount`, `releasedIndexes` | 파산(초기화된 칸 목록 포함). 채권자가 여러 명이면 `creditorId`는 좌석 순서가 앞선 한 명이고, 실제 분배 내역은 함께 발생하는 `MONEY_TRANSFERRED` 이벤트들에 담긴다 |
 
 ### 행운 티켓 효과(`TICKET_DRAWN.effect.type`)
 

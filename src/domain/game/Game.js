@@ -289,11 +289,19 @@ export class Game {
         ? 0
         : player.cash + this.#board.totalAssetValueOf(player.id) - player.loanDebt,
     }));
+    // 동점이면 현금이 많은 쪽, 그마저 같으면 좌석 순서(입력 순서)를 따른다 — 항상 같은 결과가 나온다.
+    const seatOrder = new Map(this.#players.map((player, order) => [player.id, order]));
     scored.sort((a, b) => {
       if (a.eliminated !== b.eliminated) {
         return a.eliminated ? 1 : -1;
       }
-      return b.totalAssets - a.totalAssets;
+      if (b.totalAssets !== a.totalAssets) {
+        return b.totalAssets - a.totalAssets;
+      }
+      if (b.cash !== a.cash) {
+        return b.cash - a.cash;
+      }
+      return seatOrder.get(a.playerId) - seatOrder.get(b.playerId);
     });
     return scored.map((entry, order) => ({ ...entry, rank: order + 1 }));
   }
@@ -1172,25 +1180,31 @@ export class Game {
     this.#bankrupt(this.#current);
   }
 
+  /**
+   * 파산 시 남은 현금을 받을 살아 있는 채권자들(좌석 순서).
+   * `PAY_TO_ALL`처럼 채권자가 여러 명일 수 있으므로 목록으로 다룬다.
+   */
+  #bankruptcyCreditors(debt) {
+    const ids = new Set(
+      (debt?.items ?? [])
+        .filter((item) => item.sink === SINKS.PLAYER && item.toPlayerId)
+        .map((item) => item.toPlayerId),
+    );
+    return this.#players.filter((candidate) => ids.has(candidate.id) && !candidate.eliminated);
+  }
+
   /** 파산: 남은 현금을 채권자에게 넘기고 모든 자산을 초기화한 뒤 탈락한다. */
   #bankrupt(player) {
     const debt = this.#turn.debt;
-    const creditorItem = debt?.items.find((item) => item.sink === SINKS.PLAYER) ?? null;
     const toJackpot = Boolean(debt?.items.some((item) => item.sink === SINKS.JACKPOT));
-    const creditor = creditorItem ? this.playerById(creditorItem.toPlayerId) : null;
-    const creditorId = creditor && !creditor.eliminated ? creditor.id : null;
+    const creditors = this.#bankruptcyCreditors(debt);
+    const creditorId = creditors[0]?.id ?? null;
     const remaining = player.cash;
 
     if (remaining > 0) {
       player.pay(remaining);
-      if (creditorId) {
-        creditor.receive(remaining);
-        this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
-          fromId: player.id,
-          toId: creditorId,
-          amount: remaining,
-          reason: MONEY_REASONS.BANKRUPTCY,
-        });
+      if (creditors.length > 0) {
+        this.#splitAmongCreditors(player, creditors, remaining);
       } else if (toJackpot) {
         this.#casino.accumulate(remaining);
         this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
@@ -1213,6 +1227,29 @@ export class Game {
       return;
     }
     this.#endTurn({ allowExtra: false });
+  }
+
+  /**
+   * 남은 현금을 채권자들에게 고르게(내림) 나누고, 나머지는 좌석 순서가 앞선 채권자에게 준다.
+   * 나눠 준 합계는 항상 남은 현금과 정확히 같아야 한다(돈의 보존 불변식).
+   */
+  #splitAmongCreditors(player, creditors, remaining) {
+    const share = Math.floor(remaining / creditors.length);
+    let leftover = remaining - share * creditors.length;
+    for (const creditor of creditors) {
+      const amount = share + (leftover > 0 ? 1 : 0);
+      leftover = Math.max(0, leftover - 1);
+      if (amount <= 0) {
+        continue;
+      }
+      creditor.receive(amount);
+      this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
+        fromId: player.id,
+        toId: creditor.id,
+        amount,
+        reason: MONEY_REASONS.BANKRUPTCY,
+      });
+    }
   }
 
   // ── 턴 전이 ─────────────────────────────────────────────────────────────
@@ -1269,7 +1306,8 @@ export class Game {
 
   #beginTurn() {
     const player = this.#current;
-    this.#turn = { rollWasDouble: false, casinoRoundsLeft: 0, debt: null };
+    // 이전 턴의 흔적(건설/인수 대상 칸까지)을 남기지 않는다.
+    this.#turn = { ...EMPTY_TURN };
     player.resetDoubles();
     this.#emit(EVENT_TYPES.TURN_STARTED, { playerId: player.id, round: this.#round });
 
