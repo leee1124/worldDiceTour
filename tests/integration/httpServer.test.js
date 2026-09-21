@@ -124,14 +124,15 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.body.code, 'ERR011');
     });
 
-    it('없는 API 경로는 규격 에러를 돌려준다', async () => {
+    it('없는 API 경로는 규격 에러를 돌려주고 연결은 유지한다', async () => {
       // Given / When
       const response = await request(baseUrl, { path: '/api/nope' });
 
-      // Then
+      // Then (본문 없는 요청의 에러 응답은 연결을 닫지 않는다)
       assert.equal(response.status, 404);
       assert.deepEqual(Object.keys(response.body).sort(), ['code', 'message']);
       assert.equal(response.body.code, 'ERR011');
+      assert.notEqual(response.headers.connection, 'close');
     });
   });
 

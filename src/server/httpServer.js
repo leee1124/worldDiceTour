@@ -257,7 +257,9 @@ function respondError(response, error, logger, request) {
     response.end();
     return;
   }
-  const close = Boolean(request) && request.readableEnded === false;
+  // 본문을 실어 보냈는데 우리가 끝까지 읽지 않은 경우에만 연결을 닫는다.
+  // (본문 없는 GET까지 닫으면 정상적인 404·405 응답마다 연결을 버리게 된다.)
+  const close = Boolean(request) && hasBody(request) && request.readableEnded === false;
   respondJson(response, { status: appError.status, body: appError.toBody() }, { close });
   if (close) {
     response.once('finish', () => request.destroy());

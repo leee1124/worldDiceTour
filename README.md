@@ -23,11 +23,42 @@ npm start        # = node server.js
 
 | 환경변수 | 기본값 | 설명 |
 |---|---|---|
-| `PORT` | `5173` | 서버 포트 |
-| `AUTO_PLAY_DELAY_MS` | `800` | 컴퓨터/자동 진행 좌석의 연출용 지연(ms) |
+| `PORT` | `5173` | 서버 포트. **1~65535 정수가 아니면 이유를 출력하고 시작하지 않는다** |
+| `AUTO_PLAY_DELAY_MS` | `800` | 컴퓨터/자동 진행 좌석의 연출용 지연(ms). 0 이상 정수 |
+| `ALLOWED_HOSTS` | (없음) | `Host` 헤더 추가 허용 목록(콤마 구분, 정확 일치). 아래 "접속 주소 제한" 참고 |
 
 방 상태는 `data/rooms/<코드>.json`에 자동 저장되어 서버를 다시 켜도 이어서 플레이할 수 있다.
-이 디렉터리에는 **좌석 토큰이 들어 있어 정적 서빙되지 않는다**(정적 루트는 `public/`뿐). 24시간 넘게 방치된 방은 서버 시작 시 자동 정리된다.
+이 디렉터리에는 **좌석 토큰이 들어 있어 정적 서빙되지 않는다**(정적 루트는 `public/`뿐).
+24시간 넘게 방치된 방은 서버 시작 시와 **1시간 주기로** 정리된다. 해석할 수 없게 손상된 저장 파일은
+`<코드>.json.corrupt`로 격리되어 같은 코드의 방을 다시 만들 수 있다.
+
+### 서버가 스스로 지키는 한도
+
+랜 안에서 쓰는 서버지만, 브라우저 하나가 실수로(또는 악의적으로) 서버를 망가뜨리지 못하게 한도를 둔다.
+
+| 항목 | 한도 | 초과 시 |
+|---|---|---|
+| 요청 본문 | 16KB | `413 ERR009` 후 연결 종료 |
+| 방 개수 | 200개 | 30분 이상 방치된 대기실을 먼저 정리한 뒤 `503 ERR017` |
+| SSE 구독자 | 방당 16 / 전체 128 | `503 ERR016`(이벤트 스트림이 아닌 JSON) |
+| 동시 연결 | 256 | 추가 연결을 받지 않음 |
+| 헤더 수신 | 10초 | 연결 종료 |
+
+### 접속 주소 제한 (DNS 리바인딩 방어)
+
+브라우저는 공격자 도메인을 사설 IP로 리바인딩해 이 서버에 요청을 보낼 수 있다. 그래서 서버는
+`Host` 헤더가 **랜에서 실제로 쓰이는 이름**일 때만 요청을 받는다.
+
+- 허용: `localhost`, `127.0.0.0/8`, `[::1]`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  `169.254.0.0/16`, 점이 없는 단일 라벨 호스트명(`mypc`), `*.local`(mDNS). 모두 포트를 붙일 수 있다.
+- 그 밖의 이름으로 접속해야 한다면(예: 사내 DNS 이름) 정확한 값을 환경변수에 적는다.
+  ```bash
+  ALLOWED_HOSTS="game.mylan.example:5173,myhost.test" npm start
+  ```
+- 허용 목록에 없으면 `403 ERR015`.
+
+또한 본문이 있는 요청은 `Content-Type: application/json`이어야 한다(`; charset=utf-8` 같은 파라미터는
+허용). 브라우저 폼으로는 이 타입을 만들 수 없어 사이트 간 요청 위조(CSRF)가 막힌다.
 
 ## 다른 기기에서 참가하기 (같은 와이파이)
 
@@ -94,13 +125,14 @@ src/
       Seat.js  RoomCode.js   좌석(토큰 보관, 비교는 하지 않음), 방 코드 생성/검증
     shared/
       DomainError.js         도메인 사유 코드 + 예외
-      interfaces.js          RandomSource / RoomRepository / EventPublisher 포트(JSDoc)
+      interfaces.js          RandomSource / RoomRepository / EventPublisher / PresenceQuery 포트(JSDoc)
   application/               유스케이스 — 로드 → 인증 → Aggregate 위임 → 저장 → 발행
     RoomService.js  GameService.js
     AutoPlayerPolicy.js      컴퓨터 좌석 의사결정(규칙 기반, 뷰 DTO만 입력)
-    AutoPlayerDriver.js      자동 진행 스케줄러(중복 발사·무한 루프 방지, unref 타이머)
+    AutoPlayerDriver.js      자동 진행 스케줄러(중복 발사·무한 루프 방지, 백오프 재시도, 낙관적 동시성)
     dto.js                   RoomDto / GameViewDto (엔티티·토큰 절대 미노출)
-    errors.js                ERR001~ERR014 규격 에러
+    errors.js                ERR001~ERR017 규격 에러
+    hostActions.js           호스트 동작 enum(검증이 서비스 그래프를 끌어오지 않도록 분리)
   infrastructure/            포트 구현
     CryptoRandomSource.js  SeededRandomSource.js  TokenFactory.js
     SeatAuthenticator.js     좌석 토큰 timingSafeEqual 비교
@@ -108,10 +140,13 @@ src/
     FileRoomRepository.js  InMemoryRoomRepository.js
   server/                    Controller 레이어
     httpServer.js            라우팅·정적 서빙·16KB 본문 제한·보안 헤더·규격 에러 응답
+    hostGuard.js             Host 헤더 화이트리스트(DNS 리바인딩 방어)
+    securityHeaders.js       모든 응답(JSON·정적·SSE)에 공통으로 붙는 보안 헤더
+    config.js                환경변수 검증(PORT·AUTO_PLAY_DELAY_MS)
     roomController.js        입력 화이트리스트 검증 → Service 호출 → DTO 응답
     sseHub.js                방별 구독자·브로드캐스트·하트비트·presence
     validation.js            이름/토큰/커맨드/payload 검증 규칙
-    staticFiles.js           경로 탈출 차단 + 확장자 화이트리스트
+    staticFiles.js           경로 탈출 차단(realpath 봉쇄 포함) + 확장자 화이트리스트
     networkInfo.js           LAN 주소 목록
 public/                      클라이언트(현재는 자리표시 index.html)
 tests/
@@ -127,4 +162,7 @@ docs/SPEC.md  docs/API.md
 - **풍부한 도메인 모델**: 규칙 판단은 엔티티/애그리거트 안에 있다(`Player.pay`, `City.tollFor/build/liquidationValue`, `Game`이 페이즈·턴 소유권 강제, `Room`이 호스트 권한·좌석 한도 강제). 서비스는 조합만 한다.
 - **레이어 분리**: 도메인은 `RandomSource`/`RoomRepository`/`EventPublisher` 포트에만 의존하고 `node:` 모듈을 import하지 않는다. 토큰 비교(`timingSafeEqual`)는 infrastructure에만 있고, 도메인은 이미 해석된 `seatId`만 받는다.
 - **엔티티 미노출**: 서비스는 DTO 평면 객체만 반환하며 좌석 토큰은 DTO·SSE·로그에 절대 싣지 않는다.
-- **에러 규격화**: 클라이언트에는 `{ code, message }`만, 내부 사유는 `console.error`로만.
+- **에러 규격화**: 클라이언트에는 `{ code, message }`만, 내부 사유는 `console.error`로만. 검증 메시지는
+  외부 입력을 안전하게 문자열화(`safeText`)해 `{"toString":1}` 같은 페이로드가 500으로 번지지 않게 한다.
+- **저장 스냅샷 검증**: 복원 전에 좌석·플레이어·보드·턴(채무·페이즈 정합성)·장부·잭팟을 화이트리스트로
+  검증하고, 어긋나면 파일을 격리한다 — 깨진 파일이 서버를 계속 넘어뜨리지 않게.

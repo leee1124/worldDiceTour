@@ -20,7 +20,7 @@ const noopPublisher = { publishRoom: () => {}, publishGame: () => {} };
 /** 자동 진행 드라이버 없이 서비스만 조립한다(테스트가 직접 턴을 돌린다). */
 function createHeadlessApp(seed) {
   const random = new SeededRandomSource(seed);
-  const repository = new InMemoryRoomRepository({ random });
+  const repository = new InMemoryRoomRepository({ random, logger: silentLogger });
   const authenticator = new SeatAuthenticator();
   const clock = { now: () => 1_700_000_000_000 };
   const common = { repository, random, authenticator, publisher: noopPublisher, clock, logger: silentLogger };
