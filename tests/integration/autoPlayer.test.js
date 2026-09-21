@@ -399,12 +399,13 @@ describe('AutoPlayerDriver(자동 진행 스케줄러)', () => {
   });
 
   it('자동 진행이 실패해도 예외를 던지지 않고 로그만 남긴다', async () => {
-    // Given
+    // Given (재시도 없이 한 번만 시도하도록 백오프 목록을 비운다)
     const errors = [];
     const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
     const driver = new AutoPlayerDriver({
       delayMs: 0,
       policy,
+      retryDelaysMs: [],
       gameService: {
         autoTurn: async () => {
           throw new Error('저장소 장애');
@@ -418,8 +419,281 @@ describe('AutoPlayerDriver(자동 진행 스케줄러)', () => {
     await driver.whenIdle();
 
     // Then
-    assert.equal(errors.length, 1);
     assert.match(errors[0], /자동 진행 실패/);
+    assert.match(errors.at(-1), /포기/);
+  });
+
+  describe('실패 복구(재시도와 백오프)', () => {
+    /** 예약 지연을 기록하는 타이머 대역. */
+    const recordingTimers = () => {
+      const delays = [];
+      return {
+        delays,
+        timers: {
+          setTimeout: (fn, ms) => {
+            delays.push(ms);
+            return setTimeout(fn, 0);
+          },
+          clearTimeout: (handle) => clearTimeout(handle),
+        },
+      };
+    };
+
+    it('스텝이 실패하면 백오프를 두고 다시 예약한다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const { delays, timers } = recordingTimers();
+      let attempts = 0;
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        policy,
+        timers,
+        retryDelaysMs: [10, 20],
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => {
+            attempts += 1;
+            throw new Error('저장소 장애');
+          },
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then (최초 1회 + 재시도 2회)
+      assert.equal(attempts, 3);
+      assert.deepEqual(delays, [0, 10, 20]);
+    });
+
+    it('재시도를 모두 소진하면 autoStalled 플래그를 방송한다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const stalled = [];
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        policy,
+        retryDelaysMs: [0],
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => {
+            throw new Error('저장소 장애');
+          },
+          publishAutoStalled: async (code) => stalled.push(code),
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then
+      assert.deepEqual(stalled, ['AAAA']);
+    });
+
+    it('결정이 없으면(null) 재시도한 뒤 멈춘다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      let decided = 0;
+      const stalled = [];
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        retryDelaysMs: [0],
+        policy: {
+          decide: () => {
+            decided += 1;
+            return null;
+          },
+        },
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => ({ seatId: 's1', view: {}, version: 0 }),
+          publishAutoStalled: async (code) => stalled.push(code),
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then
+      assert.equal(decided, 2);
+      assert.deepEqual(stalled, ['AAAA']);
+    });
+
+    it('한 번 성공하면 재시도 횟수가 초기화된다', async () => {
+      // Given (첫 시도는 실패, 두 번째는 성공, 그다음 또 실패)
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const stalled = [];
+      let calls = 0;
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        retryDelaysMs: [0],
+        policy: { decide: () => ({ type: 'ROLL' }) },
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => {
+            calls += 1;
+            if (calls === 1) {
+              throw new Error('일시 장애');
+            }
+            return calls <= 2 ? { seatId: 's1', view: {}, version: 0 } : null;
+          },
+          executeAsServer: async () => {
+            driver.schedule('AAAA');
+          },
+          publishAutoStalled: async (code) => stalled.push(code),
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then (성공 이후 턴이 없어져 조용히 끝난다 — 멈춤 신호 없음)
+      assert.deepEqual(stalled, []);
+    });
+
+    it('이미 진행 중이면 스텝을 버리지 않고 다시 예약한다', async () => {
+      // Given
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      let turns = 0;
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        policy: { decide: () => null },
+        retryDelaysMs: [],
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => {
+            turns += 1;
+            if (turns === 1) {
+              await gate;
+            }
+            return null;
+          },
+          publishAutoStalled: async () => {},
+        },
+      });
+
+      // When (첫 스텝이 진행 중인 사이에 두 번째 예약이 발사된다)
+      driver.schedule('AAAA');
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      driver.schedule('AAAA');
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      release();
+      await driver.whenIdle();
+
+      // Then (두 번째 스텝이 버려지지 않고 실제로 실행됐다)
+      assert.equal(turns, 2);
+    });
+  });
+
+  describe('낙관적 동시성(버전 확인)', () => {
+    it('버전이 다르면 서버 대행을 거부하고 상태를 바꾸지 않는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom([1, 2, 1, 2]) });
+      const started = await startedRoom(fixture, { guestCount: 0, computerCount: 1 });
+      fixture.driver.stop();
+      const before = await fixture.repository.findByCode(started.code);
+      const computerSeatId = before.seats.find((seat) => seat.isComputer).id;
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.gameService.executeAsServer({
+            code: started.code,
+            seatId: computerSeatId,
+            type: COMMAND_TYPES.ROLL,
+            expectedVersion: before.game.version + 5,
+          }),
+        { code: 'ERR005' },
+      );
+      const after = await fixture.repository.findByCode(started.code);
+      assert.equal(after.game.version, before.game.version);
+      assert.equal(after.game.phase, before.game.phase);
+    });
+
+    it('버전이 같으면 서버 대행이 통과한다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom([1, 2]) });
+      const started = await startedRoom(fixture, { guestCount: 0, computerCount: 1 });
+      fixture.driver.stop();
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: true },
+      });
+      const turn = await fixture.gameService.autoTurn(started.code);
+
+      // When
+      const result = await fixture.gameService.executeAsServer({
+        code: started.code,
+        seatId: turn.seatId,
+        type: COMMAND_TYPES.ROLL,
+        expectedVersion: turn.version,
+      });
+
+      // Then
+      assert.equal(turn.version, 0);
+      assert.equal(result.view.version, 1);
+    });
+
+    it('autoTurn은 결정 근거가 된 뷰 버전을 함께 알려준다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom([1, 2]) });
+      const started = await startedRoom(fixture, { guestCount: 0, computerCount: 1 });
+      fixture.driver.stop();
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: true },
+      });
+
+      // When
+      const turn = await fixture.gameService.autoTurn(started.code);
+
+      // Then
+      assert.equal(turn.version, turn.view.version);
+    });
+
+    it('버전이 어긋나면 드라이버는 다시 결정한다', async () => {
+      // Given (첫 대행은 버전 충돌로 실패, 두 번째는 성공)
+      const { AutoPlayerDriver } = await import('../../src/application/AutoPlayerDriver.js');
+      const { AppError } = await import('../../src/application/errors.js');
+      const seenVersions = [];
+      let version = 0;
+      const driver = new AutoPlayerDriver({
+        delayMs: 0,
+        retryDelaysMs: [0, 0],
+        policy: { decide: () => ({ type: 'ROLL' }) },
+        logger: { error: () => {} },
+        gameService: {
+          autoTurn: async () => (version > 1 ? null : { seatId: 's1', view: {}, version }),
+          executeAsServer: async ({ expectedVersion }) => {
+            seenVersions.push(expectedVersion);
+            if (seenVersions.length === 1) {
+              version = 1;
+              throw new AppError('ERR005', '버전 불일치');
+            }
+            version = 2;
+            driver.schedule('AAAA');
+          },
+          publishAutoStalled: async () => {},
+        },
+      });
+
+      // When
+      driver.schedule('AAAA');
+      await driver.whenIdle();
+
+      // Then (두 번째 시도는 갱신된 버전으로 다시 결정했다)
+      assert.deepEqual(seenVersions, [0, 1]);
+    });
   });
 
   it('한 방의 자동 진행 횟수 상한을 넘기면 멈춘다', async () => {

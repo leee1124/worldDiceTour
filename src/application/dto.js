@@ -22,9 +22,11 @@ export function toRoomSummaryDto(room) {
 /**
  * 방 상세.
  * @param {import('../domain/room/Room.js').Room} room
- * @param {{onlineSeatIds?: string[]}} presence SSE 연결로 파악한 접속 좌석
+ * @param {{onlineSeatIds?: string[], autoStalled?: boolean}} options
+ *   `onlineSeatIds`는 SSE 연결로 파악한 접속 좌석, `autoStalled`는 자동 진행이 재시도까지
+ *   실패해 멈췄다는 일회성 신호다(다음 `room` 이벤트에서는 다시 false).
  */
-export function toRoomDto(room, { onlineSeatIds = [] } = {}) {
+export function toRoomDto(room, { onlineSeatIds = [], autoStalled = false } = {}) {
   const online = new Set(onlineSeatIds);
   return {
     code: room.code,
@@ -42,6 +44,7 @@ export function toRoomDto(room, { onlineSeatIds = [] } = {}) {
     })),
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
+    autoStalled: Boolean(autoStalled),
   };
 }
 

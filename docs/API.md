@@ -13,6 +13,7 @@
 | 5 | 동작 | `SET_AUTOPILOT enabled:true`는 **그 좌석이 오프라인일 때만** 가능(`online: true`면 `409 ERR005`) | 호스트 UI는 `seats[].online === false`인 사람 좌석에만 "자동 진행" 버튼을 켤 것 |
 | 6 | 동작 | `SET_AUTOPILOT enabled:false`는 호스트 **또는 그 좌석 본인 토큰**으로 가능 | 돌아온 플레이어가 스스로 "직접 플레이로 복귀" 버튼을 누를 수 있다 |
 | 7 | 동작 | 자동 진행 중인 좌석의 게임 커맨드는 그 좌석 토큰이어도 `403 ERR003` | 자동 진행 중에는 행동 버튼을 비활성화하고 "복귀" 버튼만 노출할 것 |
+| 8 | **추가 필드** | `RoomDto.autoStalled`(boolean) — 자동 진행이 재시도까지 실패해 멈췄다는 일회성 신호 | `true`인 `room` 이벤트를 받으면 호스트에게 경고를 띄울 것. 다음 `room` 이벤트에서는 다시 `false` |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -205,7 +206,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
     { "id": "seat-2", "name": "컴퓨터1", "kind": "COMPUTER", "autopilot": false, "isHost": false, "online": true }
   ],
   "createdAt": 1758400000000,
-  "updatedAt": 1758400009000
+  "updatedAt": 1758400009000,
+  "autoStalled": false
 }
 ```
 
@@ -218,7 +220,8 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `seats[].kind` | `HUMAN` \| `COMPUTER` |
 | `seats[].autopilot` | 사람 좌석을 서버가 대신 진행 중인지. `true`인 동안 그 좌석의 게임 커맨드는 `ERR003` |
 | `seats[].online` | presence로 확인된 접속 여부(컴퓨터는 항상 true) |
-| `createdAt`/`updatedAt` | epoch ms. 24시간 이상 방치된 방은 서버 시작 시 정리된다 |
+| `createdAt`/`updatedAt` | epoch ms. 24시간 이상 방치된 방은 서버 시작 시와 주기적으로 정리된다 |
+| `autoStalled` | 자동 진행(컴퓨터/자동 좌석 대행)이 재시도를 모두 소진해 멈췄다는 **일회성 신호**. 이 값이 `true`인 `room` 이벤트는 "호스트가 개입해야 한다"는 뜻이며, 이후의 평범한 `room` 이벤트에서는 다시 `false`다. 호스트는 해당 좌석의 자동 진행을 끄거나 방을 정리하면 된다 |
 
 ---
 
