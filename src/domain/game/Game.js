@@ -64,7 +64,12 @@ const EMPTY_TURN = Object.freeze({
 
 /**
  * 게임 Aggregate Root.
- * 턴 소유권/페이즈 전이/모든 돈의 흐름을 스스로 검증하고 도메인 이벤트를 남긴다.
+ *
+ * **턴 소유권 · 페이즈 전이 · 서브시스템 오케스트레이션**을 맡는다. 규칙 자체는 엔티티와
+ * 도메인 서비스 안에 있다 — 돈은 `Treasury`, 라운드는 `RoundClock`, 결제·정리·파산은
+ * `payment/*`, 도시 거래는 `CityTrade`, 티켓 효과는 `TicketEffects`가 판단한다.
+ * Game은 그 결과(`{ intents, events }`)를 적용하고 다음 페이즈를 정할 뿐이다.
+ *
  * 좌석 토큰 같은 인증 정보는 다루지 않으며, 이미 해석된 seatId(=playerId)만 받는다.
  */
 export class Game {
