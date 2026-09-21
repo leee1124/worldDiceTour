@@ -2,7 +2,12 @@ import { DomainError } from '../shared/DomainError.js';
 import { MONEY_REASONS, MoneyIntent } from '../shared/MoneyIntent.js';
 import { BaseRate, BASE_RATE_MAX_BP, BASE_RATE_MIN_BP, INITIAL_BASE_RATE_BP } from './BaseRate.js';
 import { BusinessCycle } from './BusinessCycle.js';
-import { DepositAccount, DEPOSIT_CAP, DEPOSIT_UNIT } from './DepositAccount.js';
+import {
+  assertAmount as assertDepositAmount,
+  DepositAccount,
+  DEPOSIT_CAP,
+  DEPOSIT_UNIT,
+} from './DepositAccount.js';
 import { Holdings, MAX_POSITION_PER_INSTRUMENT } from './Holdings.js';
 import { Instrument } from './Instrument.js';
 import { DepositAssets, StockAssets } from './MarketAssets.js';
@@ -554,16 +559,19 @@ export class Market {
     return this.#desk.sellAtMarket({ playerId, instrument, quantity, holdings: this.#holdings });
   }
 
-  /** 예금 일부 인출(정리용). 10,000원 단위여야 한다. */
+  /**
+   * 예금 일부 인출(정리용). 10,000원 단위여야 한다.
+   *
+   * 거래 창구의 `withdraw`를 쓰지 않고 계좌를 직접 줄인다. 창구 경로를 재사용하면 그쪽이 만든
+   * `DEPOSIT` intent를 **버리고** 여기서 `LIQUIDATION` intent를 다시 만들어야 하는데,
+   * 나중에 누군가 두 intent를 모두 넘기면 플레이어가 같은 금액을 두 번 받는다. 그 함정을 없앤다.
+   */
   liquidateDeposit({ playerId, amount }) {
-    const result = this.#desk.withdraw({
-      playerId,
-      amount,
-      budget: TradeBudget.open(),
-      account: this.#deposits,
-    });
+    assertDepositAmount(amount);
+    const balance = this.#deposits.withdraw({ playerId, amount });
     return {
       refund: amount,
+      fee: 0,
       intents: [
         MoneyIntent.fromBank({
           playerId,
@@ -572,10 +580,12 @@ export class Market {
           meta: { deposit: true },
         }),
       ],
-      events: result.events.map((event) => ({
-        ...event,
-        payload: { ...event.payload, viaLiquidation: true },
-      })),
+      events: [
+        {
+          type: MARKET_EVENT_TYPES.DEPOSIT_WITHDRAWN,
+          payload: { playerId, amount, balance, viaLiquidation: true },
+        },
+      ],
     };
   }
 
