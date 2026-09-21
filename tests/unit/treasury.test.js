@@ -452,3 +452,74 @@ describe('Treasury.apply의 원자성(중간 실패가 돈을 만들지 않는�
     assert.equal(treasury.report().balanced, true);
   });
 });
+
+describe('Treasury 관찰자(성적표 사유별 손익)', () => {
+  /** 적용된 이동을 좌석별·사유별로 모으는 최소 관찰자. */
+  function recordingObserver() {
+    const pnl = new Map();
+    return {
+      pnl,
+      onMoneyMoved(playerId, reason, amount) {
+        const byReason = pnl.get(playerId) ?? new Map();
+        byReason.set(reason, (byReason.get(reason) ?? 0) + amount);
+        pnl.set(playerId, byReason);
+      },
+    };
+  }
+
+  it('좌석 간 이동은 **양쪽 모두** 관찰자에게 알린다', () => {
+    // Given (통행료는 지불자 기준 intent 1건으로 양쪽을 옮긴다. 지불 측만 기록하면
+    //        "상품별 손익 합 + 현금 = 최종 순자산"이 원리적으로 성립하지 않는다)
+    const players = [
+      new Player({ id: 's1', name: '하나', cash: 1_000_000 }),
+      new Player({ id: 's2', name: '두리', cash: 1_000_000 }),
+    ];
+    const observer = recordingObserver();
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino: new Casino(),
+      initialTotal: 2_000_000,
+      observer,
+    });
+
+    // When
+    treasury.transfer({
+      fromId: 's1',
+      toId: 's2',
+      amount: 140_000,
+      reason: MONEY_REASONS.TOLL,
+    });
+
+    // Then
+    assert.equal(observer.pnl.get('s1').get(MONEY_REASONS.TOLL), -140_000, '지불 측');
+    assert.equal(observer.pnl.get('s2').get(MONEY_REASONS.TOLL), 140_000, '수령 측이 누락됐다');
+  });
+
+  it('은행·잭팟 이동은 한쪽만 알린다(상대 좌석이 없다)', () => {
+    // Given
+    const players = [new Player({ id: 's1', name: '하나', cash: 1_000_000 })];
+    const observer = recordingObserver();
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino: new Casino(),
+      initialTotal: 1_000_000,
+      observer,
+    });
+
+    // When
+    treasury.receiveFromBank({ playerId: 's1', amount: 200_000, reason: MONEY_REASONS.SALARY });
+
+    // Then
+    assert.equal(observer.pnl.size, 1);
+    assert.equal(observer.pnl.get('s1').get(MONEY_REASONS.SALARY), 200_000);
+  });
+
+  it('관찰자가 없어도 정상 동작한다', () => {
+    // Given / When / Then
+    const { treasury, byId } = createTreasury();
+    treasury.receiveFromBank({ playerId: 's1', amount: 100, reason: MONEY_REASONS.SALARY });
+    assert.equal(byId('s1').cash, 1_000_100);
+  });
+});

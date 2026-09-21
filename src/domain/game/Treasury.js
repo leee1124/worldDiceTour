@@ -20,13 +20,18 @@ export class Treasury {
   /** @type {import('./Casino.js').Casino} */
   #casino;
   #initialTotal;
-  /** @type {{onMoneyMoved: (intent: MoneyIntent) => void}|null} */
+  /** @type {{onMoneyMoved: (playerId: string, reason: string, amount: number) => void}|null} */
   #observer;
 
   /**
-   * @param {{observer?: {onMoneyMoved: (intent: MoneyIntent) => void}}} params
-   *   `observer`는 **적용된 모든 돈 이동**을 관찰한다(성적표의 사유별 손익). 돈이 움직이는 길이
-   *   이 클래스 하나뿐이므로, 어떤 흐름도 이 관찰을 빠져나갈 수 없다 — 그것이 관찰자를 여기 둔 이유다.
+   * @param {{observer?: {onMoneyMoved: (playerId: string, reason: string, amount: number) => void}}} params
+   *   `observer`는 **적용된 모든 돈 이동**을 좌석 기준으로 관찰한다(성적표의 사유별 손익).
+   *   돈이 움직이는 길이 이 클래스 하나뿐이므로 어떤 흐름도 이 관찰을 빠져나갈 수 없다.
+   *
+   *   **좌석 간 이동은 양쪽을 따로 알린다.** `MoneyIntent.transfer`는 지불자 기준 1건이지만
+   *   돈은 두 좌석에서 움직이므로, 수령 측을 알리지 않으면 "사유별 손익의 합 + 현금 = 순자산"이
+   *   원리적으로 성립하지 않는다(통행료를 낸 기록만 있고 받은 기록이 없게 된다).
+   *
    *   관찰자는 상태를 바꾸지 않고 던지지도 않아야 한다(부가 기능이 게임을 멈추면 안 된다).
    */
   constructor({ players, ledger, casino, initialTotal, observer = null }) {
@@ -69,7 +74,7 @@ export class Treasury {
 
     for (const intent of intents) {
       this.#move(intent);
-      this.#observer?.onMoneyMoved(intent);
+      this.#notify(intent);
       if (intent.affectsLedger) {
         ledgerNet.set(intent.reason, (ledgerNet.get(intent.reason) ?? 0) + intent.amount);
       }
@@ -205,6 +210,17 @@ export class Treasury {
       throw DomainError.invalidState(
         `돈의 보존 불변식 위반${label ? ` (${label})` : ''}: ${JSON.stringify(report)}`,
       );
+    }
+  }
+
+  /** 적용된 이동을 관찰자에게 알린다(좌석 간 이동은 양쪽 모두). */
+  #notify(intent) {
+    if (!this.#observer) {
+      return;
+    }
+    this.#observer.onMoneyMoved(intent.playerId, intent.reason, intent.amount);
+    if (intent.counterparty === COUNTERPARTIES.PLAYER) {
+      this.#observer.onMoneyMoved(intent.otherPlayerId, intent.reason, -intent.amount);
     }
   }
 

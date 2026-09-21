@@ -228,6 +228,13 @@ describe('E2E: 투자 모드 매트릭스 {OFF, STOCKS} × 10시드', () => {
     assert.ok(record.highlights.length > 0, '하이라이트가 하나도 없다');
     assert.ok(record.highlights.length <= 200, '하이라이트 상한을 넘었다');
     assert.ok(Object.keys(record.pnl).length > 0, '사유별 손익이 비었다');
+    // 좌석 간 이동(통행료·인수·파산 분배)은 양쪽이 모두 기록돼야 한다 — 한쪽만 쌓으면
+    // Phase 5의 "상품별 손익 합 + 현금 = 최종 순자산"이 원리적으로 성립하지 않는다.
+    const tollPaid = Object.values(record.pnl).reduce(
+      (sum, byReason) => sum + (byReason.TOLL ?? 0),
+      0,
+    );
+    assert.equal(tollPaid, 0, `통행료의 지불·수령 합이 0이 아니다: ${tollPaid}`);
     // 라운드 스냅샷의 총자산 내역도 합이 맞아야 한다.
     for (const snapshot of record.snapshots) {
       for (const player of snapshot.players) {

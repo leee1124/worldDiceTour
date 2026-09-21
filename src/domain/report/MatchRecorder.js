@@ -68,22 +68,25 @@ export class MatchRecorder {
 
   /**
    * 돈이 움직일 때마다 사유별 손익을 쌓는다(`Treasury`의 관찰자).
+   *
+   * `Treasury`가 **좌석 기준으로** 부른다 — 좌석 간 이동은 지불 측과 수령 측을 각각 한 번씩
+   * 알려 주므로, 같은 사유의 합이 0이 되어 "손익 합 + 현금 = 순자산"이 성립한다.
+   *
    * 실패해도 게임을 멈추면 안 되는 **부가 기능**이므로 어떤 검증도 던지지 않는다.
-   * @param {import('../shared/MoneyIntent.js').MoneyIntent} intent
    */
-  onMoneyMoved(intent) {
-    const map = this.#pnl.get(intent.playerId) ?? new Map();
-    const next = (map.get(intent.reason) ?? 0) + intent.amount;
+  onMoneyMoved(playerId, reason, amount) {
+    const map = this.#pnl.get(playerId) ?? new Map();
+    const next = (map.get(reason) ?? 0) + amount;
     if (next === 0) {
-      map.delete(intent.reason);
+      map.delete(reason);
     } else {
-      map.set(intent.reason, next);
+      map.set(reason, next);
     }
     if (map.size === 0) {
-      this.#pnl.delete(intent.playerId);
+      this.#pnl.delete(playerId);
       return;
     }
-    this.#pnl.set(intent.playerId, map);
+    this.#pnl.set(playerId, map);
   }
 
   /** 라운드별 자산 스냅샷(라운드 틱이 끝난 뒤). */
