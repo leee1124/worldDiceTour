@@ -152,6 +152,49 @@ describe('RoomService(방 유스케이스)', () => {
     });
   });
 
+  describe('오래된 방 정리', () => {
+    it('24시간 넘게 방치된 방을 서버 시작 시 지운다', async () => {
+      // Given
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      // clock을 앞으로 돌릴 수 있도록 서비스가 쓰는 시계를 교체한다.
+      const movableClock = { now: () => now };
+      const roomService = new (await import('../../src/application/RoomService.js')).RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: movableClock,
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+      const oldRoom = await roomService.createRoom({ hostName: '옛방' });
+      now += day + 1_000;
+      const freshRoom = await roomService.createRoom({ hostName: '새방' });
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(removed, [oldRoom.room.code]);
+      assert.equal(await fixture.repository.findByCode(oldRoom.room.code), null);
+      assert.notEqual(await fixture.repository.findByCode(freshRoom.room.code), null);
+    });
+
+    it('정리할 방이 없으면 빈 목록을 돌려준다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(removed, []);
+    });
+  });
+
   describe('호스트 동작', () => {
     it('호스트는 컴퓨터 좌석을 추가할 수 있다', async () => {
       // Given
