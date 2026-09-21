@@ -1,13 +1,22 @@
 /**
- * 건설 기회 모달(`AWAIT_BUILD`). pending: `{index, name, options:[{type,cost}], buildings, landmark}`
+ * 건설 기회 모달(`AWAIT_BUILD`).
+ * pending: `{index, name, options:[{type,cost}], lockedOptions:[{type,cost,unlockLap}], buildings, landmark}`
  *
  * - 별장/빌딩/호텔은 원하는 조합을 한 번에 고른다(합계 비용 · 건설 후 통행료 미리보기).
+ * - 바퀴가 모자라 아직 못 짓는 건물은 `lockedOptions`로 와서 잠긴 행(🔒)으로만 보여 준다.
  * - 3종을 이미 가진 기회라면 서버가 `LANDMARK` 하나만 제안한다 → 랜드마크 업그레이드 화면.
  */
 
 import { el, setText } from '../../dom.js';
 import { formatWon } from '../../format.js';
-import { comboCost, isLandmarkOffer, predictToll, validateSelection } from '../../domain/buildRules.js';
+import {
+  LAP_RULE_TEXT,
+  buildRows,
+  comboCost,
+  isLandmarkOffer,
+  predictToll,
+  validateSelection,
+} from '../../domain/buildRules.js';
 import { buildingIcon, buildingLabel } from '../../domain/labels.js';
 import { actionRow, citySummary, moneyRow, noticeLine, primaryButton, quietButton } from './parts.js';
 
@@ -17,21 +26,43 @@ export const BUILD_MODAL_ID = 'build';
  * 건물 조합 선택기. 체크박스 상태는 DOM이 들고 있고, 합계·통행료·버튼 상태를 즉시 갱신한다.
  * @returns {{element: HTMLElement, selected: () => string[], refresh: () => void}}
  */
-export function createBuildingPicker({ options, price, buildings, landmark, cash, onValidityChange }) {
-  const boxes = options.map((option) => {
+export function createBuildingPicker({
+  options,
+  lockedOptions = [],
+  price,
+  buildings,
+  landmark,
+  cash,
+  onValidityChange,
+}) {
+  // 잠긴 건물은 서버가 고를 수 없게 막으므로, 화면에서도 체크박스를 비활성화해 보여 준다.
+  const boxes = buildRows({ options, lockedOptions }).map((row) => {
     const input = el('input', {
       class: 'check-input',
       type: 'checkbox',
-      id: `build-${option.type}`,
-      value: option.type,
+      id: `build-${row.type}`,
+      value: row.type,
+      disabled: row.locked,
     });
-    const row = el('label', { class: 'check-row', for: `build-${option.type}` }, [
-      input,
-      el('span', { class: 'check-icon', 'aria-hidden': 'true', text: buildingIcon(option.type) }),
-      el('span', { class: 'check-label', text: buildingLabel(option.type) }),
-      el('span', { class: 'check-cost', text: formatWon(option.cost) }),
-    ]);
-    return { option, input, row };
+    const rowNode = el(
+      'label',
+      {
+        class: row.locked ? ['check-row', 'check-row--static', 'check-row--locked'] : 'check-row',
+        for: `build-${row.type}`,
+      },
+      [
+        input,
+        el('span', {
+          class: 'check-icon',
+          'aria-hidden': 'true',
+          text: row.locked ? '🔒' : buildingIcon(row.type),
+        }),
+        el('span', { class: 'check-label', text: buildingLabel(row.type) }),
+        row.locked ? el('span', { class: 'check-note', text: row.notice }) : null,
+        el('span', { class: 'check-cost', text: formatWon(row.cost) }),
+      ],
+    );
+    return { option: row, input, row: rowNode, locked: row.locked };
   });
 
   const totalNode = el('span', { class: 'summary-value' });
@@ -56,7 +87,7 @@ export function createBuildingPicker({ options, price, buildings, landmark, cash
   ]);
 
   function selected() {
-    return boxes.filter((box) => box.input.checked).map((box) => box.option.type);
+    return boxes.filter((box) => !box.locked && box.input.checked).map((box) => box.option.type);
   }
 
   function refresh() {
@@ -81,7 +112,9 @@ export function createBuildingPicker({ options, price, buildings, landmark, cash
   }
 
   for (const box of boxes) {
-    box.input.addEventListener('change', refresh);
+    if (!box.locked) {
+      box.input.addEventListener('change', refresh);
+    }
   }
 
   return { element, selected, refresh };
@@ -103,6 +136,7 @@ export function buildModalSpec({ pending, space, cash, keepBody, locked = false,
       const confirmButton = primaryButton('건설하기', { onClick: () => {}, disabled: true, busy: locked, focusKey: 'build' });
       const picker = createBuildingPicker({
         options: pending.options,
+        lockedOptions: pending.lockedOptions,
         price,
         buildings: pending.buildings ?? [],
         landmark: Boolean(pending.landmark),
@@ -121,6 +155,7 @@ export function buildModalSpec({ pending, space, cash, keepBody, locked = false,
           buildings: pending.buildings ?? [],
           landmark: Boolean(pending.landmark),
         }),
+        el('p', { class: 'modal-help', text: LAP_RULE_TEXT }),
         moneyRow('보유 현금', cash),
         landmarkOffer
           ? el('p', {

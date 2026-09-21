@@ -5,6 +5,7 @@
 
 import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
+import { lapLabel } from '../domain/buildRules.js';
 import { countTo } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
 import { isHostSeatMine, isMySeat, slotOf } from '../store.js';
@@ -63,6 +64,8 @@ export function createPlayersView({ onSetAutopilot }) {
 
   function renderBadges(node, state, player, seat) {
     clear(node);
+    // 지을 수 있는 건물이 바퀴 수로 정해지므로(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔) 항상 보여 준다.
+    node.appendChild(badge(`🔄 ${lapLabel(player.lap)}`, 'muted'));
     if (player.eliminated) {
       node.appendChild(badge('💀 파산', 'danger'));
     }
