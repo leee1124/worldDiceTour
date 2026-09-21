@@ -240,6 +240,24 @@ describe('PaymentFlow(강제 지불 → 정리 → 정산 → 이어하기)', ()
     assert.equal(casino.jackpot, 100_000);
   });
 
+  it('자기 자신이 채권자로 적힌 손상 채무는 돈을 움직이지 않는다', () => {
+    // Given (내던 돈이 그대로 돌아오는 셈 — 파산의 자기 채권자 방어와 같은 이유)
+    const { flow, byId, ledger } = build();
+
+    // When
+    const result = flow.charge({
+      payer: byId('s1'),
+      items: [{ amount: 42_000, sink: SINKS.PLAYER, toPlayerId: 's1' }],
+      reason: MONEY_REASONS.TOLL,
+      event: tollEvent('s1', 's1', 42_000),
+    });
+
+    // Then
+    assert.equal(result.outcome, PAYMENT_OUTCOMES.SETTLED);
+    assert.equal(byId('s1').cash, 1_000_000, '총액이 그대로다');
+    assert.equal(ledger.netFromBank, 0, '은행으로 새지도 않는다');
+  });
+
   it('채권자가 탈락했으면 은행이 받는다', () => {
     // Given
     const { flow, byId, ledger } = build({ cash: { s1: 1_000_000, s2: 0 }, eliminated: ['s2'] });

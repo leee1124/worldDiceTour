@@ -113,23 +113,38 @@ export class DebtNote {
    * @param {{payerId:string, findPlayer:(id:string)=>object|null}} params
    */
   toIntents({ payerId, findPlayer }) {
-    return this.#items.map((item) => {
+    const intents = [];
+    for (const item of this.#items) {
       if (item.sink === SINKS.JACKPOT) {
-        return MoneyIntent.toJackpot({ playerId: payerId, amount: item.amount, reason: this.#reason });
+        intents.push(
+          MoneyIntent.toJackpot({ playerId: payerId, amount: item.amount, reason: this.#reason }),
+        );
+        continue;
       }
       if (item.sink === SINKS.PLAYER) {
+        // 자기 자신이 채권자로 적힌 손상 스냅샷: 내던 돈이 그대로 돌아오는 셈이므로
+        // 아무것도 옮기지 않는다(파산의 자기 채권자 방어와 같은 이유).
+        if (item.toPlayerId === payerId) {
+          continue;
+        }
         const creditor = findPlayer(item.toPlayerId);
         if (creditor && !creditor.eliminated) {
-          return MoneyIntent.transfer({
-            fromId: payerId,
-            toId: creditor.id,
-            amount: item.amount,
-            reason: this.#reason,
-          });
+          intents.push(
+            MoneyIntent.transfer({
+              fromId: payerId,
+              toId: creditor.id,
+              amount: item.amount,
+              reason: this.#reason,
+            }),
+          );
+          continue;
         }
       }
-      return MoneyIntent.toBank({ playerId: payerId, amount: item.amount, reason: this.#reason });
-    });
+      intents.push(
+        MoneyIntent.toBank({ playerId: payerId, amount: item.amount, reason: this.#reason }),
+      );
+    }
+    return intents;
   }
 
   /** 저장 형태(깊은 사본). 스냅샷 검증기가 이 모양을 검사한다. */
