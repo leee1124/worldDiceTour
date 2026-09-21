@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { MOVE_TIMING, planMove } from '../../public/js/domain/movePlan.js';
 
-test('이동 계획: 주사위 7칸은 한 칸씩 걷고 경로에 중간 칸이 모두 들어간다', () => {
+test('이동 계획: 주사위 7칸은 칸당 0.1초로 한 칸씩 걷고 경로에 중간 칸이 모두 들어간다', () => {
   // Given 0번에서 7칸 전진하는 이동
   // When 연출 계획을 세우면
   const plan = planMove({ from: 0, to: 7, steps: 7 });
@@ -16,8 +16,8 @@ test('이동 계획: 주사위 7칸은 한 칸씩 걷고 경로에 중간 칸이
   // Then 걷기이고 1~7번 칸을 차례로 밟는다
   assert.equal(plan.kind, 'walk');
   assert.deepEqual(plan.path, [1, 2, 3, 4, 5, 6, 7]);
-  assert.equal(plan.stepMs, MOVE_TIMING.baseStepMs);
-  assert.equal(plan.totalMs, MOVE_TIMING.baseStepMs * 7);
+  assert.equal(plan.stepMs, 100);
+  assert.equal(plan.totalMs, 700);
 });
 
 test('이동 계획: 뒤로 2칸(행운 티켓)도 한 칸씩 되돌아간다', () => {
@@ -40,26 +40,26 @@ test('이동 계획: 모서리를 넘어가는 이동도 번호가 39 → 0으�
   assert.deepEqual(plan.path, [39, 0, 1, 2]);
 });
 
-test('이동 계획: 긴 이동은 칸당 시간을 줄여 총 연출 시간 상한을 지킨다', () => {
-  // Given 한 번에 12칸(더블 최대치)을 가는 이동
-  const plan = planMove({ from: 0, to: 12, steps: 12 });
+test('이동 계획: 긴 이동도 가속하지 않고 칸당 0.1초를 지킨다(오너 결정)', () => {
+  // Given — 주사위 최댓값 12칸
+  const event = { from: 0, to: 12, steps: 12 };
 
-  // When 총 시간을 보면
-  // Then 상한을 넘지 않고, 칸당 시간은 기본값보다 짧아진다
+  // When
+  const plan = planMove(event);
+
+  // Then — 1칸 = 100ms, 12칸 = 1.2초
   assert.equal(plan.kind, 'walk');
-  assert.equal(plan.path.length, 12);
-  assert.ok(plan.totalMs <= MOVE_TIMING.maxTotalMs, `총 ${plan.totalMs}ms가 상한을 넘었다`);
-  assert.ok(plan.stepMs < MOVE_TIMING.baseStepMs);
-  assert.ok(plan.stepMs >= MOVE_TIMING.minStepMs);
+  assert.equal(plan.stepMs, 100);
+  assert.equal(plan.totalMs, 1200);
 });
 
-test('이동 계획: 짧은 이동은 상한과 무관하게 기본 속도를 그대로 쓴다', () => {
+test('이동 계획: 짧은 이동도 칸당 0.1초를 그대로 쓴다', () => {
   // Given 2·3칸짜리 짧은 이동
   for (const steps of [1, 2, 3]) {
     // When 계획을 세우면
     const plan = planMove({ from: 0, to: steps, steps });
     // Then 칸당 시간이 기본값이다(짧다고 더 느려지지 않는다)
-    assert.equal(plan.stepMs, MOVE_TIMING.baseStepMs, `${steps}칸 이동이 기본 속도가 아니다`);
+    assert.equal(plan.stepMs, MOVE_TIMING.stepMs, `${steps}칸 이동이 기본 속도가 아니다`);
   }
 });
 
@@ -97,29 +97,32 @@ test('이동 계획: 제자리(0칸) 이동은 연출이 없다', () => {
   assert.equal(plan.totalMs, 0);
 });
 
-test('이동 계획: 컴퓨터 차례는 같은 경로를 더 빠르게 지나간다', () => {
-  // Given 같은 7칸 이동을 사람과 컴퓨터가 각각 할 때
-  const human = planMove({ from: 0, to: 7, steps: 7 });
-  const computer = planMove({ from: 0, to: 7, steps: 7, fast: true });
+test('이동 계획: 컴퓨터 차례도 사람과 같은 속도(칸당 0.1초)로 걷는다', () => {
+  // Given
+  const event = { from: 3, to: 9, steps: 6 };
 
-  // When 두 계획을 비교하면
-  // Then 경로는 같고 컴퓨터 쪽이 더 짧다(그래도 걷는 모습은 남는다)
+  // When
+  const human = planMove(event);
+  const computer = planMove({ ...event, fast: true });
+
+  // Then
+  assert.equal(human.stepMs, 100);
+  assert.equal(computer.stepMs, 100);
   assert.deepEqual(computer.path, human.path);
-  assert.equal(computer.kind, 'walk');
-  assert.ok(computer.stepMs < human.stepMs);
-  assert.ok(computer.stepMs >= MOVE_TIMING.minStepMs);
 });
 
-test('이동 계획: 모션 축소 설정에서는 칸마다 아주 짧게만 머문다(그래도 칸을 건너뛰지 않는다)', () => {
-  // Given 모션 축소를 켠 사용자의 7칸 이동
-  const plan = planMove({ from: 0, to: 7, steps: 7, reducedMotion: true });
+test('이동 계획: 모션 축소 설정에서도 칸당 0.1초로 칸을 건너뛰지 않고, 튀는 대신 페이드로 보여 준다', () => {
+  // Given
+  const event = { from: 5, to: 10, steps: 5, reducedMotion: true };
 
-  // When 계획을 보면
-  // Then 경로는 그대로지만 칸당 시간이 아주 짧고 페이드로 넘어간다
-  assert.deepEqual(plan.path, [1, 2, 3, 4, 5, 6, 7]);
-  assert.equal(plan.stepMs, MOVE_TIMING.reducedStepMs);
-  assert.equal(plan.style, 'fade');
+  // When
+  const plan = planMove(event);
+
+  // Then
   assert.equal(plan.kind, 'walk');
+  assert.deepEqual(plan.path, [6, 7, 8, 9, 10]);
+  assert.equal(plan.stepMs, 100);
+  assert.equal(plan.style, 'fade');
 });
 
 test('이동 계획: 보통 설정에서는 통통 튀는 방식으로 표시된다', () => {

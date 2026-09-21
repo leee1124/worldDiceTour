@@ -10,31 +10,21 @@
 import { hopPath, normalizeIndex } from './boardLayout.js';
 
 export const MOVE_TIMING = Object.freeze({
-  /** 칸 하나를 지나는 기본 시간. */
-  baseStepMs: 175,
-  /** 아무리 길어도 이보다 빨리 지나가지는 않는다(눈이 못 따라간다). */
-  minStepMs: 90,
-  /** 걷기 연출 전체의 상한. */
-  maxTotalMs: 1800,
+  /**
+   * 칸 하나를 지나는 시간. 오너 결정: **누구든, 어떤 설정이든 0.1초에 1칸**
+   * (사람·컴퓨터·모션 축소 모두 같고, 긴 이동도 가속하지 않는다 — 12칸이면 1.2초).
+   */
+  stepMs: 100,
   /** 순간이동(들어 올림 → 호를 그리며 사라짐 → 내려놓기) 전체 시간. */
   teleportMs: 560,
-  /** 모션 축소 설정에서 칸마다 머무는 시간(칸을 건너뛰지는 않는다). */
-  reducedStepMs: 45,
   /** 여기까지만 걸어서 보여 준다. 더 멀면 순간이동. */
   maxWalkSteps: 14,
-  /** 컴퓨터 차례 등 "빨리 지나가도 되는" 이동의 배속. */
-  fastFactor: 0.6,
 });
 
 const EMPTY_PLAN = Object.freeze({ kind: 'none', path: [], stepMs: 0, totalMs: 0, style: 'none' });
 
-function walkStepMs({ count, reducedMotion, fast }) {
-  if (reducedMotion) {
-    return MOVE_TIMING.reducedStepMs;
-  }
-  const base = fast ? Math.round(MOVE_TIMING.baseStepMs * MOVE_TIMING.fastFactor) : MOVE_TIMING.baseStepMs;
-  const capped = Math.floor(MOVE_TIMING.maxTotalMs / count);
-  return Math.max(MOVE_TIMING.minStepMs, Math.min(base, capped));
+function walkStepMs() {
+  return MOVE_TIMING.stepMs;
 }
 
 /**
@@ -47,7 +37,8 @@ export function planMove(event) {
   if (!event || typeof event !== 'object') {
     return { ...EMPTY_PLAN };
   }
-  const { from, to, steps, reducedMotion = false, fast = false } = event;
+  // `fast`(컴퓨터 차례)는 호출부 호환을 위해 받기만 한다 — 속도는 누구에게나 같다.
+  const { from, to, steps, reducedMotion = false } = event;
   const target = normalizeIndex(to);
 
   // 칸 수를 모르거나 너무 멀면 걷지 않는다(30칸을 걸어가면 연출이 아니라 기다림이다).
@@ -65,7 +56,7 @@ export function planMove(event) {
     return { kind: 'teleport', path: [target], stepMs: 0, totalMs: MOVE_TIMING.teleportMs, style: 'arc' };
   }
 
-  const stepMs = walkStepMs({ count: path.length, reducedMotion, fast });
+  const stepMs = walkStepMs();
   return {
     kind: 'walk',
     path,
