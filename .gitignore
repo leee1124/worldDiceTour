@@ -1,3 +1,5 @@
 node_modules/
 .omc/
 *.log
+data/
+coverage/
