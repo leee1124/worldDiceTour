@@ -56,17 +56,26 @@ describe('MoneyIntent(돈 이동 의사 VO)', () => {
     assert.equal(got.reason, MONEY_REASONS.SALARY);
   });
 
-  it('거래소도 은행 창구이므로 장부에 기록된다', () => {
-    // Given / When
-    const intent = MoneyIntent.toExchange({
+  it('거래소도 은행 창구이므로 양방향 모두 장부에 기록된다', () => {
+    // Given (주식 매수/매도가 들어올 자리 — 예금·주식은 현금이 아니라 은행이 보관하는 채무다)
+    const paid = MoneyIntent.toExchange({
       playerId: 's1',
       amount: 5_000,
       reason: MONEY_REASONS.PURCHASE,
     });
+    const got = MoneyIntent.fromExchange({
+      playerId: 's1',
+      amount: 5_000,
+      reason: MONEY_REASONS.LIQUIDATION,
+    });
 
     // Then
-    assert.equal(intent.counterparty, COUNTERPARTIES.EXCHANGE);
-    assert.equal(intent.affectsLedger, true);
+    assert.equal(paid.counterparty, COUNTERPARTIES.EXCHANGE);
+    assert.equal(paid.amount, -5_000);
+    assert.equal(paid.affectsLedger, true);
+    assert.equal(got.counterparty, COUNTERPARTIES.EXCHANGE);
+    assert.equal(got.amount, 5_000);
+    assert.equal(got.affectsLedger, true);
   });
 
   it('플레이어 간 이동과 잭팟 이동은 총합을 바꾸지 않으므로 장부 대상이 아니다', () => {

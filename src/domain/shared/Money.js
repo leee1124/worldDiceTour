@@ -45,11 +45,6 @@ export function assertSignedAmount(amount, label = '금액') {
   return amount;
 }
 
-/** 합계/잔액이 상한 이내인지(누적으로 상한을 넘는 경우를 잡는다). */
-export function assertBalance(balance, label = '잔액') {
-  return assertAmount(balance, label);
-}
-
 /** 오류 메시지에 값을 안전하게 싣는다(도메인은 외부 문자열화 유틸에 의존하지 않는다). */
 function describe(value) {
   return typeof value === 'number' ? String(value) : `<${typeof value}>`;
