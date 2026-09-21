@@ -37,8 +37,15 @@ export function createCommandLock() {
       baseVersion = Number.isInteger(currentVersion) ? currentVersion : null;
     },
 
-    /** 서버가 커맨드를 받아들였다. 다음 버전이 올 때까지는 계속 잠근다. */
+    /**
+     * 서버가 커맨드를 받아들였다. 다음 버전이 올 때까지는 계속 잠근다.
+     * 단, SSE의 새 버전이 POST 응답보다 먼저 반영돼 이미 풀린 상태(IDLE)라면
+     * 더 기다릴 버전이 없으므로 다시 잠그지 않는다(영구 잠금 방지).
+     */
     onSuccess() {
+      if (state !== STATE.IN_FLIGHT) {
+        return;
+      }
       state = STATE.AWAITING_VERSION;
     },
 

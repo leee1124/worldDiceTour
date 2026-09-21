@@ -131,10 +131,10 @@ export function createGameController({ appRoot, overlayRoot }) {
     isCasinoOpen: () => modalHost.isOpen(CASINO_MODAL_ID),
     announce: (text) => gameView.announce(text),
     applyView: (view) => {
-      store.patch({ view });
       // 실제로 최신 뷰가 반영된 순간에만 잠금을 푼다(연출이 끝날 때까지는 이중 전송을 막는다).
+      // 뷰와 잠금을 한 번에 반영해야 한다: 뷰를 먼저 그리면 새 결정 모달이 잠긴 채로 만들어진다.
       commandLock.onView(view?.version);
-      syncLock();
+      store.patch({ view, locked: commandLock.locked });
     },
     isLocalSeat: (seatId) => isMySeat(store.state, seatId),
     onGameOver: (reason) => {
@@ -166,11 +166,12 @@ export function createGameController({ appRoot, overlayRoot }) {
 
     gameView.update(state);
     if (state.view) {
+      // 목적지 선택 모드를 먼저 정해야 한다: 칸의 선택 가능/금지 표시는 boardView.update가 그 모드를 읽어 그린다.
+      syncTravelMode(state);
       boardView.update(state);
       centerView.update(state);
       centerView.animateJackpot(state.view.jackpot);
       playersView.update(state);
-      syncTravelMode(state);
       syncModals(state);
     }
   }
@@ -252,7 +253,7 @@ export function createGameController({ appRoot, overlayRoot }) {
         });
 
       case 'BUILD': {
-        const signature = signatureOfBuild(pending, cash);
+        const signature = `${signatureOfBuild(pending, cash)}:${locked}`;
         const keepBody = modalHost.isOpen(BUILD_MODAL_ID) && buildSignature === signature;
         buildSignature = signature;
         return buildModalSpec({
@@ -266,16 +267,20 @@ export function createGameController({ appRoot, overlayRoot }) {
         });
       }
 
-      case 'START_BUILD':
-        return startBuildModalSpec({
+      case 'START_BUILD': {
+        const spec = startBuildModalSpec({
           pending,
           boardOf: spaceAt,
           cash,
-          keepBody: modalHost.isOpen(START_BUILD_MODAL_ID),
+          // 잠금 상태가 바뀌면 버튼의 disabled를 다시 그려야 하므로 본문을 유지하지 않는다.
+          keepBody: modalHost.isOpen(START_BUILD_MODAL_ID) && startBuildLocked === locked,
           locked,
           onStartBuild: (cityIndex, buildings) => void sendCommand('START_BUILD', { cityIndex, buildings }),
           onSkip: () => void sendCommand('SKIP_START_BUILD'),
         });
+        startBuildLocked = locked;
+        return spec;
+      }
 
       case 'ACQUIRE':
         return acquireModalSpec({
@@ -317,6 +322,8 @@ export function createGameController({ appRoot, overlayRoot }) {
 
   /** 건설 모달은 체크 상태를 지키기 위해 같은 기회일 때 본문을 다시 만들지 않는다. */
   let buildSignature = null;
+  /** 출발 보너스 모달 본문을 마지막으로 그렸을 때의 잠금 상태. */
+  let startBuildLocked = null;
   function signatureOfBuild(pending, cash) {
     return `${pending.index}:${(pending.options ?? []).map((option) => `${option.type}${option.cost}`).join(',')}:${cash}`;
   }

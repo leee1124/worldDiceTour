@@ -90,3 +90,30 @@ test('커맨드 잠금: 보내기 전(IDLE)에 뷰가 와도 아무 효과가 �
   // Then 계속 풀려 있다(전송한 적이 없으므로 잠글 이유가 없다)
   assert.equal(lock.locked, false);
 });
+
+test('SSE의 새 버전이 POST 응답보다 먼저 도착해도 잠금이 영구히 남지 않는다', () => {
+  // Given — 버전 3에서 커맨드를 보냈다
+  const lock = createCommandLock();
+  lock.onSend(3);
+
+  // When — 응답보다 먼저 SSE로 버전 4가 반영되고, 그 뒤에 POST 성공 응답이 도착한다
+  lock.onView(4);
+  lock.onSuccess();
+
+  // Then — 이미 새 버전을 봤으므로 더 기다릴 것이 없다
+  assert.equal(lock.locked, false);
+});
+
+test('응답이 먼저 오고 새 버전이 나중에 오는 순서에서는 새 버전이 올 때까지 잠근다', () => {
+  // Given
+  const lock = createCommandLock();
+  lock.onSend(3);
+
+  // When
+  lock.onSuccess();
+
+  // Then
+  assert.equal(lock.locked, true);
+  lock.onView(4);
+  assert.equal(lock.locked, false);
+});

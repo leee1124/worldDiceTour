@@ -4,3 +4,4 @@ node_modules/
 /data/
 coverage/
 .claude/
+public/__verify.*
