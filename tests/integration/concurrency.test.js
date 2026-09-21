@@ -8,6 +8,12 @@ import { createAppFixture, startedRoom } from '../support/appFixture.js';
 
 const scriptedRandom = (diceValues = []) => new FakeRandomSource([3, 3, 3, 3, ...diceValues]);
 
+/**
+ * 이 파일은 실제 `setTimeout`을 쓴다(가짜 타이머를 주입하지 않는다).
+ * 검증 대상이 "겹치는 비동기 작업의 **실행 순서**"이기 때문이다. 타이머를 가짜로 바꾸면
+ * 마이크로태스크 큐가 흐르는 방식까지 바뀌어, 정작 확인하려는 경합을 재현할 수 없다.
+ * 대기 시간은 20ms 이하로 짧게 두어 테스트 전체 실행 시간에 영향이 없게 했다.
+ */
 describe('KeyedMutex(키별 직렬화)', () => {
   it('같은 키의 작업은 순서대로 하나씩 실행된다', async () => {
     // Given

@@ -15,6 +15,15 @@ const silentLogger = { error: () => {}, warn: () => {}, info: () => {} };
 let app;
 let baseUrl;
 
+/**
+ * 트레이드오프: 실제 서버를 `before`에서 **한 번만** 띄우고 모든 테스트가 공유한다.
+ * 테스트마다 새로 띄우면(=beforeEach) 포트 바인딩과 조립 비용이 테스트 수만큼 들어 눈에 띄게
+ * 느려지므로, 대신 아래 두 규칙으로 격리를 지킨다.
+ *  1) 각 테스트는 자기 방을 새로 만든다(방 코드가 겹치지 않아 상태가 섞이지 않는다).
+ *  2) 난수는 시드 고정 `SeededRandomSource`를 공유하므로, **특정 주사위 눈에 의존하는 단정은
+ *     쓰지 않는다**(자동 진행이 난수를 얼마나 소비하는지가 타이밍에 따라 달라질 수 있다).
+ * 난수 소비 순서까지 통제해야 하는 검증은 단위/통합 테스트에서 `FakeRandomSource`로 한다.
+ */
 before(async () => {
   const random = new SeededRandomSource(12345);
   app = createApp({
@@ -32,6 +41,29 @@ before(async () => {
 after(async () => {
   await app.close();
 });
+
+/**
+ * 상태 지문. 코드만 확인하고 끝내면 "에러는 났지만 상태는 바뀐" 경우를 놓치므로,
+ * 방 + 게임 스냅샷 응답 전체를 굳혀서 비교한다.
+ */
+async function stateDigest(code) {
+  const response = await request(baseUrl, { path: `/api/rooms/${code}` });
+  return JSON.stringify(response.body);
+}
+
+/** 권한 위반 요청이 규격 에러를 내고 상태를 전혀 바꾸지 않는지 검증한다. */
+async function assertRejectedWithoutChange(code, { status, errorCode }, send) {
+  const before = await stateDigest(code);
+  const beforeVersion = JSON.parse(before).game?.version ?? null;
+
+  const response = await send();
+
+  assert.equal(response.status, status);
+  assert.equal(response.body.code, errorCode);
+  const after = await stateDigest(code);
+  assert.equal(JSON.parse(after).game?.version ?? null, beforeVersion, '게임 버전이 바뀌었습니다');
+  assert.equal(after, before, '상태 지문이 바뀌었습니다');
+}
 
 /** 방 생성 + 참가 + 시작까지 끝낸 방을 만든다. */
 async function createStartedRoom() {
@@ -453,30 +485,58 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.body.code, 'ERR002');
     });
 
-    it('호스트가 아닌 좌석이 호스트 동작을 하면 403이다', async () => {
+    it('호스트가 아닌 좌석이 호스트 동작을 하면 403이고 상태는 그대로다', async () => {
       // Given
       const created = await request(baseUrl, {
         method: 'POST',
         path: '/api/rooms',
         body: { hostName: '하나' },
       });
+      const code = created.body.room.code;
       const guest = await request(baseUrl, {
         method: 'POST',
-        path: `/api/rooms/${created.body.room.code}/seats`,
+        path: `/api/rooms/${code}/seats`,
         body: { name: '두리' },
       });
 
-      // When
-      const response = await request(baseUrl, {
-        method: 'POST',
-        path: `/api/rooms/${created.body.room.code}/host-actions`,
-        token: guest.body.seatToken,
-        body: { type: 'ADD_COMPUTER', name: '컴퓨터' },
-      });
+      // When / Then
+      await assertRejectedWithoutChange(code, { status: 403, errorCode: 'ERR003' }, () =>
+        request(baseUrl, {
+          method: 'POST',
+          path: `/api/rooms/${code}/host-actions`,
+          token: guest.body.seatToken,
+          body: { type: 'ADD_COMPUTER', name: '컴퓨터' },
+        }),
+      );
+    });
 
-      // Then
-      assert.equal(response.status, 403);
-      assert.equal(response.body.code, 'ERR003');
+    it('토큰 없이 게임 커맨드를 보내면 401이고 상태는 그대로다', async () => {
+      // Given
+      const started = await createStartedRoom();
+
+      // When / Then
+      await assertRejectedWithoutChange(started.code, { status: 401, errorCode: 'ERR002' }, () =>
+        request(baseUrl, {
+          method: 'POST',
+          path: `/api/rooms/${started.code}/commands`,
+          body: { type: 'ROLL' },
+        }),
+      );
+    });
+
+    it('본문 seatId가 토큰의 좌석과 다르면 403이고 상태는 그대로다', async () => {
+      // Given
+      const started = await createStartedRoom();
+
+      // When / Then
+      await assertRejectedWithoutChange(started.code, { status: 403, errorCode: 'ERR003' }, () =>
+        request(baseUrl, {
+          method: 'POST',
+          path: `/api/rooms/${started.code}/commands`,
+          token: started.host.seatToken,
+          body: { type: 'ROLL', seatId: started.guest.seatId },
+        }),
+      );
     });
 
     it('접속 중인 좌석을 자동 진행으로 바꾸려 하면 409 ERR005다', async () => {
@@ -561,36 +621,30 @@ describe('HTTP 서버(REST + SSE)', () => {
       // Given
       const started = await createStartedRoom();
 
-      // When
-      const response = await request(baseUrl, {
-        method: 'POST',
-        path: `/api/rooms/${started.code}/commands`,
-        token: started.guest.seatToken,
-        body: { type: 'ROLL' },
-      });
-
-      // Then
-      assert.equal(response.status, 409);
-      assert.equal(response.body.code, 'ERR006');
-      const room = await request(baseUrl, { path: `/api/rooms/${started.code}` });
-      assert.equal(room.body.game.version, 0);
+      // When / Then
+      await assertRejectedWithoutChange(started.code, { status: 409, errorCode: 'ERR006' }, () =>
+        request(baseUrl, {
+          method: 'POST',
+          path: `/api/rooms/${started.code}/commands`,
+          token: started.guest.seatToken,
+          body: { type: 'ROLL' },
+        }),
+      );
     });
 
-    it('잘못된 페이즈의 커맨드는 409 ERR005다', async () => {
+    it('잘못된 페이즈의 커맨드는 409 ERR005이고 상태는 그대로다', async () => {
       // Given
       const started = await createStartedRoom();
 
-      // When
-      const response = await request(baseUrl, {
-        method: 'POST',
-        path: `/api/rooms/${started.code}/commands`,
-        token: started.host.seatToken,
-        body: { type: 'BUY' },
-      });
-
-      // Then
-      assert.equal(response.status, 409);
-      assert.equal(response.body.code, 'ERR005');
+      // When / Then
+      await assertRejectedWithoutChange(started.code, { status: 409, errorCode: 'ERR005' }, () =>
+        request(baseUrl, {
+          method: 'POST',
+          path: `/api/rooms/${started.code}/commands`,
+          token: started.host.seatToken,
+          body: { type: 'BUY' },
+        }),
+      );
     });
 
     it('알 수 없는 커맨드 종류는 400이다', async () => {

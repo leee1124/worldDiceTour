@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
 import { PHASES } from '../../src/domain/game/phases.js';
 import { FakeRandomSource } from '../support/FakeRandomSource.js';
-import { createAppFixture, startedRoom } from '../support/appFixture.js';
+import { assertRejectedWithoutChange, createAppFixture, startedRoom } from '../support/appFixture.js';
 
 /** 방 코드 생성용 난수 + 주사위 결과를 순서대로 준비한다. */
 const scriptedRandom = (diceValues = []) =>
@@ -76,48 +76,54 @@ describe('GameService(게임 커맨드 유스케이스)', () => {
       const started = await startedRoom(fixture, { guestCount: 1 });
 
       // When / Then
-      await assert.rejects(
-        () => fixture.gameService.execute({ code: started.code, type: COMMAND_TYPES.ROLL }),
-        { code: 'ERR002' },
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR002', () =>
+        fixture.gameService.execute({ code: started.code, type: COMMAND_TYPES.ROLL }),
       );
-      const saved = await fixture.repository.findByCode(started.code);
-      assert.equal(saved.game.version, 0);
     });
 
-    it('다른 좌석의 토큰으로는 내 차례를 대신 진행할 수 없다', async () => {
+    it('엉뚱한 토큰이면 인증 에러이고 상태가 변하지 않는다', async () => {
       // Given
       const fixture = createAppFixture({ random: scriptedRandom([1, 2]) });
       const started = await startedRoom(fixture, { guestCount: 1 });
 
       // When / Then
-      await assert.rejects(
-        () =>
-          fixture.gameService.execute({
-            code: started.code,
-            token: started.guests[0].seatToken,
-            type: COMMAND_TYPES.ROLL,
-          }),
-        { code: 'ERR006' },
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR002', () =>
+        fixture.gameService.execute({
+          code: started.code,
+          token: 'f'.repeat(64),
+          type: COMMAND_TYPES.ROLL,
+        }),
       );
-      const saved = await fixture.repository.findByCode(started.code);
-      assert.equal(saved.game.version, 0);
     });
 
-    it('본문의 seatId가 토큰의 좌석과 다르면 거부한다', async () => {
+    it('다른 좌석의 토큰으로는 내 차례를 대신 진행할 수 없고 상태가 변하지 않는다', async () => {
       // Given
       const fixture = createAppFixture({ random: scriptedRandom([1, 2]) });
       const started = await startedRoom(fixture, { guestCount: 1 });
 
       // When / Then
-      await assert.rejects(
-        () =>
-          fixture.gameService.execute({
-            code: started.code,
-            token: started.host.seatToken,
-            seatId: started.guests[0].seatId,
-            type: COMMAND_TYPES.ROLL,
-          }),
-        { code: 'ERR003' },
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR006', () =>
+        fixture.gameService.execute({
+          code: started.code,
+          token: started.guests[0].seatToken,
+          type: COMMAND_TYPES.ROLL,
+        }),
+      );
+    });
+
+    it('본문의 seatId가 토큰의 좌석과 다르면 거부하고 상태가 변하지 않는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: scriptedRandom([1, 2]) });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+
+      // When / Then
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR003', () =>
+        fixture.gameService.execute({
+          code: started.code,
+          token: started.host.seatToken,
+          seatId: started.guests[0].seatId,
+          type: COMMAND_TYPES.ROLL,
+        }),
       );
     });
 
@@ -133,17 +139,14 @@ describe('GameService(게임 커맨드 유스케이스)', () => {
       });
 
       // When / Then
-      await assert.rejects(
-        () =>
-          fixture.gameService.execute({
-            code: started.code,
-            token: started.host.seatToken,
-            type: COMMAND_TYPES.ROLL,
-          }),
-        { code: 'ERR003' },
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR003', () =>
+        fixture.gameService.execute({
+          code: started.code,
+          token: started.host.seatToken,
+          type: COMMAND_TYPES.ROLL,
+        }),
       );
       const saved = await fixture.repository.findByCode(started.code);
-      assert.equal(saved.game.version, 0);
       assert.equal(saved.game.phase, PHASES.AWAIT_ROLL);
     });
 
@@ -171,37 +174,33 @@ describe('GameService(게임 커맨드 유스케이스)', () => {
       assert.equal(result.view.version, 1);
     });
 
-    it('현재 페이즈에서 허용되지 않은 커맨드는 거부한다', async () => {
+    it('현재 페이즈에서 허용되지 않은 커맨드는 거부하고 상태가 변하지 않는다', async () => {
       // Given
       const fixture = createAppFixture({ random: scriptedRandom([1, 2]) });
       const started = await startedRoom(fixture, { guestCount: 1 });
 
       // When / Then
-      await assert.rejects(
-        () =>
-          fixture.gameService.execute({
-            code: started.code,
-            token: started.host.seatToken,
-            type: COMMAND_TYPES.BUY,
-          }),
-        { code: 'ERR005' },
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR005', () =>
+        fixture.gameService.execute({
+          code: started.code,
+          token: started.host.seatToken,
+          type: COMMAND_TYPES.BUY,
+        }),
       );
     });
 
-    it('알 수 없는 커맨드는 거부한다', async () => {
+    it('알 수 없는 커맨드는 거부하고 상태가 변하지 않는다', async () => {
       // Given
       const fixture = createAppFixture({ random: scriptedRandom([1, 2]) });
       const started = await startedRoom(fixture, { guestCount: 1 });
 
       // When / Then
-      await assert.rejects(
-        () =>
-          fixture.gameService.execute({
-            code: started.code,
-            token: started.host.seatToken,
-            type: 'HACK',
-          }),
-        { code: 'ERR001' },
+      await assertRejectedWithoutChange(fixture, started.code, 'ERR001', () =>
+        fixture.gameService.execute({
+          code: started.code,
+          token: started.host.seatToken,
+          type: 'HACK',
+        }),
       );
     });
 
