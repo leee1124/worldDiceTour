@@ -22,6 +22,10 @@ export const ERROR_CATALOG = Object.freeze({
   ERR015: { status: 403, message: '허용되지 않은 접속 주소입니다.' },
   ERR016: { status: 503, message: '접속자가 너무 많습니다. 잠시 후 다시 시도하세요.' },
   ERR017: { status: 503, message: '방을 더 만들 수 없습니다. 잠시 후 다시 시도하세요.' },
+  // 증권거래소(브랜치 1). 설계서는 ERR015/ERR016을 예고했지만 두 번호는 이미 접속 주소·구독자
+  // 상한으로 쓰이고 있어, 뜻은 그대로 두고 번호만 새로 발급했다(docs/API.md 1장에 기록).
+  ERR018: { status: 409, message: '주문 한도를 초과했습니다.' },
+  ERR019: { status: 429, message: '요청이 너무 잦습니다. 잠시 후 다시 시도하세요.' },
 });
 
 /** 도메인 사유 코드 → 클라이언트 에러 코드 매핑. */
@@ -36,6 +40,7 @@ const DOMAIN_TO_APP = Object.freeze({
   [DOMAIN_ERROR_CODES.ROOM_FULL]: 'ERR007',
   [DOMAIN_ERROR_CODES.SEAT_NOT_FOUND]: 'ERR012',
   [DOMAIN_ERROR_CODES.NOT_ENOUGH_SEATS]: 'ERR013',
+  [DOMAIN_ERROR_CODES.TRADE_LIMIT]: 'ERR018',
 });
 
 export class AppError extends Error {

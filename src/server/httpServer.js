@@ -240,6 +240,8 @@ function respondJson(response, { status, body }, { close = false } = {}) {
     'content-length': Buffer.byteLength(payload),
     // 방 목록·게임 상태는 절대 캐시되면 안 된다(뒤로 가기·프록시 재사용 방지).
     'cache-control': 'no-store',
+    // 레이트 리밋(429)은 "언제 다시 시도할지"를 알려 줘야 한다 — 없으면 클라이언트가 즉시 재시도한다.
+    ...(status === 429 ? { 'retry-after': '1' } : {}),
     ...(close ? { connection: 'close' } : {}),
   });
   response.end(payload);
