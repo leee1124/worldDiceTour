@@ -234,6 +234,48 @@ describe('Game(게임 시작과 턴 진행)', () => {
       assert.equal(game.phase, PHASES.AWAIT_ROLL);
     });
 
+    it('실제 굴림으로 쌓인 연속 더블 횟수는 턴이 넘어간 뒤 초기화된다', () => {
+      // Given (28에서 더블로 공항(30)에 도착하면 추가 턴 없이 턴이 끝난다)
+      const game = buildGame({
+        positions: { s1: 28 },
+        random: new FakeRandomSource([1, 1, 1, 2]),
+      });
+
+      // When
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then (더블 횟수가 실제로 쌓인 채 턴이 넘어갔다)
+      assert.equal(game.playerById('s1').consecutiveDoubles, 1);
+      assert.equal(game.currentPlayerId, 's2');
+
+      // When (s2가 턴을 끝내 다시 s1 차례가 된다)
+      game.execute('s2', COMMAND_TYPES.ROLL);
+      game.execute('s2', COMMAND_TYPES.SKIP_BUY);
+
+      // Then
+      assert.equal(game.currentPlayerId, 's1');
+      assert.equal(game.playerById('s1').consecutiveDoubles, 0, '내 턴이 시작될 때 초기화된다');
+    });
+
+    it('추가 턴으로 이어지는 동안에는 연속 더블 횟수가 쌓인다', () => {
+      // Given (0 → 더블 4 → 4번 칸, 매입 포기 후 추가 턴)
+      const game = buildGame({ random: new FakeRandomSource([2, 2, 1, 1]) });
+
+      // When
+      game.execute('s1', COMMAND_TYPES.ROLL);
+      game.execute('s1', COMMAND_TYPES.SKIP_BUY);
+
+      // Then
+      assert.equal(game.currentPlayerId, 's1');
+      assert.equal(game.playerById('s1').consecutiveDoubles, 1);
+
+      // When (두 번째 더블)
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      assert.equal(game.playerById('s1').consecutiveDoubles, 2);
+    });
+
     it('3연속 더블이면 이동 없이 조난 섬으로 이송된다', () => {
       // Given
       const game = buildGame({

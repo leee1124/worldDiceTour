@@ -74,6 +74,21 @@ describe('Game(행운 티켓 효과)', () => {
     assert.equal(findEvent(events, EVENT_TYPES.SALARY_PAID), undefined);
   });
 
+  it('뒤로 밀려 출발 칸에 도착하면 월급은 없지만 출발 보너스는 받는다', () => {
+    // Given (뒤로 2칸 티켓 + 건설 가능한 내 도시)
+    const game = ticketGame('T10', { cities: [{ index: 1, ownerId: 's1' }] });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then
+    assert.equal(game.playerById('s1').position, 0);
+    assert.equal(findEvent(events, EVENT_TYPES.SALARY_PAID), undefined);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH, '월급이 들어오지 않았다');
+    assert.equal(game.phase, PHASES.AWAIT_START_BUILD);
+    assert.equal(findEvent(events, EVENT_TYPES.START_BONUS_OFFERED).candidates[0].index, 1);
+  });
+
   it('출발 칸 직행 티켓은 월급을 받는다', () => {
     // Given
     const game = ticketGame('T11');
