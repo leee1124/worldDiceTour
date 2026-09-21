@@ -47,6 +47,8 @@ export class GameService {
     if (seatId && seatId !== resolvedSeatId) {
       throw new AppError('ERR003', `토큰의 좌석(${resolvedSeatId})과 요청 좌석(${seatId})이 다릅니다`);
     }
+    // 서버가 대신 두는 좌석을 사람이 동시에 조종하면 두 커맨드가 경합한다(이중 조종).
+    this.#guard(() => room.assertManualControl(resolvedSeatId));
     return this.#run(room, resolvedSeatId, type, payload);
   }
 
@@ -97,7 +99,8 @@ export class GameService {
         toRoomDto(room, { onlineSeatIds: this.#presence.onlineSeatIds(room.code) }),
       );
       this.#autoDriver?.cancel(room.code);
-    } else {
+    } else if (room.currentSeatIsAutoControlled()) {
+      // 다음 턴이 사람 좌석이면 예약할 이유가 없다(쓸데없는 타이머와 오예약 방지).
       this.#autoDriver?.schedule(room.code);
     }
     return { view, events };

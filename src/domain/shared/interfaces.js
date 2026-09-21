@@ -14,6 +14,13 @@
  * @typedef {object} EventPublisher
  * @property {(code: string, payload: object) => void} publishRoom 로비/좌석 변경 브로드캐스트
  * @property {(code: string, payload: object) => void} publishGame 게임 스냅샷 + 이벤트 브로드캐스트
+ * @property {(code: string) => void} closeRoom 방이 사라질 때 그 방의 스트림을 모두 닫는다
+ *
+ * @typedef {object} PresenceQuery
+ * @property {(code: string) => string[]} onlineSeatIds
+ *   그 방에서 **토큰 검증을 통과해** 접속 중인 좌석 id 목록.
+ *   도메인은 이 목록만 받아 "접속 중인 좌석은 자동 진행으로 바꿀 수 없다" 규칙을 판단한다.
+ *   구현체는 server 레이어의 SseHub다.
  *
  * @typedef {object} TokenFactory
  * @property {() => string} create 좌석 토큰(hex 문자열) 생성

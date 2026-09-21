@@ -368,6 +368,137 @@ describe('RoomService(방 유스케이스)', () => {
       assert.equal(publisher.lastGame.view.currentSeatId, host.seatId);
     });
 
+    it('접속 중인 좌석을 자동 진행으로 바꾸려 하면 ERR005다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      fixture.presence.setOnline(started.code, [started.guests[0].seatId]);
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.hostAction({
+            code: started.code,
+            token: started.host.seatToken,
+            action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: true },
+          }),
+        { code: 'ERR005' },
+      );
+      const room = await fixture.roomService.getRoom({ code: started.code });
+      assert.equal(room.seats[1].autopilot, false);
+    });
+
+    it('자동 진행 해제는 그 좌석 본인 토큰으로도 할 수 있다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: true },
+      });
+
+      // When
+      const room = await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.guests[0].seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: false },
+      });
+
+      // Then
+      assert.equal(room.seats[1].autopilot, false);
+    });
+
+    it('남의 좌석 자동 진행을 비호스트가 켜려 하면 ERR003이다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 2 });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.hostAction({
+            code: started.code,
+            token: started.guests[0].seatToken,
+            action: { type: 'SET_AUTOPILOT', seatId: started.guests[1].seatId, enabled: true },
+          }),
+        { code: 'ERR003' },
+      );
+    });
+
+    it('현재 턴 좌석을 자동 진행으로 켜면 드라이버가 예약되고, 끄면 예약이 취소된다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      const scheduled = [];
+      const cancelled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: (code) => scheduled.push(code),
+        cancelTimer: (code) => cancelled.push(code),
+        cancel: (code) => cancelled.push(code),
+      });
+
+      // When (첫 턴은 호스트 좌석)
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: true },
+      });
+
+      // Then
+      assert.deepEqual(scheduled, [started.code]);
+
+      // When (되돌리면 예약을 취소한다)
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: false },
+      });
+
+      // Then
+      assert.deepEqual(cancelled, [started.code]);
+      assert.equal(scheduled.length, 1);
+    });
+
+    it('사람 차례인 방을 시작할 때는 드라이버를 예약하지 않는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const scheduled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: (code) => scheduled.push(code),
+        cancelTimer: () => {},
+        cancel: () => {},
+      });
+
+      // When
+      await startedRoom(fixture, { guestCount: 1 });
+
+      // Then
+      assert.deepEqual(scheduled, []);
+    });
+
+    it('컴퓨터 차례로 시작하는 방은 드라이버를 예약한다', async () => {
+      // Given (호스트를 컴퓨터로 만들 수는 없으므로 호스트 좌석을 자동 진행으로 돌린다)
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      const scheduled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: (code) => scheduled.push(code),
+        cancelTimer: () => {},
+        cancel: () => {},
+      });
+
+      // When
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: true },
+      });
+
+      // Then
+      assert.deepEqual(scheduled, [started.code]);
+    });
+
     it('호스트는 좌석을 자동 진행으로 바꿀 수 있다', async () => {
       // Given
       const fixture = createAppFixture({ random: codeRandom() });

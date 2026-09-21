@@ -225,16 +225,46 @@ export class Room {
     this.touch(now);
   }
 
-  /** 오프라인 좌석을 컴퓨터 자동 진행으로 전환(또는 복귀). */
-  setAutopilot({ seatId, enabled, bySeatId, now }) {
-    this.assertHost(bySeatId);
+  /**
+   * 오프라인 좌석을 컴퓨터 자동 진행으로 전환(또는 복귀).
+   *
+   * - **켜기**: 호스트만, 그리고 그 좌석이 **접속 중이 아닐 때만**. 접속한 사람과 서버가
+   *   같은 좌석을 동시에 조종하면(이중 조종) 커맨드가 경합한다.
+   * - **끄기**: 호스트 또는 **그 좌석 본인**. 돌아온 사람이 스스로 조종권을 회수할 수 있어야 한다.
+   *
+   * @param {{seatId:string, enabled:boolean, bySeatId:string, onlineSeatIds?:string[], now:number}} params
+   *   `onlineSeatIds`는 application 레이어가 PresenceQuery 포트로 확인한 **검증된** 좌석 목록이다.
+   */
+  setAutopilot({ seatId, enabled, bySeatId, onlineSeatIds = [], now }) {
     const seat = this.seatById(seatId);
     if (!seat) {
       throw DomainError.seatNotFound(`좌석을 찾을 수 없습니다: ${seatId}`);
     }
+    if (enabled) {
+      this.assertHost(bySeatId);
+      if (onlineSeatIds.includes(seatId)) {
+        throw DomainError.invalidState(
+          `접속 중인 좌석은 자동 진행으로 바꿀 수 없습니다: ${seatId}`,
+        );
+      }
+    } else if (seatId !== bySeatId) {
+      this.assertHost(bySeatId);
+    }
     seat.setAutopilot(enabled);
     this.touch(now);
     return seat;
+  }
+
+  /**
+   * 사람이 직접 커맨드를 보낼 수 있는 좌석인지 확인한다.
+   * 자동 진행 중인 좌석은 서버가 조종하므로, 사람은 먼저 자동 진행을 끄고 조종권을 되찾아야 한다.
+   */
+  assertManualControl(seatId) {
+    if (this.seatById(seatId)?.isAutoControlled()) {
+      throw DomainError.forbidden(
+        `자동 진행 중인 좌석입니다. 먼저 자동 진행을 해제하세요: ${seatId}`,
+      );
+    }
   }
 
   assertHost(seatId) {

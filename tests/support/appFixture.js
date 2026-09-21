@@ -44,11 +44,30 @@ export class SequentialTokenFactory {
   }
 }
 
+/** 테스트에서 온라인 좌석 목록을 마음대로 조작할 수 있는 PresenceQuery 구현. */
+export class FakePresence {
+  /** @type {Map<string, string[]>} */
+  #online = new Map();
+
+  onlineSeatIds(code) {
+    return this.#online.get(code) ?? [];
+  }
+
+  setOnline(code, seatIds) {
+    this.#online.set(code, [...seatIds]);
+    return this;
+  }
+}
+
 /**
  * 인메모리 저장소 + 결정적 난수로 애플리케이션 서비스를 조립한다.
  */
-export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_000_000_000 } = {}) {
-  const repository = new InMemoryRoomRepository({ random });
+export function createAppFixture({
+  random = new FakeRandomSource(),
+  now = 1_700_000_000_000,
+  presence = new FakePresence(),
+} = {}) {
+  const repository = new InMemoryRoomRepository({ random, logger: { error: () => {} } });
   const publisher = new RecordingPublisher();
   const authenticator = new SeatAuthenticator();
   const tokenFactory = new SequentialTokenFactory();
@@ -64,6 +83,7 @@ export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_
     publisher,
     clock,
     logger,
+    presence,
     mutex,
   });
 
@@ -71,7 +91,6 @@ export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_
     delayMs: 0,
     policy,
     gameService,
-    repository,
     logger,
     maxStepsPerRoom: 2_000,
   });
@@ -84,13 +103,25 @@ export function createAppFixture({ random = new FakeRandomSource(), now = 1_700_
     clock,
     tokenFactory,
     logger,
+    presence,
     mutex,
   });
 
   gameService.attachAutoPlayerDriver(driver);
   roomService.attachAutoPlayerDriver(driver);
 
-  return { repository, publisher, authenticator, tokenFactory, roomService, gameService, driver, policy, clock };
+  return {
+    repository,
+    publisher,
+    authenticator,
+    tokenFactory,
+    roomService,
+    gameService,
+    driver,
+    policy,
+    clock,
+    presence,
+  };
 }
 
 /** 방 생성 + 좌석 참가 + 시작까지 진행한 픽스처. */

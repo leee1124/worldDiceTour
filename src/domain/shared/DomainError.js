@@ -10,6 +10,8 @@ export const DOMAIN_ERROR_CODES = Object.freeze({
   NOT_YOUR_TURN: 'NOT_YOUR_TURN',
   INSUFFICIENT_CASH: 'INSUFFICIENT_CASH',
   NOT_HOST: 'NOT_HOST',
+  /** 호스트 여부와 무관한 권한 위반(예: 자동 진행 중인 좌석을 사람이 조종하려는 시도). */
+  FORBIDDEN: 'FORBIDDEN',
   ROOM_FULL: 'ROOM_FULL',
   SEAT_NOT_FOUND: 'SEAT_NOT_FOUND',
   NOT_ENOUGH_SEATS: 'NOT_ENOUGH_SEATS',
@@ -54,6 +56,10 @@ export class DomainError extends Error {
 
   static notHost(message) {
     return new DomainError(DOMAIN_ERROR_CODES.NOT_HOST, message);
+  }
+
+  static forbidden(message) {
+    return new DomainError(DOMAIN_ERROR_CODES.FORBIDDEN, message);
   }
 
   static roomFull(message) {

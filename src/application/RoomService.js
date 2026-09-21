@@ -155,7 +155,14 @@ export class RoomService {
         break;
       case HOST_ACTIONS.SET_AUTOPILOT:
         this.#guard(() =>
-          room.setAutopilot({ seatId: action.seatId, enabled: Boolean(action.enabled), bySeatId, now }),
+          room.setAutopilot({
+            seatId: action.seatId,
+            enabled: Boolean(action.enabled),
+            bySeatId,
+            // 도메인 규칙("접속 중인 좌석은 켤 수 없다")이 판단할 재료를 PresenceQuery 포트로 확인해 넘긴다.
+            onlineSeatIds: this.#presence.onlineSeatIds(room.code),
+            now,
+          }),
         );
         break;
       case HOST_ACTIONS.START:
@@ -169,9 +176,22 @@ export class RoomService {
     this.#publishRoom(room);
     if (room.game) {
       this.#publisher.publishGame(room.code, { view: toGameViewDto(room.game), events: [] });
-      this.#autoDriver?.schedule(room.code);
     }
+    this.#syncAutoDriver(room);
     return this.#roomDto(room);
+  }
+
+  /**
+   * 자동 진행 예약을 현재 턴 좌석에 맞춘다.
+   * 자동 진행을 켠 좌석의 차례면 예약하고, 되돌렸으면 대기 중인 타이머를 취소한다
+   * (사람이 돌아왔는데 서버가 한 수 더 두는 일을 막는다).
+   */
+  #syncAutoDriver(room) {
+    if (room.currentSeatIsAutoControlled()) {
+      this.#autoDriver?.schedule(room.code);
+      return;
+    }
+    this.#autoDriver?.cancelTimer(room.code);
   }
 
   /** 시작 시 오래된 방 정리. */

@@ -323,6 +323,84 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.body.code, 'ERR003');
     });
 
+    it('접속 중인 좌석을 자동 진행으로 바꾸려 하면 409 ERR005다', async () => {
+      // Given (좌석 토큰으로 presence를 붙여 두리를 온라인으로 만든다)
+      const started = await createStartedRoom();
+      const stream = openSse(
+        baseUrl,
+        `/api/rooms/${started.code}/events?presence=${started.guest.seatId}:${started.guest.seatToken}`,
+      );
+      await stream.ready;
+      await stream.waitFor((event) => event.event === 'room' && event.data.seats[1].online === true);
+
+      // When
+      const response = await request(baseUrl, {
+        method: 'POST',
+        path: `/api/rooms/${started.code}/host-actions`,
+        token: started.host.seatToken,
+        body: { type: 'SET_AUTOPILOT', seatId: started.guest.seatId, enabled: true },
+      });
+
+      // Then
+      assert.equal(response.status, 409);
+      assert.equal(response.body.code, 'ERR005');
+      stream.close();
+    });
+
+    it('오프라인 좌석은 자동 진행으로 바꿀 수 있고, 그 좌석 토큰으로 되돌릴 수 있다', async () => {
+      // Given
+      const started = await createStartedRoom();
+
+      // When
+      const enabled = await request(baseUrl, {
+        method: 'POST',
+        path: `/api/rooms/${started.code}/host-actions`,
+        token: started.host.seatToken,
+        body: { type: 'SET_AUTOPILOT', seatId: started.guest.seatId, enabled: true },
+      });
+
+      // Then
+      assert.equal(enabled.status, 200);
+      assert.equal(enabled.body.room.seats[1].autopilot, true);
+
+      // When (좌석 본인이 조종권을 회수한다)
+      const disabled = await request(baseUrl, {
+        method: 'POST',
+        path: `/api/rooms/${started.code}/host-actions`,
+        token: started.guest.seatToken,
+        body: { type: 'SET_AUTOPILOT', seatId: started.guest.seatId, enabled: false },
+      });
+
+      // Then
+      assert.equal(disabled.status, 200);
+      assert.equal(disabled.body.room.seats[1].autopilot, false);
+    });
+
+    it('자동 진행 중인 좌석의 커맨드는 그 좌석 토큰이어도 403 ERR003이다', async () => {
+      // Given (두리 좌석을 자동 진행으로 돌린다 — 두리 차례가 아니므로 드라이버는 움직이지 않는다)
+      const started = await createStartedRoom();
+      await request(baseUrl, {
+        method: 'POST',
+        path: `/api/rooms/${started.code}/host-actions`,
+        token: started.host.seatToken,
+        body: { type: 'SET_AUTOPILOT', seatId: started.guest.seatId, enabled: true },
+      });
+
+      // When
+      const response = await request(baseUrl, {
+        method: 'POST',
+        path: `/api/rooms/${started.code}/commands`,
+        token: started.guest.seatToken,
+        body: { type: 'ROLL' },
+      });
+
+      // Then (차례가 아닌 것(ERR006)보다 이중 조종 차단이 먼저 걸린다)
+      assert.equal(response.status, 403);
+      assert.equal(response.body.code, 'ERR003');
+      const room = await request(baseUrl, { path: `/api/rooms/${started.code}` });
+      assert.equal(room.body.game.version, 0);
+    });
+
     it('내 차례가 아니면 409 ERR006이고 상태는 그대로다', async () => {
       // Given
       const started = await createStartedRoom();
