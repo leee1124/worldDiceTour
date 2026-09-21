@@ -2,14 +2,26 @@
    모달 · 바텀 시트 · 행운 티켓 카드 · 통행료 안내 · 순위표
    ========================================================================== */
 
+/*
+  결정 모달은 폰에서 **행동 버튼이 늘 보여야** 한다. 그래서 세 줄 구조로 고정한다.
+    머리(.modal-head, 고정) / 본문(.modal-body, 여기만 스크롤) / 버튼 줄(.modal-actions, 바닥에 붙음)
+
+  높이는 `dvh`(화면 키보드가 올라오면 함께 줄어든다)를 쓰고, 모르는 브라우저는 `svh`로 남는다.
+  안전 영역(노치·홈 바)은 백드롭의 padding이 한 번만 책임진다.
+*/
 .modal-backdrop {
   position: fixed;
   inset: 0;
+  /* 고정 요소의 기본 높이는 키보드를 따라오지 않는다 — 명시해서 dvh를 쓴다. */
+  height: 100svh;
+  height: 100dvh;
   z-index: 80;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   padding: clamp(0.6rem, 2vw, 1.5rem);
+  padding-top: calc(clamp(0.6rem, 2vw, 1.5rem) + env(safe-area-inset-top, 0px));
   padding-bottom: calc(clamp(0.6rem, 2vw, 1.5rem) + env(safe-area-inset-bottom, 0px));
   background: rgba(3, 9, 15, 0.72);
   backdrop-filter: blur(5px);
@@ -20,6 +32,9 @@
   flex-direction: column;
   width: min(30rem, 100%);
   max-height: min(88svh, 48rem);
+  max-height: min(88dvh, 48rem);
+  /* 백드롭이 이미 안전 영역만큼 좁혀 두었으므로 여기서는 남은 높이를 다 쓴다. */
+  max-height: min(100%, 48rem);
   overflow: hidden;
   border: 1px solid rgba(239, 193, 101, 0.28);
   border-radius: var(--radius-xl);
@@ -29,6 +44,8 @@
 }
 
 .modal-head {
+  /* 머리는 줄어들지 않는다(줄어들면 제목이 잘린다). */
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -59,8 +76,18 @@
 }
 
 .modal-body {
-  padding: 0.9rem 1.1rem 1.1rem;
+  /* 모달 안에서 스크롤되는 곳은 여기 하나뿐이다. */
+  --modal-pad-x: 1.1rem;
+  --modal-pad-b: 1.1rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.9rem var(--modal-pad-x) var(--modal-pad-b);
   overflow-y: auto;
+  /* 폰: 모달 안을 끝까지 내렸을 때 뒤 화면이 따라 움직이지 않게 한다. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* 세로 스크롤은 항상 브라우저가 처리한다(슬라이더·탭 줄 위에서도 본문이 스크롤된다). */
+  touch-action: pan-y;
 }
 
 .modal-stack {
@@ -87,14 +114,32 @@
   color: #ffb3b8;
 }
 
+/*
+  버튼 줄은 본문 안의 마지막 요소지만 **바닥에 붙어 있다**(`position: sticky`).
+  본문이 길어도 스크롤 없이 누를 수 있고, 내용은 버튼 줄 아래로 지나간다.
+  좌우·아래로 본문 padding만큼 번지게 해서 배경이 끊기지 않는다.
+*/
 .modal-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--modal-pad-b, 0px));
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-top: 0.3rem;
+  margin: 0.55rem calc(-1 * var(--modal-pad-x, 0px)) calc(-1 * var(--modal-pad-b, 0px));
+  padding: 0.55rem var(--modal-pad-x, 0px);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(8, 21, 31, 0.86), rgba(8, 21, 31, 0.98) 55%);
+  backdrop-filter: blur(6px);
 }
 
-/* 아래에서 올라오는 시트(칸 상세) */
+/* 카지노 모달은 네온 톤이라 버튼 줄 배경도 어두운 자보라로 맞춘다. */
+.modal--neon .modal-actions {
+  border-top-color: rgba(255, 61, 154, 0.32);
+  background: linear-gradient(180deg, rgba(10, 4, 20, 0.86), rgba(8, 4, 15, 0.98) 55%);
+}
+
+/* 아래에서 올라오는 시트(칸 상세 · 도시 목록) */
 .modal--sheet {
   width: min(28rem, 100%);
 }
@@ -107,7 +152,38 @@
   .modal--sheet {
     width: 100%;
     max-height: 82svh;
+    max-height: 82dvh;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+}
+
+/*
+  낮은 화면(폰 가로 · 360×640처럼 짧은 세로)에서는 여백을 줄여 버튼 줄까지 한 화면에 들어오게 한다.
+  본문 padding을 변수로 바꾸기만 하면 sticky 버튼 줄의 위치도 함께 따라온다.
+*/
+@media (max-height: 46rem) {
+  .modal-head {
+    padding: 0.6rem 0.85rem 0.45rem;
+  }
+
+  .modal-title {
+    font-size: 1.02rem;
+  }
+
+  .modal-subtitle {
+    font-size: 0.76rem;
+  }
+
+  .modal-body {
+    --modal-pad-x: 0.85rem;
+    --modal-pad-b: 0.85rem;
+    padding-top: 0.7rem;
+  }
+
+  .modal-actions {
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
   }
 }
 
@@ -650,27 +726,197 @@
   font-size: 0.72rem;
 }
 
-/* ── 행운 티켓 카드 ─────────────────────────────────────────── */
+/* ── 일시 안내(티켓 · 통행료 · 조난 · 월급 · 바퀴 · 잭팟) ───── */
 
-.ticket-overlay {
+/*
+  안내 카드는 **결정 모달보다 아래**(z-index < .overlay-root)에 깔린다.
+  혹시라도 카드가 남더라도 모달의 버튼을 덮어 조작을 막을 수 없다.
+  수명·닫기·페일세이프는 `js/views/modals/noticeCard.js`가 책임진다.
+*/
+.notice-overlay {
   position: fixed;
   inset: 0;
-  z-index: 88;
+  height: 100svh;
+  height: 100dvh;
+  z-index: 62;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(3, 9, 15, 0.6);
+  padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(3, 9, 15, 0.62);
   backdrop-filter: blur(3px);
-  animation: toast-in 180ms ease-out;
+  cursor: pointer;
+  animation: notice-in 180ms ease-out;
 }
 
-.ticket-overlay--leaving {
-  animation: toast-out 220ms ease forwards;
+.notice-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: min(20rem, 82vw);
+  max-height: 100%;
 }
+
+/* 티켓은 3:4 카드라 높이로도 폭을 제한해야 낮은 화면에서 잘리지 않는다. */
+.notice-overlay--ticket .notice-card {
+  width: min(20rem, 82vw, (100svh - 9rem) * 0.75);
+  width: min(20rem, 82vw, (100dvh - 9rem) * 0.75);
+}
+
+/* 사라지는 중에는 절대 입력을 가로채지 않는다(안 보이는 카드가 탭을 먹는 일이 없게). */
+.notice--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 남은 시간을 보여 주는 얇은 진행 바 + "탭하면 닫힘" */
+.notice-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.notice-progress {
+  display: block;
+  width: min(12rem, 60vw);
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.notice-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold-400);
+  transform-origin: left center;
+  animation: notice-drain var(--notice-ms, 2500ms) linear forwards;
+}
+
+/* 모션 축소: 바는 움직이지 않고, 남은 시간은 글자로 알린다(읽는 시간은 그대로다). */
+.notice-progress--static .notice-progress-fill {
+  animation: none;
+  background: var(--gold-300);
+}
+
+.notice-hint {
+  color: var(--text-300);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* 빨리 감기·남의 잔돈 이동: 카드 대신 한 줄(정보를 버리지 않는다). */
+.notice-line {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
+  z-index: 64;
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(8, 21, 31, 0.95);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transform: translateX(-50%);
+  animation: toll-in 180ms ease-out;
+}
+
+.notice-line-text {
+  display: block;
+  overflow: hidden;
+  color: var(--text-100);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 금액·상태 안내 카드(조난 · 월급 · 바퀴 · 잭팟) ─────────── */
+
+.info-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, rgba(16, 36, 52, 0.97), rgba(10, 23, 35, 0.97));
+  box-shadow: var(--shadow-lift);
+  text-align: center;
+}
+
+.info-notice-eyebrow {
+  color: var(--gold-300);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.info-notice-headline {
+  font-size: 1rem;
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.info-notice-amount {
+  font-family: var(--font-num);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.info-notice-note {
+  color: var(--text-500);
+  font-size: 0.78rem;
+}
+
+.info-notice--plus {
+  border-color: rgba(67, 196, 145, 0.45);
+}
+
+.info-notice--plus .info-notice-amount {
+  color: #7bf0b8;
+}
+
+.info-notice--minus,
+.info-notice--lose {
+  border-color: rgba(240, 85, 95, 0.45);
+}
+
+.info-notice--minus .info-notice-amount {
+  color: #ff9aa0;
+}
+
+.info-notice--win {
+  border-color: rgba(47, 243, 224, 0.45);
+}
+
+.info-notice--lap {
+  border-color: rgba(86, 183, 232, 0.45);
+}
+
+.info-notice--jackpot {
+  border-color: rgba(239, 193, 101, 0.6);
+  background: linear-gradient(160deg, rgba(56, 42, 12, 0.97), rgba(10, 23, 35, 0.97));
+}
+
+.info-notice--jackpot .info-notice-amount {
+  color: var(--gold-300);
+}
+
+/* ── 행운 티켓 카드 ─────────────────────────────────────────── */
 
 .ticket-card {
   position: relative;
-  width: min(20rem, 82vw);
+  width: 100%;
   aspect-ratio: 3 / 4;
   transform-style: preserve-3d;
   transition: transform 520ms cubic-bezier(0.3, 1.1, 0.4, 1);
@@ -745,31 +991,15 @@
 
 /* ── 통행료 안내 ────────────────────────────────────────────── */
 
+/* 통행료 카드. 위치·수명은 `.notice-overlay`가 잡아 주므로 여기서는 모양만 정한다. */
 .toll-notice {
-  position: fixed;
-  left: 50%;
-  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
-  z-index: 86;
-  width: min(20rem, 88vw);
-  padding: 0.8rem 1rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
   border: 1px solid rgba(240, 85, 95, 0.45);
   border-radius: var(--radius-lg);
   background: linear-gradient(160deg, rgba(56, 16, 22, 0.96), rgba(10, 23, 35, 0.96));
   box-shadow: var(--shadow-lift);
   text-align: center;
-  transform: translate(-50%, 16px);
-  opacity: 0;
-  transition: opacity 200ms ease, transform 200ms ease;
-}
-
-.toll-notice--in {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.toll-notice--out {
-  opacity: 0;
-  transform: translate(-50%, -10px);
 }
 
 .toll-notice--mine {
@@ -798,6 +1028,139 @@
 .toll-parties {
   color: var(--text-500);
   font-size: 0.8rem;
+}
+
+/* ── "○○의 도시" 시트 ──────────────────────────────────────── */
+
+.owned-position {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-300);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.owned-help,
+.owned-empty {
+  color: var(--text-500);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.owned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.owned-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: var(--tap);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--owned-row-color, var(--gold-500));
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.owned-row:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.owned-list--ruby {
+  --owned-row-color: var(--seat-ruby);
+}
+.owned-list--azure {
+  --owned-row-color: var(--seat-azure);
+}
+.owned-list--amber {
+  --owned-row-color: var(--seat-amber);
+}
+.owned-list--jade {
+  --owned-row-color: var(--seat-jade);
+}
+
+.owned-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.owned-row-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.owned-row-builds {
+  display: flex;
+  gap: 0.2rem;
+}
+
+/* 시트 안의 배지는 보드처럼 줄어들지 않고 늘 같은 크기로 읽힌다. */
+.owned-row-builds .build-slot {
+  --badge: 19px;
+  flex: 0 0 auto;
+}
+
+.owned-row-builds .build-slot-text {
+  display: inline;
+}
+
+.owned-row-kind {
+  color: var(--text-500);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.owned-row-side {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.owned-row-toll {
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.owned-row-tolllabel {
+  color: var(--text-500);
+  font-size: 0.68rem;
+}
+
+.owned-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(239, 193, 101, 0.3);
+  border-radius: var(--radius-sm);
+  background: rgba(239, 193, 101, 0.1);
+}
+
+.owned-total-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.owned-total-value {
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: 1.05rem;
+  font-weight: 800;
 }
 
 /* ── 칸 상세: 건물 세 종의 지음/안 지음 ─────────────────────── */

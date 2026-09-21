@@ -434,9 +434,22 @@
 
 .bet-range {
   flex: 1;
+  min-width: 0;
   height: var(--tap);
   accent-color: var(--neon-pink);
   cursor: pointer;
+  /*
+    슬라이더 위에서도 **세로 스크롤은 본문에게 넘긴다**(폰에서 슬라이더가 스크롤을 삼켜
+    버튼 줄까지 내려가지 못하는 일을 막는다). 가로 드래그만 슬라이더가 쓴다.
+  */
+  touch-action: pan-y;
+}
+
+/* 베팅 칩은 좁은 화면에서 줄바꿈 대신 **한 줄 가로 스크롤**로 둔다(높이를 먹지 않게). */
+.chip-row--bet {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .chip-row--bet .btn--chip {
@@ -465,4 +478,147 @@
 .casino--spectating .bet-control,
 .casino--spectating .casino-tabs {
   opacity: 0.7;
+}
+
+/* 탭 줄도 아주 좁은 화면에서는 가로로 밀어 볼 수 있게 한다(줄바꿈으로 높이를 먹지 않게). */
+.casino-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* 가로로 미는 동작만 여기서 처리하고, 세로 스크롤은 모달 본문에게 넘긴다. */
+  touch-action: pan-x pan-y;
+}
+
+.casino-tabs::-webkit-scrollbar,
+.chip-row--bet::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================================
+   낮은 화면(360×640 같은 폰 세로)용 compact 배치.
+
+   오너 피드백: 카지노 모달에서 베팅 조작 + "베팅" + "카지노에서 나가기"가
+   한 화면에 같이 보여야 한다. 무대·칩·여백을 줄여 버튼 줄까지 끌어올린다.
+   (버튼 줄 자체는 modals.css의 sticky 규칙이 항상 바닥에 붙여 둔다.)
+   ========================================================================== */
+
+@media (max-height: 46rem) {
+  .casino {
+    gap: 0.45rem;
+  }
+
+  /* 전광판은 분위기용이라 낮은 화면에서는 접는다. */
+  .casino-marquee {
+    display: none;
+  }
+
+  .neon-amount {
+    font-size: clamp(1.1rem, 5vw, 1.4rem);
+  }
+
+  .casino-tab {
+    min-height: 36px;
+    padding: 0.2rem 0.45rem;
+  }
+
+  .tab-icon {
+    font-size: 0.95rem;
+  }
+
+  .casino-stage {
+    min-height: 3.5rem;
+    padding: 0.3rem;
+  }
+
+  .reel {
+    width: 2.6rem;
+    height: 3.2rem;
+  }
+
+  .reel-symbol {
+    font-size: 1.6rem;
+  }
+
+  .casino-dice {
+    --die-size: 2.4rem;
+    gap: 0.7rem;
+    padding-top: 0.25rem;
+  }
+
+  .casino-banner {
+    min-height: 2.1rem;
+    padding: 0.3rem;
+  }
+
+  .banner-title {
+    font-size: 0.88rem;
+  }
+
+  .banner-amount {
+    font-size: 1.15rem;
+  }
+
+  .choice-chip {
+    flex: 1 1 6.5rem;
+    min-height: 38px;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .choice-label {
+    font-size: 0.86rem;
+  }
+
+  .choice-hint {
+    font-size: 0.66rem;
+  }
+
+  .casino-payout,
+  .casino-hint {
+    font-size: 0.72rem;
+  }
+
+  .bet-control {
+    gap: 0.3rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .bet-value {
+    font-size: 1.1rem;
+  }
+
+  .bet-row {
+    gap: 0.4rem;
+  }
+
+  .bet-step,
+  .bet-range {
+    height: 38px;
+  }
+
+  .bet-step {
+    width: 38px;
+  }
+
+  /* 칩은 한 줄 가로 스크롤(줄바꿈으로 높이를 먹지 않게). */
+  .chip-row--bet {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+
+  .chip-row--bet .btn--chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* "베팅"과 "나가기"를 한 줄에 나란히 둔다(두 줄이면 바닥 버튼 줄이 화면을 먹는다). */
+  .modal--neon .modal-actions .btn--wide {
+    flex: 1 1 7.5rem;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0.4rem 0.45rem;
+    font-size: 0.84rem;
+    line-height: 1.15;
+  }
 }
