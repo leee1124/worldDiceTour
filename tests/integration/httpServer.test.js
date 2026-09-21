@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createApp } from '../../src/app.js';
+import { Room } from '../../src/domain/room/Room.js';
 import { InMemoryRoomRepository } from '../../src/infrastructure/InMemoryRoomRepository.js';
 import { SeededRandomSource } from '../../src/infrastructure/SeededRandomSource.js';
 import { TokenFactory } from '../../src/infrastructure/TokenFactory.js';
@@ -935,6 +936,128 @@ describe('HTTP 서버(REST + SSE)', () => {
       await ended;
       assert.equal(response.complete, true);
       stream.close();
+    });
+  });
+
+  describe('바퀴별 건설 제한', () => {
+    /**
+     * 실제 HTTP로 잠긴 건물을 요청해도 서버가 막는지 본다.
+     * 특정 건설 상황은 주사위로 만들 수 없으므로, 저장소를 직접 들고 있는 별도 서버를 띄워
+     * "2바퀴 플레이어가 자기 도시에서 건설 기회를 받은" 스냅샷을 심는다.
+     */
+    async function startLapServer({ lap, buildings = [] }) {
+      const random = new SeededRandomSource(4_242);
+      const repository = new InMemoryRoomRepository({ random, logger: silentLogger });
+      const server = createApp({
+        repository,
+        random,
+        tokenFactory: new TokenFactory(),
+        publicDir,
+        autoPlayDelayMs: 0,
+        logger: silentLogger,
+      });
+      await new Promise((resolve) => server.server.listen(0, '127.0.0.1', resolve));
+      const url = `http://127.0.0.1:${server.server.address().port}`;
+
+      const created = await request(url, { method: 'POST', path: '/api/rooms', body: { hostName: '하나' } });
+      const code = created.body.room.code;
+      await request(url, { method: 'POST', path: `/api/rooms/${code}/seats`, body: { name: '두리' } });
+      await request(url, {
+        method: 'POST',
+        path: `/api/rooms/${code}/host-actions`,
+        token: created.body.seatToken,
+        body: { type: 'START' },
+      });
+
+      const room = await repository.findByCode(code);
+      const snapshot = room.toSnapshot();
+      snapshot.game.phase = 'AWAIT_BUILD';
+      snapshot.game.turnIndex = 0;
+      snapshot.game.players[0].lap = lap;
+      snapshot.game.board = [{ index: 3, ownerId: created.body.seatId, buildings, landmark: false }];
+      snapshot.game.turn = { ...snapshot.game.turn, buildIndex: 3, debt: null };
+      await repository.save(Room.restore(snapshot, random));
+
+      return { server, url, code, host: created.body };
+    }
+
+    it('2바퀴 플레이어에게는 호텔이 잠긴 선택지로만 보인다', async (t) => {
+      // Given
+      const { server, url, code } = await startLapServer({ lap: 2 });
+      t.after(() => server.close());
+
+      // When
+      const response = await request(url, { path: `/api/rooms/${code}` });
+
+      // Then
+      assert.equal(response.body.game.players[0].lap, 2);
+      assert.deepEqual(
+        response.body.game.pending.options.map((option) => option.type),
+        ['VILLA', 'BUILDING'],
+      );
+      assert.deepEqual(response.body.game.pending.lockedOptions, [
+        { type: 'HOTEL', cost: 63_000, locked: true, unlockLap: 3 },
+      ]);
+    });
+
+    it('잠긴 건물을 BUILD로 보내면 400 ERR001이고 상태가 그대로다', async (t) => {
+      // Given
+      const { server, url, code, host } = await startLapServer({ lap: 2 });
+      t.after(() => server.close());
+      const before = JSON.stringify((await request(url, { path: `/api/rooms/${code}` })).body);
+
+      // When
+      const response = await request(url, {
+        method: 'POST',
+        path: `/api/rooms/${code}/commands`,
+        token: host.seatToken,
+        body: { type: 'BUILD', payload: { buildings: ['HOTEL'] } },
+      });
+
+      // Then
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, 'ERR001');
+      const after = JSON.stringify((await request(url, { path: `/api/rooms/${code}` })).body);
+      assert.equal(after, before, '상태 지문이 바뀌었습니다');
+    });
+
+    it('1바퀴 플레이어가 빌딩을 보내도 400 ERR001이고 상태가 그대로다', async (t) => {
+      // Given
+      const { server, url, code, host } = await startLapServer({ lap: 1 });
+      t.after(() => server.close());
+      const before = JSON.stringify((await request(url, { path: `/api/rooms/${code}` })).body);
+
+      // When (페이즈가 달라 ERR005가 아니라, 페이로드가 막혀 ERR001이어야 한다)
+      const response = await request(url, {
+        method: 'POST',
+        path: `/api/rooms/${code}/commands`,
+        token: host.seatToken,
+        body: { type: 'BUILD', payload: { buildings: ['VILLA', 'BUILDING'] } },
+      });
+
+      // Then
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, 'ERR001');
+      const after = JSON.stringify((await request(url, { path: `/api/rooms/${code}` })).body);
+      assert.equal(after, before, '상태 지문이 바뀌었습니다');
+    });
+
+    it('열린 건물만 고르면 건설이 성공한다', async (t) => {
+      // Given
+      const { server, url, code, host } = await startLapServer({ lap: 2 });
+      t.after(() => server.close());
+
+      // When
+      const response = await request(url, {
+        method: 'POST',
+        path: `/api/rooms/${code}/commands`,
+        token: host.seatToken,
+        body: { type: 'BUILD', payload: { buildings: ['VILLA', 'BUILDING'] } },
+      });
+
+      // Then
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body.view.board[3].buildings, ['VILLA', 'BUILDING']);
     });
   });
 

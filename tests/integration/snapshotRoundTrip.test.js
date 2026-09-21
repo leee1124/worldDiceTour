@@ -4,7 +4,11 @@ import assert from 'node:assert/strict';
 import { AutoPlayerPolicy } from '../../src/application/AutoPlayerPolicy.js';
 import { InMemoryRoomRepository } from '../../src/infrastructure/InMemoryRoomRepository.js';
 import { SeededRandomSource } from '../../src/infrastructure/SeededRandomSource.js';
-import { deserializeRoom, validateRoomSnapshot } from '../../src/infrastructure/RoomSerializer.js';
+import {
+  RoomSchemaError,
+  deserializeRoom,
+  validateRoomSnapshot,
+} from '../../src/infrastructure/RoomSerializer.js';
 import { Room } from '../../src/domain/room/Room.js';
 import { ALL_PHASES, PHASES } from '../../src/domain/game/phases.js';
 import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
@@ -95,6 +99,62 @@ describe('저장 스냅샷 왕복(검증 거짓 양성 방어)', () => {
     const again = deserializeRoom(restored.toSnapshot(), random);
     assert.equal(again.game.phase, PHASES.AWAIT_TRAVEL);
     assert.equal(again.game.pendingDecision.kind, 'TRAVEL');
+  });
+
+  it('바퀴 수가 저장되고 그대로 복원된다', () => {
+    // Given (출발 칸을 지나 2바퀴가 된 상태)
+    const random = new FakeRandomSource([1, 2]);
+    const room = Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW });
+    room.join({ name: '두리', token: 'b'.repeat(64), now: NOW });
+    room.start({ bySeatId: room.hostSeatId, random, now: NOW });
+    const seeded = room.toSnapshot();
+    seeded.game.players[0].position = 38;
+    const playing = deserializeRoom(seeded, random);
+    playing.executeCommand({ seatId: 'seat-1', type: COMMAND_TYPES.ROLL, now: NOW });
+
+    // When
+    const snapshot = playing.toSnapshot();
+
+    // Then
+    assert.equal(snapshot.game.players[0].lap, 2);
+    assert.doesNotThrow(() => validateRoomSnapshot(snapshot));
+    assert.equal(deserializeRoom(snapshot, random).game.playerById('seat-1').lap, 2);
+  });
+
+  it('바퀴 수가 없는 예전 스냅샷은 1바퀴로 복원된다', () => {
+    // Given (규칙 변경 전에 저장된 파일)
+    const random = new FakeRandomSource([1, 2]);
+    const { room } = autoRoom(17);
+    const snapshot = room.toSnapshot();
+    for (const player of snapshot.game.players) {
+      delete player.lap;
+    }
+
+    // When
+    const restored = deserializeRoom(snapshot, random);
+
+    // Then
+    assert.doesNotThrow(() => validateRoomSnapshot(snapshot));
+    assert.deepEqual(
+      restored.game.players.map((player) => player.lap),
+      [1, 1, 1, 1],
+    );
+  });
+
+  it('바퀴 수가 1 미만이거나 정수가 아닌 스냅샷은 거부한다', () => {
+    // Given
+    const { room } = autoRoom(23);
+
+    // When / Then
+    for (const lap of [0, -1, 1.5, '2', null]) {
+      const snapshot = room.toSnapshot();
+      snapshot.game.players[0].lap = lap;
+      assert.throws(
+        () => validateRoomSnapshot(snapshot),
+        RoomSchemaError,
+        `바퀴 값 ${String(lap)}을 통과시켰다`,
+      );
+    }
   });
 
   it('저장소를 거쳐도 같은 상태로 이어서 진행할 수 있다', async () => {

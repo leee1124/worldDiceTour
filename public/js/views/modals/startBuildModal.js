@@ -1,11 +1,14 @@
 /**
- * 출발 보너스 모달(`AWAIT_START_BUILD`). pending: `{candidates: [{index, name, price, options}]}`
+ * 출발 보너스 모달(`AWAIT_START_BUILD`).
+ * pending: `{candidates: [{index, name, price, options, lockedOptions}]}`
  *
  * 내 도시 하나를 고르고, 그 도시에서 지을 건물 조합을 고른다.
+ * 바퀴가 모자라 아직 못 짓는 건물은 잠긴 행(🔒)으로만 보여 준다.
  */
 
 import { button, clear, el, replaceChildren, setText, toggleClass } from '../../dom.js';
 import { formatWon } from '../../format.js';
+import { LAP_RULE_TEXT } from '../../domain/buildRules.js';
 import { actionRow, moneyRow, primaryButton, quietButton } from './parts.js';
 import { createBuildingPicker } from './buildModal.js';
 
@@ -37,6 +40,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, locked =
         const space = boardOf(candidate.index);
         picker = createBuildingPicker({
           options: candidate.options ?? [],
+          lockedOptions: candidate.lockedOptions ?? [],
           price: candidate.price ?? space?.price ?? 0,
           buildings: space?.buildings ?? [],
           landmark: Boolean(space?.landmark),
@@ -93,7 +97,11 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, locked =
 
       const body = el('div', { class: 'modal-stack' }, [
         moneyRow('보유 현금', cash),
-        el('p', { class: 'modal-help', text: '랜드마크가 완성된 도시는 후보에 나오지 않습니다.' }),
+        el('p', { class: 'modal-help', text: LAP_RULE_TEXT }),
+        el('p', {
+          class: 'modal-help',
+          text: '랜드마크가 완성된 도시와, 이번 바퀴에 지을 것이 없는 도시는 후보에 나오지 않습니다.',
+        }),
         list,
         pickerSlot,
         actionRow([confirmButton, quietButton('보너스 포기', { onClick: onSkip, busy: locked, focusKey: 'skip-start-build' })]),
