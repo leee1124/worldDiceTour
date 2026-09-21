@@ -2,6 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { PHASES } from '../../src/domain/game/phases.js';
+import { MAX_TICKET_CHAIN } from '../../src/domain/game/Game.js';
+import { Board } from '../../src/domain/game/Board.js';
+import { SPACE_KINDS } from '../../src/domain/game/data/board.js';
+import { TICKETS, TICKET_EFFECTS } from '../../src/domain/game/data/tickets.js';
 import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
 import { EVENT_TYPES } from '../../src/domain/game/events.js';
 import { STARTING_CASH, SALARY, ISLAND_RESCUE_FEE } from '../../src/domain/game/Player.js';
@@ -209,17 +213,99 @@ describe('Game(행운 티켓 효과)', () => {
     assertMoneyConserved(game, '세무조사');
   });
 
-  it('티켓 연쇄가 무한히 이어지지 않는다', () => {
-    // Given (앞으로 3칸 티켓만 남긴 덱 → 2 → 5 → ... 연쇄 상한까지)
-    const random = new FakeRandomSource([1, 1, ...new Array(20).fill(0)]);
-    const game = buildGame({ drawPile: ['T09'], random });
+  describe('티켓 연쇄 상한', () => {
+    /**
+     * 배포 티켓으로는 티켓 칸에서 티켓 칸으로 이어지는 연쇄가 **한 번도** 일어나지 않는다.
+     * 그래서 상한을 실제로 시험하려면 연쇄가 일어나는 티켓을 직접 넣어야 한다.
+     * 앞으로 10칸 이동 티켓이면 2 → 12 → 22 → 32가 모두 티켓 칸이라 연쇄가 성립한다.
+     */
+    const CHAIN_CATALOG = {
+      X1: {
+        id: 'X1',
+        text: '테스트용: 앞으로 10칸',
+        effect: { type: TICKET_EFFECTS.MOVE_RELATIVE, steps: 10 },
+      },
+    };
 
-    // When
-    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+    it('연쇄가 실제로 일어나도 정확히 상한(3장)에서 멈추고 턴이 정상 종료된다', () => {
+      // Given (36 → 주사위 6(2+4, 더블 아님) → 2번 티켓 칸)
+      const game = buildGame({
+        positions: { s1: 36 },
+        drawPile: ['X1'],
+        ticketCatalog: CHAIN_CATALOG,
+        random: new FakeRandomSource([2, 4, 0, 0, 0]),
+      });
 
-    // Then
-    assert.ok(eventTypes(events).filter((type) => type === EVENT_TYPES.TICKET_DRAWN).length <= 6);
-    assert.equal(game.isOver(), false);
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      const draws = events.filter((event) => event.type === EVENT_TYPES.TICKET_DRAWN);
+      assert.equal(draws.length, MAX_TICKET_CHAIN, '상한만큼만 뽑는다');
+      assert.deepEqual(
+        events.filter((event) => event.type === EVENT_TYPES.MOVED).map((event) => event.to),
+        [2, 12, 22, 32],
+      );
+      // 마지막 칸(32)은 티켓 칸이지만 상한에 닿아 효과가 발동하지 않는다
+      assert.equal(game.playerById('s1').position, 32);
+      assert.ok(eventTypes(events).includes(EVENT_TYPES.TURN_ENDED));
+      assert.equal(findEvent(events, EVENT_TYPES.EXTRA_TURN), undefined);
+      assert.equal(game.currentPlayerId, 's2');
+      assert.equal(game.isOver(), false);
+      assertMoneyConserved(game, '티켓 연쇄 상한');
+    });
+
+    it('배포된 티켓 데이터로는 연쇄가 한 번도 일어나지 않는다(상한은 방어용)', () => {
+      // Given (모든 티켓 칸 × 모든 이동형 티켓 조합)
+      const board = Board.createDefault();
+      const ticketIndexes = Array.from({ length: board.size }, (_unused, index) => index).filter(
+        (index) => board.spaceAt(index).kind === SPACE_KINDS.TICKET,
+      );
+
+      // When (각 조합의 도착 칸을 모은다)
+      const destinations = [];
+      for (const from of ticketIndexes) {
+        for (const ticket of TICKETS) {
+          const { effect } = ticket;
+          if (effect.type === TICKET_EFFECTS.MOVE_RELATIVE) {
+            destinations.push(board.advance(from, effect.steps).index);
+          } else if (effect.type === TICKET_EFFECTS.MOVE_TO) {
+            destinations.push(effect.index);
+          } else if (effect.type === TICKET_EFFECTS.NEAREST_RESORT) {
+            destinations.push(board.nearestResortFrom(from));
+          } else if (effect.type === TICKET_EFFECTS.TO_ISLAND) {
+            destinations.push(board.indexOfKind(SPACE_KINDS.ISLAND));
+          }
+        }
+      }
+
+      // Then
+      assert.ok(destinations.length > 0, '이동형 티켓이 있어야 의미 있는 검사다');
+      assert.deepEqual(
+        destinations.filter((index) => ticketIndexes.includes(index)),
+        [],
+        '티켓 칸으로 이동시키는 티켓이 하나도 없어야 한다',
+      );
+    });
+
+    it('배포 데이터로 티켓 칸에 도착하면 티켓을 한 장만 뽑는다', () => {
+      // Given (앞으로 3칸 티켓만 남긴 덱)
+      const game = buildGame({
+        positions: { s1: 36 },
+        drawPile: ['T09'],
+        random: new FakeRandomSource([2, 4, 0]),
+      });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then (2 → 5 제주 올레길, 티켓 칸이 아니므로 연쇄 없음)
+      assert.equal(
+        events.filter((event) => event.type === EVENT_TYPES.TICKET_DRAWN).length,
+        1,
+      );
+      assert.equal(game.playerById('s1').position, 5);
+    });
   });
 });
 

@@ -25,8 +25,12 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 4;
 /** 세관 납부 비율. */
 const CUSTOMS_TAX_RATE = 0.1;
-/** 한 커맨드 안에서 티켓이 연쇄될 수 있는 최대 횟수(무한 루프 방지). */
-const MAX_TICKET_CHAIN = 3;
+/**
+ * 한 커맨드 안에서 티켓이 연쇄될 수 있는 최대 횟수(무한 루프 방지).
+ * 배포 티켓 데이터로는 연쇄가 한 번도 일어나지 않으므로 지금은 **방어용**이며,
+ * 앞으로 티켓이 추가돼 연쇄가 생겨도 턴이 끝없이 이어지지 않도록 보장한다.
+ */
+export const MAX_TICKET_CHAIN = 3;
 /** 돈이 향하는 곳. 저장 스냅샷 검증(RoomSerializer)도 이 목록을 쓴다. */
 export const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
 /** 지불이 끝난 뒤 이어질 흐름. 저장 스냅샷 검증도 이 목록을 쓴다. */
@@ -114,8 +118,16 @@ export class Game {
     });
   }
 
-  /** 스냅샷에서 복원한다. */
-  static restore(snapshot, random) {
+  /**
+   * 스냅샷에서 복원한다.
+   * @param {object} snapshot
+   * @param {import('../shared/interfaces.js').RandomSource} random
+   * @param {{ticketCatalog?: Record<string, object>}} [options]
+   *   `ticketCatalog`는 **테스트 전용** 티켓 목록이다. 배포 데이터로는 만들 수 없는 상황
+   *   (예: 티켓이 연달아 나오는 연쇄)을 실제로 재현해 검증하기 위한 seam이며,
+   *   운영 경로에서는 언제나 생략해 배포 티켓 20장을 쓴다.
+   */
+  static restore(snapshot, random, { ticketCatalog } = {}) {
     if (!snapshot || !Array.isArray(snapshot.players)) {
       throw DomainError.invalidArgument('게임 스냅샷 구조가 올바르지 않습니다');
     }
@@ -123,7 +135,9 @@ export class Game {
     return new Game({
       board: Board.restore(snapshot.board ?? []),
       players,
-      deck: TicketDeck.restore(snapshot.deck ?? {}),
+      deck: ticketCatalog
+        ? TicketDeck.restore(snapshot.deck ?? {}, ticketCatalog)
+        : TicketDeck.restore(snapshot.deck ?? {}),
       casino: new Casino(snapshot.casino ?? {}),
       ledger: new BankLedger(snapshot.ledger ?? {}),
       random,
