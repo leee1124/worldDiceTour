@@ -63,6 +63,10 @@ export function spaceKindIcon(kind) {
 
 /** 페이즈별 안내 문구. title은 현재 해야 할 일, hint는 보조 설명. */
 export const PHASE_PROMPTS = Object.freeze({
+  AWAIT_TRADE: {
+    title: '거래 창구가 열렸습니다',
+    hint: '주식·예금을 정리한 뒤 "거래 마치고 주사위 굴리기"를 눌러야 다음으로 갑니다.',
+  },
   AWAIT_ROLL: { title: '주사위를 굴리세요', hint: '더블이 나오면 한 번 더 굴립니다.' },
   AWAIT_BUY: { title: '도시를 매입할까요?', hint: '매입하면 같은 턴에 건설 기회가 열립니다.' },
   AWAIT_BUILD: { title: '건설 기회', hint: '원하는 건물을 한 번에 골라 지을 수 있습니다.' },

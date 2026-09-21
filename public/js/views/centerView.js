@@ -1,6 +1,6 @@
 /**
  * 보드 중앙 코어: 라운드 · 잭팟 · 현재 차례와 페이즈 안내 · 주사위 · 주 행동 버튼 ·
- * 다음 업데이트용 예약 패널(증권거래소).
+ * 증권거래소 시장 패널(투자 모드가 켜진 방에서만 보인다).
  *
  * 넓은 화면에서는 보드 안쪽(9×9)에 겹쳐 놓이고, 세로 화면에서는 보드 아래로 내려간다(CSS).
  */
@@ -25,7 +25,15 @@ const DECISION_LABELS = Object.freeze({
   AWAIT_LIQUIDATION: '지불 정리하기',
 });
 
-export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLeaveGame, onResumeControl }) {
+export function createCenterView({
+  onRoll,
+  onOpenDecision,
+  onShowRankings,
+  onLeaveGame,
+  onResumeControl,
+  onOpenTrade = () => {},
+  marketView = null,
+}) {
   const roundNode = el('span', { class: 'core-stat-value' });
   const jackpotNode = el('span', { class: 'core-stat-value core-stat-value--gold' });
   const jackpotBox = el('div', { class: 'core-stat core-stat--jackpot' }, [
@@ -59,22 +67,8 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
     ]),
     dice.element,
     actionsNode,
-    el('details', { class: 'reserved-panel' }, [
-      el('summary', { class: 'reserved-summary' }, [
-        el('span', { text: '📈 증권거래소' }),
-        el('span', { class: 'reserved-tag', text: '준비 중' }),
-      ]),
-      el('div', { class: 'reserved-body' }, [
-        el('p', {
-          text: '도시 지분을 사고파는 투자 모드가 다음 업데이트에서 이 자리에 들어옵니다.',
-        }),
-        el('div', { class: 'reserved-skeleton', 'aria-hidden': 'true' }, [
-          el('span', { class: 'skeleton-bar' }),
-          el('span', { class: 'skeleton-bar' }),
-          el('span', { class: 'skeleton-bar' }),
-        ]),
-      ]),
-    ]),
+    // 증권거래소가 들어가는 자리(SPEC U7의 예약 자리). 투자 모드가 꺼진 방에서는 패널이 스스로 숨는다.
+    marketView ? marketView.element : null,
   ]);
 
   let lastJackpot = null;
@@ -125,7 +119,23 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
       return;
     }
 
-    if (view.phase === 'AWAIT_ROLL') {
+    if (view.phase === 'AWAIT_TRADE') {
+      // 거래 창구는 시트로 열린다. 시트를 닫아 두고 보드를 보다가 여기서 다시 열 수 있다.
+      actionsNode.appendChild(
+        button(
+          {
+            class: 'btn btn--primary btn--block',
+            disabled: Boolean(state.locked),
+            'aria-busy': state.locked ? 'true' : undefined,
+            on: { click: () => onOpenTrade() },
+          },
+          '💱 거래 창구 열기',
+        ),
+      );
+      actionsNode.appendChild(
+        el('p', { class: 'spectate-note', text: '거래를 마쳐야 주사위 차례로 넘어갑니다.' }),
+      );
+    } else if (view.phase === 'AWAIT_ROLL') {
       const locked = Boolean(state.locked);
       rollButton = button(
         {

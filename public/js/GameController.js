@@ -10,8 +10,10 @@ import * as storage from './storage.js';
 import {
   CONNECTION,
   SCREENS,
+  actingSeatId,
   createStore,
   isHostSeatMine,
+  isMyActingTurn,
   isMySeat,
   isMyTurn,
   isPlayingRoom,
@@ -24,6 +26,8 @@ import { buildCostOf } from './domain/buildRules.js';
 import { createCommandLock } from './domain/commandLock.js';
 import { inferGameOverReason } from './domain/gameOverReason.js';
 import { isRoomGoneError } from './domain/roomErrors.js';
+import { tradeErrorHint } from './domain/marketLabels.js';
+import { TUTORIAL_CARDS, firstUnseenCard } from './domain/tutorialCards.js';
 import { EventPlaybackQueue } from './animation/EventQueue.js';
 import { createPlaybackEngine } from './animation/playback.js';
 import { createToastHost } from './views/toast.js';
@@ -36,6 +40,8 @@ import { createLogView } from './views/logView.js';
 import { createGameView } from './views/gameView.js';
 import { createStatusStrip } from './views/statusStrip.js';
 import { createLegendView } from './views/legendView.js';
+import { createMarketView } from './views/marketView.js';
+import { createTradeView, TRADE_MODAL_ID, tradeModalSpec } from './views/tradeView.js';
 import { createCasinoView, CASINO_MODAL_ID, casinoModalSpec } from './views/casinoView.js';
 import { createModalHost } from './views/modals/modalHost.js';
 import { BUY_MODAL_ID, buyModalSpec } from './views/modals/buyModal.js';
@@ -47,6 +53,8 @@ import { LIQUIDATION_MODAL_ID, liquidationModalSpec } from './views/modals/liqui
 import { GAME_OVER_MODAL_ID, gameOverModalSpec } from './views/modals/gameOverModal.js';
 import { TRAVEL_MODAL_ID, travelConfirmSpec } from './views/modals/travelModal.js';
 import { CELL_SHEET_ID, cellSheetSpec } from './views/modals/cellSheet.js';
+import { TUTORIAL_MODAL_ID, tutorialModalSpec } from './views/modals/tutorialModal.js';
+import { newsCardSpec, NEWS_MODAL_ID } from './views/modals/newsCardModal.js';
 
 /** 방 목록 자동 새로고침 주기. */
 const ROOM_LIST_INTERVAL_MS = 3000;
@@ -67,6 +75,17 @@ export function createGameController({ appRoot, overlayRoot }) {
   const commandLock = createCommandLock();
   /** 마지막 GAME_OVER 이벤트의 종료 사유. 재접속 스냅샷에는 이벤트가 없으므로 뷰에서 추정한다. */
   let gameOverReason = null;
+
+  /**
+   * 거래 시트 상태. `null`이면 시트가 닫혀 있다(보드를 보는 중).
+   * 창구가 열려도 **닫아 둘 수 있어야** 하므로 "페이즈"가 아니라 이 화면 상태가 시트를 결정한다.
+   * @type {{mode: 'TRADE'|'QUEUE', seatId: string}|null}
+   */
+  let tradeSheet = null;
+  /** 지금 창구(좌석+라운드). 창구가 새로 열리면 시트를 한 번 자동으로 띄운다. */
+  let tradeWindowKey = null;
+  /** 뉴스 전문 시트를 열어 뒀는지. */
+  let newsSheetOpen = false;
 
   /** 잠금 상태가 바뀔 때마다 화면에 반영한다(모든 커맨드 버튼의 disabled/aria-busy 기준). */
   function syncLock() {
@@ -91,17 +110,35 @@ export function createGameController({ appRoot, overlayRoot }) {
     onKickSeat: (seatId) => void kickSeat(seatId),
     onAddComputer: (name) => void sendHostAction({ type: 'ADD_COMPUTER', name }),
     onSetRoundLimit: (roundLimit) => void sendHostAction({ type: 'SET_OPTIONS', roundLimit }),
+    onSetInvestmentMode: (investmentMode) =>
+      // `finance`의 나머지 키는 생략하면 서버가 기존 값을 유지한다(API.md 변경 20).
+      void sendHostAction({ type: 'SET_OPTIONS', finance: { investmentMode } }),
     onStart: () => void sendHostAction({ type: 'START' }),
     onExit: () => void leaveRoomFromLobby(),
   });
 
   const boardView = createBoardView({ onCellActivate: (index) => onCellActivate(index) });
+  const marketView = createMarketView({
+    onOpenTrade: () => openTradeSheet(),
+    onOpenQueue: () => openQueueSheet(),
+    onOpenNews: () => openNewsSheet(),
+    onOpenTutorial: () => showTutorial({ force: true }),
+    onCancelQueued: (seatId, orderId) => void sendSeatCommand(seatId, 'CANCEL_QUEUED_ORDER', { orderId }),
+  });
+  const tradeView = createTradeView({
+    onOrder: (type, payload) => void sendCommand(type, payload),
+    onCloseTrading: () => void sendCommand('CLOSE_TRADING'),
+    onQueueOrder: (seatId, payload) => void sendSeatCommand(seatId, 'QUEUE_ORDER', payload),
+    onCancelQueued: (seatId, orderId) => void sendSeatCommand(seatId, 'CANCEL_QUEUED_ORDER', { orderId }),
+  });
   const centerView = createCenterView({
     onRoll: () => void sendCommand('ROLL'),
     onOpenDecision: () => syncModals(),
     onShowRankings: () => showRankings(),
     onLeaveGame: () => leaveGameScreen(),
     onResumeControl: (seatId) => void setAutopilot(seatId, false),
+    onOpenTrade: () => openTradeSheet(),
+    marketView,
   });
   const playersView = createPlayersView({
     onSetAutopilot: (seatId, enabled) => void setAutopilot(seatId, enabled),
@@ -111,6 +148,7 @@ export function createGameController({ appRoot, overlayRoot }) {
   const logView = createLogView();
   const statusStrip = createStatusStrip({
     onFindMe: () => findMyToken(),
+    onOpenTrade: () => openTradeSheet(),
     onToggleZoom: (zoomed) => {
       boardView.setZoom(zoomed);
       if (zoomed) {
@@ -185,6 +223,14 @@ export function createGameController({ appRoot, overlayRoot }) {
     },
     nameOf: (seatId) => seatNameOf(store.state, seatId),
     spaceNameOf: (index) => spaceNameOf(store.state, index),
+    // 예약 주문 체결/거절처럼 "연출은 없지만 반드시 알려야 하는" 결과를 토스트로 전한다.
+    notify: ({ tone, message }) => {
+      if (tone === 'success') {
+        toast.success(message, '예약 주문');
+      } else {
+        toast.info(message, '예약 주문');
+      }
+    },
   });
 
   /* ── 렌더링 ───────────────────────────────────────────────── */
@@ -207,7 +253,8 @@ export function createGameController({ appRoot, overlayRoot }) {
       return;
     }
 
-    gameView.update(state);
+    const market = marketContext(state);
+    gameView.update(state, market);
     if (state.view) {
       // 목적지 선택 모드를 먼저 정해야 한다: 칸의 선택 가능/금지 표시는 boardView.update가 그 모드를 읽어 그린다.
       syncTravelMode(state);
@@ -215,8 +262,204 @@ export function createGameController({ appRoot, overlayRoot }) {
       centerView.update(state);
       centerView.animateJackpot(state.view.jackpot);
       playersView.update(state);
+      marketView.update(state, market);
       syncModals(state);
     }
+  }
+
+  /* ── 증권거래소 ───────────────────────────────────────────── */
+
+  /** 시장 패널·상황판·거래 시트가 함께 쓰는 "지금 내가 거래할 수 있는지" 계산. */
+  function marketContext(state) {
+    const view = state.view;
+    const market = view?.market ?? null;
+    if (!market) {
+      return { hasMarket: false, canTrade: false, mySeatId: null, mySeatIds: [], tradingSeatName: null };
+    }
+    const acting = actingSeatId(state);
+    const mineActing = isMyActingTurn(state);
+    const seatIds = state.mySeats.map((seat) => seat.seatId);
+    const tradingOpen = view.phase === 'AWAIT_TRADE';
+    return {
+      hasMarket: true,
+      canTrade: tradingOpen && mineActing,
+      // 보유·손익은 "지금 결정하는 내 좌석"(없으면 이 기기의 첫 좌석) 기준으로 보여 준다.
+      mySeatId: mineActing ? acting : seatIds[0] ?? null,
+      mySeatIds: seatIds,
+      tradingSeatName: tradingOpen ? seatNameOf(state, acting) : null,
+      seatNameOf: (seatId) => seatNameOf(state, seatId),
+    };
+  }
+
+  /** 지금 창구를 식별하는 키(좌석 + 라운드). 창구가 새로 열렸는지 판단한다. */
+  function tradeWindowKeyOf(state) {
+    const view = state.view;
+    if (!view || view.phase !== 'AWAIT_TRADE') {
+      return null;
+    }
+    return `${actingSeatId(state)}:${view.round}`;
+  }
+
+  function openTradeSheet() {
+    const state = store.state;
+    if (!isMyActingTurn(state) || state.view?.phase !== 'AWAIT_TRADE') {
+      openQueueSheet();
+      return;
+    }
+    tradeSheet = { mode: 'TRADE', seatId: actingSeatId(state) };
+    syncModals();
+    // 처음 거래하는 사람에게만 안내 카드를 얹는다(읽었으면 다시 뜨지 않는다).
+    showTutorial();
+  }
+
+  function openQueueSheet(seatId = null) {
+    const state = store.state;
+    const seats = state.mySeats;
+    if (seats.length === 0) {
+      toast.info('이 기기에는 좌석이 없습니다.');
+      return;
+    }
+    if (!state.view?.market) {
+      return;
+    }
+    tradeSheet = { mode: 'QUEUE', seatId: seatId ?? seats[0].seatId };
+    tradeView.resetForm();
+    syncModals();
+    showTutorial();
+  }
+
+  function openNewsSheet() {
+    newsSheetOpen = true;
+    syncModals();
+  }
+
+  function closeNewsSheet() {
+    newsSheetOpen = false;
+    modalHost.close(NEWS_MODAL_ID);
+  }
+
+  /* ── 첫 사용 안내 ─────────────────────────────────────────── */
+
+  /** 다음에 보여 줄 안내 카드 index(0부터). `force`면 이미 읽었어도 처음부터 보여 준다. */
+  let tutorialIndex = 0;
+
+  function showTutorial({ force = false } = {}) {
+    if (force) {
+      tutorialIndex = 0;
+    } else {
+      const next = firstUnseenCard(storage.seenTutorials());
+      if (!next) {
+        return;
+      }
+      tutorialIndex = TUTORIAL_CARDS.indexOf(next);
+    }
+    presentTutorial();
+  }
+
+  function presentTutorial() {
+    const card = TUTORIAL_CARDS[tutorialIndex];
+    if (!card) {
+      modalHost.close(TUTORIAL_MODAL_ID);
+      return;
+    }
+    modalHost.present(
+      tutorialModalSpec({
+        card,
+        index: tutorialIndex,
+        total: TUTORIAL_CARDS.length,
+        onNext: () => {
+          storage.markTutorialSeen(card.id);
+          tutorialIndex += 1;
+          if (tutorialIndex >= TUTORIAL_CARDS.length) {
+            modalHost.close(TUTORIAL_MODAL_ID);
+            return;
+          }
+          presentTutorial();
+        },
+        onSkip: () => {
+          // "다시 보지 않기"는 강제로 열었을 때도 안전하다(이미 읽은 것으로 표시할 뿐이다).
+          storage.markAllTutorialsSeen(TUTORIAL_CARDS.map((item) => item.id));
+          modalHost.close(TUTORIAL_MODAL_ID);
+        },
+      }),
+    );
+  }
+
+  /**
+   * 거래 시트를 페이즈·좌석에 맞춰 띄우거나 닫는다.
+   * @returns {boolean} 이 시트가 지금 화면의 주 모달인지
+   */
+  function syncTradeSheet(state, keep) {
+    const view = state.view;
+    const market = view?.market ?? null;
+    if (!market) {
+      tradeSheet = null;
+      tradeWindowKey = null;
+      return false;
+    }
+
+    // 창구가 새로 열렸다면 한 번은 자동으로 띄운다(닫은 뒤에는 다시 띄우지 않는다).
+    const windowKey = tradeWindowKeyOf(state);
+    if (windowKey !== tradeWindowKey) {
+      tradeWindowKey = windowKey;
+      if (windowKey && isMyActingTurn(state)) {
+        tradeSheet = { mode: 'TRADE', seatId: actingSeatId(state) };
+        tradeView.resetForm();
+      } else if (tradeSheet?.mode === 'TRADE') {
+        tradeSheet = null;
+      }
+    }
+
+    if (!tradeSheet) {
+      return false;
+    }
+
+    // 내 창구가 열렸는데 예약 모드로 열려 있으면 거래 모드로 승격한다(같은 폼을 쓴다).
+    if (view.phase === 'AWAIT_TRADE' && isMyActingTurn(state) && tradeSheet.mode === 'QUEUE') {
+      tradeSheet = { mode: 'TRADE', seatId: actingSeatId(state) };
+    }
+    // 창구가 닫혔으면 거래 모드를 유지할 수 없다.
+    if (tradeSheet.mode === 'TRADE' && (view.phase !== 'AWAIT_TRADE' || !isMyActingTurn(state))) {
+      tradeSheet = null;
+      modalHost.close(TRADE_MODAL_ID);
+      return false;
+    }
+
+    const seatId = tradeSheet.seatId;
+    const trading = tradeSheet.mode === 'TRADE';
+    const pending = trading && view.pending?.kind === 'TRADE' ? view.pending : null;
+    const player = view.players.find((item) => item.seatId === seatId) ?? null;
+
+    tradeView.update({
+      market,
+      // 창구 예산은 `pending`이 가장 정확하고(내 창구), 없으면 공개 스냅샷을 쓴다.
+      budget: pending?.budget ?? (market.budget?.seatId === seatId ? market.budget : { ...market.budget, open: false }),
+      cash: pending?.cash ?? player?.cash ?? 0,
+      deposit: pending?.deposit ?? market.deposits?.[seatId] ?? 0,
+      seatId,
+      seatName: seatNameOf(state, seatId),
+      mode: tradeSheet.mode,
+      interactive: trading ? isMyActingTurn(state) : true,
+      locked: Boolean(state.locked),
+      afterTrade: pending?.afterTrade ?? 'ROLL',
+      seatNameOf: (id) => seatNameOf(state, id),
+      mySeatIds: state.mySeats.map((seat) => seat.seatId),
+      queueSeats: state.mySeats,
+      onSelectSeat: (nextSeatId) => openQueueSheet(nextSeatId),
+    });
+
+    modalHost.present(
+      tradeModalSpec({
+        tradeView,
+        seatName: seatNameOf(state, seatId),
+        mode: tradeSheet.mode,
+        onDismiss: () => {
+          tradeSheet = null;
+        },
+      }),
+    );
+    modalHost.closeOthers([TRADE_MODAL_ID, ...keep]);
+    return true;
   }
 
   /* ── 모달 동기화 (phase + pending) ─────────────────────────── */
@@ -240,6 +483,7 @@ export function createGameController({ appRoot, overlayRoot }) {
     }
 
     if (view.isOver) {
+      tradeSheet = null;
       presentGameOver(state);
       modalHost.closeOthers([GAME_OVER_MODAL_ID, CELL_SHEET_ID]);
       return;
@@ -248,6 +492,19 @@ export function createGameController({ appRoot, overlayRoot }) {
     const pending = view.pending;
     // 목적지 확인 시트는 공항 선택 페이즈에서만 남겨 둔다.
     const keep = view.phase === 'AWAIT_TRAVEL' ? [CELL_SHEET_ID, TRAVEL_MODAL_ID] : [CELL_SHEET_ID];
+    // 시장 설명 시트들은 어느 페이즈에서든 읽는 중일 수 있다(게임 진행을 막지 않는다).
+    if (newsSheetOpen) {
+      modalHost.present(newsCardSpec({ market: view.market, onClose: () => closeNewsSheet() }));
+      keep.push(NEWS_MODAL_ID);
+    }
+    if (modalHost.isOpen(TUTORIAL_MODAL_ID)) {
+      keep.push(TUTORIAL_MODAL_ID);
+    }
+
+    // 거래 창구/예약 주문 시트가 열려 있으면 그것이 주 모달이다.
+    if (syncTradeSheet(state, keep)) {
+      return;
+    }
 
     // 카지노는 관전자도 함께 본다(조작은 자기 차례에만).
     if (view.phase === 'AWAIT_CASINO' && pending) {
@@ -352,12 +609,23 @@ export function createGameController({ appRoot, overlayRoot }) {
           creditorName: seatNameOf(state, pending.creditorId),
           keepBody: false,
           locked,
+          rules: view.market?.rules,
+          // 옛 서버(assetKind 없음)를 위해 부동산은 `SELL { cityIndex }` 경로를 그대로 남긴다.
           onSell: (cityIndex) => void sendCommand('SELL', { cityIndex }),
+          onSellAsset: (item, quantity) =>
+            void sendCommand('SELL_ASSET', {
+              assetKind: item.assetKind,
+              assetId: item.assetId,
+              // 전량이면 quantity를 생략한다(서버 기본값이 전량이다).
+              ...(quantity < item.maxQuantity ? { quantity } : {}),
+            }),
           onAutoSell: () => void sendCommand('AUTO_SELL'),
           onTakeLoan: () => void sendCommand('TAKE_LOAN'),
           onDeclareBankruptcy: () => void sendCommand('DECLARE_BANKRUPTCY'),
         });
 
+      // 거래 창구(`TRADE`)는 결정 모달이 아니라 전용 시트로 띄운다(syncTradeSheet).
+      case 'TRADE':
       default:
         return null;
     }
@@ -378,6 +646,9 @@ export function createGameController({ appRoot, overlayRoot }) {
         // 이번 세션에서 GAME_OVER 이벤트를 받았으면 그 사유를, 재접속 스냅샷이라 못 받았으면 뷰에서 추정한다.
         reason: gameOverReason ?? inferGameOverReason(state.view),
         slotOfSeat: (seatId) => slotOf(state, seatId),
+        // 순위에는 총자산 내역이 없다(현금·채무만) — 내역은 players[].netWorth에서 찾는다.
+        playerOfSeat: (seatId) => state.view.players.find((player) => player.seatId === seatId) ?? null,
+        withMarket: Boolean(state.view.market),
         onBackToRoom: () => {
           modalHost.close(GAME_OVER_MODAL_ID);
         },
@@ -694,11 +965,33 @@ export function createGameController({ appRoot, overlayRoot }) {
     if (commandLock.locked) {
       return;
     }
-    const seatId = state.view.currentSeatId;
+    // "지금 결정하는 좌석"으로 보낸다(오늘은 currentSeatId와 같지만 앞날에 안전하다 — API.md 변경 18).
+    const seatId = actingSeatId(state);
     if (!isMySeat(state, seatId)) {
       toast.info('지금은 내 차례가 아닙니다.');
       return;
     }
+    await postCommand(seatId, type, payload);
+  }
+
+  /**
+   * 좌석을 지정해 보내는 커맨드. 예약 주문(`QUEUE_ORDER`/`CANCEL_QUEUED_ORDER`)은
+   * **내 차례가 아니어도** 자기 좌석에 대해 허용된다(API.md 변경 25).
+   */
+  async function sendSeatCommand(seatId, type, payload) {
+    const state = store.state;
+    if (!roomCode || !state.view || commandLock.locked) {
+      return;
+    }
+    if (!isMySeat(state, seatId)) {
+      toast.info('이 좌석은 이 기기의 좌석이 아닙니다.');
+      return;
+    }
+    await postCommand(seatId, type, payload);
+  }
+
+  async function postCommand(seatId, type, payload) {
+    const state = store.state;
     const token = storage.tokenOf(roomCode, seatId);
     if (!token) {
       toast.info('이 좌석의 권한이 이 기기에 없습니다.');
@@ -717,10 +1010,30 @@ export function createGameController({ appRoot, overlayRoot }) {
     } catch (error) {
       commandLock.onError();
       syncLock();
-      reportError(error);
+      // 레이트 리밋(ERR019)은 즉시 재시도하면 또 막힌다 — 주문 버튼을 잠깐 잠근다.
+      if (!applyTradeCooldown(error)) {
+        reportError(error);
+      }
       // 서버 뷰가 유일한 진실이므로 현재 상태를 다시 받아 화면을 되돌린다.
       await refreshRoomState();
     }
+  }
+
+  /**
+   * 거래 에러에 쿨다운이 필요한지 보고, 필요하면 안내까지 마친다.
+   * @returns {boolean} 안내를 여기서 처리했는지
+   */
+  function applyTradeCooldown(error) {
+    if (!(error instanceof api.ApiError)) {
+      return false;
+    }
+    const hint = tradeErrorHint(error.code);
+    if (hint.cooldownMs <= 0) {
+      return false;
+    }
+    tradeView.startCooldown(hint.cooldownMs);
+    toast.info(hint.message, '잠시 뒤 다시');
+    return true;
   }
 
   async function refreshRoomState() {

@@ -6,12 +6,12 @@
  * "내 위치 보기"로 내 말을 바로 찾아갈 수 있게 한다.
  */
 
-import { button, el, setText, toggleClass } from '../dom.js';
+import { button, el, setHidden, setText, toggleClass } from '../dom.js';
 import { currentLocationLabel } from '../domain/locationLabel.js';
 import { isMySeat, seatNameOf, slotOf, spaceOf } from '../store.js';
 import { createDicePair } from './diceView.js';
 
-export function createStatusStrip({ onFindMe, onToggleZoom }) {
+export function createStatusStrip({ onFindMe, onToggleZoom, onOpenTrade = () => {} }) {
   const chip = el('span', { class: 'strip-chip', 'aria-hidden': 'true' });
   const nameNode = el('span', { class: 'strip-name' });
   const tagNode = el('span', { class: 'strip-tag' });
@@ -40,23 +40,38 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
     '🔍 확대',
   );
 
+  // 거래 창구를 닫아 두고 보드를 보다가 여기서 다시 열 수 있다(폰에서 늘 손가락이 닿는 자리).
+  const tradeButton = button(
+    { class: 'btn btn--primary btn--small strip-btn strip-btn--trade', on: { click: () => onOpenTrade() } },
+    '💱 거래 창구 열기',
+  );
+
   const element = el('section', { class: 'status-strip', 'aria-label': '현재 상황' }, [
     el('div', { class: 'strip-line' }, [
       el('span', { class: 'strip-who' }, [chip, nameNode, tagNode]),
       locationNode,
     ]),
+    tradeButton,
     el('div', { class: 'strip-line strip-line--tools' }, [dice.element, findButton, zoomButton]),
   ]);
+  setHidden(tradeButton, true);
 
   return {
     element,
     dice,
 
-    update(state) {
+    /**
+     * @param {object} state
+     * @param {{canTrade?: boolean}} [context] 거래 창구를 열 수 있는 차례인지
+     */
+    update(state, context = {}) {
       const view = state.view;
       if (!view) {
         return;
       }
+      setHidden(tradeButton, !context.canTrade);
+      tradeButton.disabled = Boolean(state.locked);
+
       const slot = slotOf(state, view.currentSeatId);
       chip.dataset.slot = slot.color;
       chip.dataset.shape = slot.shape;

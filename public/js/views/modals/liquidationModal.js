@@ -1,13 +1,19 @@
 /**
  * 정리 페이즈 모달(`AWAIT_LIQUIDATION`).
- * pending: `{amountDue, creditorId, canSell, canLoan, sellable: [{index, name, refund}]}`
+ *
+ * pending.sellable 항목은 자산군이 섞여 온다(API.md 6장):
+ * `{ assetKind: 'PROPERTY'|'STOCK'|'DEPOSIT', assetId, label, refund, quantity, maxQuantity, unitValue, index?, name? }`
+ * - `PROPERTY`는 통째로 하나(수량 1). 옛 서버(assetKind 없음)에서는 `SELL { cityIndex }`로 떨어진다.
+ * - `STOCK`은 수량을, `DEPOSIT`은 금액을 골라 일부만 팔 수 있다(`SELL_ASSET { quantity }`).
+ * - 정리·파산 중 매각에는 **거래 수수료가 없다**(refund가 그대로 들어온다).
  *
  * 현금이 지불액에 닿는 순간 서버가 자동으로 지불을 마치고 흐름을 이어 준다.
  * 파산 선언은 되돌릴 수 없으므로 두 단계 확인을 받는다.
  */
 
-import { button, el, setText } from '../../dom.js';
+import { button, el, replaceChildren, setText } from '../../dom.js';
 import { formatWon } from '../../format.js';
+import { normalizeRules } from '../../domain/marketRules.js';
 import { actionRow, infoRow, moneyRow, quietButton } from './parts.js';
 
 export const LIQUIDATION_MODAL_ID = 'liquidation';
@@ -15,18 +21,164 @@ export const LIQUIDATION_MODAL_ID = 'liquidation';
 const LOAN_PRINCIPAL = 1_000_000;
 const LOAN_DEBT = 1_200_000;
 
+const SECTIONS = Object.freeze([
+  { kind: 'PROPERTY', title: '부동산', help: '환급액은 투자액의 50%입니다. 건물도 함께 사라집니다.' },
+  { kind: 'STOCK', title: '주식', help: '현재가로 팝니다. 정리 중에는 거래 수수료가 없습니다.' },
+  { kind: 'DEPOSIT', title: '예금', help: '정해진 단위로만 뺄 수 있습니다.' },
+]);
+
+/**
+ * 부분 매각 수량 초안. 모달 본문이 다시 그려져도(서버 뷰가 바뀔 때마다 그린다) 사용자가 맞춘
+ * 수량이 날아가지 않게 모듈 수준에 둔다. 값은 렌더할 때마다 최신 `maxQuantity`로 다시 묶는다.
+ * @type {Map<string, number>}
+ */
+const drafts = new Map();
+
+const draftKey = (item) => `${item.assetKind ?? 'PROPERTY'}:${item.assetId ?? item.index}`;
+
+function clampDraft(item, unit) {
+  const max = Number.isInteger(item.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : 1;
+  const stored = drafts.get(draftKey(item));
+  const raw = Number.isInteger(stored) ? stored : max;
+  if (unit <= 1) {
+    return Math.min(max, Math.max(1, raw));
+  }
+  // 예금은 단위의 배수여야 한다. 잔액이 단위보다 작으면 전액(잔액)만 가능하다.
+  const ceiling = Math.floor(max / unit) * unit;
+  if (ceiling < unit) {
+    return max;
+  }
+  return Math.min(ceiling, Math.max(unit, Math.floor(raw / unit) * unit));
+}
+
+/** 자산군별 한 행. 수량을 고를 수 있는 자산은 스테퍼를 함께 준다. */
+function sellRow(item, { locked, unit, onSellAsset, onSellProperty }) {
+  const isProperty = (item.assetKind ?? 'PROPERTY') === 'PROPERTY';
+  const label = item.label ?? item.name ?? '자산';
+  const maxQuantity = Number.isInteger(item.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : 1;
+  const unitValue = Number.isInteger(item.unitValue) && item.unitValue > 0 ? item.unitValue : null;
+  const pickable = !isProperty && maxQuantity > 1;
+
+  const row = el('div', { class: 'sell-row' });
+
+  if (!pickable) {
+    replaceChildren(row, [
+      el('span', { class: 'sell-name', text: label }),
+      el('span', { class: 'sell-refund', text: `+${formatWon(item.refund)}` }),
+      button(
+        {
+          class: 'btn btn--ghost btn--small',
+          disabled: locked,
+          'aria-busy': locked ? 'true' : undefined,
+          dataset: { focusKey: `sell-${draftKey(item)}` },
+          on: {
+            click: () =>
+              isProperty && item.assetKind === undefined ? onSellProperty(item.index) : onSellAsset(item, maxQuantity),
+          },
+        },
+        '매각',
+      ),
+    ]);
+    return row;
+  }
+
+  let quantity = clampDraft(item, unit);
+  const step = unit > 1 ? unit : 1;
+  const suffix = unit > 1 ? '' : '주';
+
+  const draw = () => {
+    drafts.set(draftKey(item), quantity);
+    const refund = unitValue ? unitValue * quantity : item.refund;
+    replaceChildren(row, [
+      el('div', { class: 'sell-main' }, [
+        el('span', { class: 'sell-name', text: label }),
+        el('span', {
+          class: 'sell-unit',
+          text: unit > 1 ? `잔액 ${formatWon(maxQuantity)}` : `${formatWon(unitValue ?? 0)} × 최대 ${maxQuantity}주`,
+        }),
+      ]),
+      el('div', { class: 'sell-stepper' }, [
+        button(
+          {
+            class: 'trade-step',
+            'aria-label': '줄이기',
+            disabled: locked || quantity <= step,
+            on: {
+              click: () => {
+                quantity = Math.max(step, quantity - step);
+                draw();
+              },
+            },
+          },
+          '−',
+        ),
+        el('span', {
+          class: 'sell-quantity',
+          text: unit > 1 ? formatWon(quantity) : `${quantity}${suffix}`,
+        }),
+        button(
+          {
+            class: 'trade-step',
+            'aria-label': '늘리기',
+            disabled: locked || quantity >= maxQuantity,
+            on: {
+              click: () => {
+                quantity = Math.min(maxQuantity, quantity + step);
+                draw();
+              },
+            },
+          },
+          '＋',
+        ),
+        button(
+          {
+            class: 'btn btn--chip',
+            disabled: locked || quantity >= maxQuantity,
+            on: {
+              click: () => {
+                quantity = maxQuantity;
+                draw();
+              },
+            },
+          },
+          '전량',
+        ),
+      ]),
+      el('div', { class: 'sell-tail' }, [
+        el('span', { class: 'sell-refund', text: `+${formatWon(refund)}` }),
+        button(
+          {
+            class: 'btn btn--ghost btn--small',
+            disabled: locked,
+            'aria-busy': locked ? 'true' : undefined,
+            dataset: { focusKey: `sell-${draftKey(item)}` },
+            on: { click: () => onSellAsset(item, quantity) },
+          },
+          '매각',
+        ),
+      ]),
+    ]);
+  };
+  draw();
+  return row;
+}
+
 export function liquidationModalSpec({
   pending,
   cash,
   creditorName,
   keepBody,
   locked = false,
+  rules,
   onSell,
+  onSellAsset,
   onAutoSell,
   onTakeLoan,
   onDeclareBankruptcy,
 }) {
   const shortfall = Math.max(0, pending.amountDue - cash);
+  const depositUnit = normalizeRules(rules).depositUnit;
+  const sellable = Array.isArray(pending.sellable) ? pending.sellable : [];
 
   return {
     id: LIQUIDATION_MODAL_ID,
@@ -70,28 +222,39 @@ export function liquidationModalSpec({
         bankruptcySlot.querySelector('[data-focus-key="bankrupt-confirm"]')?.focus();
       };
 
-      const sellList = el('div', { class: 'sell-list' });
-      if (pending.sellable.length === 0) {
-        sellList.appendChild(el('p', { class: 'empty-note', text: '팔 수 있는 자산이 없습니다.' }));
-      } else {
-        for (const item of pending.sellable) {
-          sellList.appendChild(
-            el('div', { class: 'sell-row' }, [
-              el('span', { class: 'sell-name', text: item.name }),
-              el('span', { class: 'sell-refund', text: `+${formatWon(item.refund)}` }),
-              button(
-                {
-                  class: 'btn btn--ghost btn--small',
-                  disabled: locked,
-                  'aria-busy': locked ? 'true' : undefined,
-                  dataset: { focusKey: `sell-${item.index}` },
-                  on: { click: () => onSell(item.index) },
-                },
-                '매각',
-              ),
-            ]),
-          );
+      const sections = [];
+      for (const section of SECTIONS) {
+        // 옛 서버는 `assetKind`를 보내지 않는다 — 그때는 전부 부동산이다.
+        const items = sellable.filter((item) => (item.assetKind ?? 'PROPERTY') === section.kind);
+        if (items.length === 0) {
+          continue;
         }
+        sections.push(
+          el('section', { class: 'liq-section' }, [
+            el('h3', { class: 'liq-title', text: `${section.title} 매각` }),
+            el('p', { class: 'modal-help', text: section.help }),
+            el(
+              'div',
+              { class: 'sell-list' },
+              items.map((item) =>
+                sellRow(item, {
+                  locked,
+                  unit: section.kind === 'DEPOSIT' ? depositUnit : 1,
+                  onSellAsset,
+                  onSellProperty: onSell,
+                }),
+              ),
+            ),
+          ]),
+        );
+      }
+      if (sections.length === 0) {
+        sections.push(
+          el('section', { class: 'liq-section' }, [
+            el('h3', { class: 'liq-title', text: '선택 매각' }),
+            el('p', { class: 'empty-note', text: '팔 수 있는 자산이 없습니다.' }),
+          ]),
+        );
       }
 
       return el('div', { class: 'modal-stack' }, [
@@ -100,11 +263,7 @@ export function liquidationModalSpec({
         moneyRow('부족한 금액', shortfall, { tone: 'out' }),
         infoRow('채권자', pending.creditorId ? creditorName : '은행 (잭팟 적립)'),
 
-        el('section', { class: 'liq-section' }, [
-          el('h3', { class: 'liq-title', text: '선택 매각' }),
-          el('p', { class: 'modal-help', text: '환급액은 투자액의 50%입니다. 건물도 함께 사라집니다.' }),
-          sellList,
-        ]),
+        ...sections,
 
         el('section', { class: 'liq-section' }, [
           el('h3', { class: 'liq-title', text: '빠른 수단' }),
@@ -117,7 +276,7 @@ export function liquidationModalSpec({
                 dataset: { focusKey: 'auto-sell' },
                 on: { click: onAutoSell },
               },
-              '자동 매각 (환급 낮은 순)',
+              '자동 매각',
             ),
             button(
               {
@@ -130,6 +289,10 @@ export function liquidationModalSpec({
               `대출 받기 (+${formatWon(LOAN_PRINCIPAL)})`,
             ),
           ]),
+          el('p', {
+            class: 'modal-help',
+            text: '자동 매각 순서: 주식 → 예금 → 부동산. 같은 자산군에서는 환급액이 낮은 것부터 팔고, 현금이 지불액에 닿으면 멈춥니다.',
+          }),
           el('p', {
             class: 'modal-help',
             text: pending.canLoan
