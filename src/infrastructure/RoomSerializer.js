@@ -1,4 +1,8 @@
 import { ROOM_STATUS, MAX_SEATS, Room } from '../domain/room/Room.js';
+import {
+  ALLOWED_FINANCE_OPTIONS,
+  FINANCE_OPTION_KEYS,
+} from '../domain/room/FinanceOptions.js';
 import { SEAT_KINDS } from '../domain/room/Seat.js';
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
 import { ALL_PHASES, PHASES } from '../domain/game/phases.js';
@@ -71,11 +75,7 @@ export function validateRoomSnapshot(snapshot) {
       `호스트 좌석이 목록에 없습니다: ${snapshot.hostSeatId}`,
     );
   }
-  assert(isPlainObject(snapshot.options), '방 옵션이 객체가 아닙니다');
-  assert(
-    snapshot.options.roundLimit === null || isFiniteInteger(snapshot.options.roundLimit),
-    `라운드 제한 오류: ${snapshot.options.roundLimit}`,
-  );
+  validateOptionsSnapshot(snapshot.options);
   assert(isFiniteInteger(snapshot.createdAt), '생성 시각 오류');
   assert(isFiniteInteger(snapshot.updatedAt), '수정 시각 오류');
 
@@ -84,6 +84,33 @@ export function validateRoomSnapshot(snapshot) {
     return;
   }
   validateGameSnapshot(snapshot.game, snapshot.seats);
+}
+
+/**
+ * 방 옵션 검증.
+ * `finance`는 **없을 수도 있다** — schemaVersion 1 시절 저장된 방에는 없고,
+ * 마이그레이션이 기본값으로 채운다. 있으면 키와 값이 모두 화이트리스트여야 한다.
+ */
+function validateOptionsSnapshot(options) {
+  assert(isPlainObject(options), '방 옵션이 객체가 아닙니다');
+  assert(
+    options.roundLimit === null || isFiniteInteger(options.roundLimit),
+    `라운드 제한 오류: ${options.roundLimit}`,
+  );
+  if (options.finance === undefined || options.finance === null) {
+    return;
+  }
+  assert(isPlainObject(options.finance), '금융 옵션이 객체가 아닙니다');
+  for (const key of Object.keys(options.finance)) {
+    assert(FINANCE_OPTION_KEYS.includes(key), `알 수 없는 금융 옵션: ${key}`);
+  }
+  for (const key of FINANCE_OPTION_KEYS) {
+    const value = options.finance[key];
+    assert(
+      value === undefined || ALLOWED_FINANCE_OPTIONS[key].includes(value),
+      `금융 옵션 값 오류: ${key}=${String(value)}`,
+    );
+  }
 }
 
 function validateGameSnapshot(game, seats) {

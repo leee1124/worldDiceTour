@@ -35,7 +35,8 @@ export function toRoomDto(room, { onlineSeatIds = [], autoStalled = false } = {}
     code: room.code,
     status: room.status,
     hostSeatId: room.hostSeatId,
-    options: { roundLimit: room.options.roundLimit },
+    // `finance`는 가산 필드다(기존 UI는 `roundLimit`만 읽어도 된다).
+    options: { roundLimit: room.options.roundLimit, finance: room.options.finance },
     maxSeats: MAX_SEATS,
     seats: room.seats.map((seat) => ({
       id: seat.id,

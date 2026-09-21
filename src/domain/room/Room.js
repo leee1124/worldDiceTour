@@ -1,5 +1,6 @@
 import { Game } from '../game/Game.js';
 import { DomainError } from '../shared/DomainError.js';
+import { normalizeFinanceOptions } from './FinanceOptions.js';
 import { SEAT_KINDS, Seat } from './Seat.js';
 
 /** 방 상태. */
@@ -51,7 +52,10 @@ export class Room {
     this.#status = status;
     this.#hostSeatId = hostSeatId;
     this.#seats = seats;
-    this.#options = { roundLimit: options.roundLimit ?? null };
+    this.#options = {
+      roundLimit: options.roundLimit ?? null,
+      finance: normalizeFinanceOptions(options.finance),
+    };
     this.#game = game;
     this.#createdAt = createdAt;
     this.#updatedAt = updatedAt;
@@ -108,7 +112,7 @@ export class Room {
   }
 
   get options() {
-    return { ...this.#options };
+    return { roundLimit: this.#options.roundLimit, finance: { ...this.#options.finance } };
   }
 
   get game() {
@@ -229,14 +233,22 @@ export class Room {
     return seat;
   }
 
-  setOptions({ roundLimit, bySeatId, now }) {
+  /**
+   * 방 옵션을 바꾼다(호스트, **대기실에서만**).
+   * `START` 시점의 옵션이 판 내내 고정된다 — 진행 중인 판에 밸런스/불변식이 끼어들면 안 된다.
+   *
+   * `finance`를 생략하면 기존 값을 유지한다(금융 옵션을 모르는 기존 클라이언트 호환).
+   */
+  setOptions({ roundLimit, finance, bySeatId, now }) {
     this.assertHost(bySeatId);
     this.#assertLobby();
     const normalized = roundLimit ?? null;
     if (!ALLOWED_ROUND_LIMITS.includes(normalized)) {
       throw DomainError.invalidArgument(`선택할 수 없는 라운드 제한입니다: ${roundLimit}`);
     }
-    this.#options = { roundLimit: normalized };
+    // 검증이 먼저 끝나야 한다 — 거부된 요청이 상태를 절반만 바꿔서는 안 된다.
+    const nextFinance = normalizeFinanceOptions(finance, { base: this.#options.finance });
+    this.#options = { roundLimit: normalized, finance: nextFinance };
     this.touch(now);
   }
 
@@ -357,7 +369,10 @@ export class Room {
       status: this.#status,
       hostSeatId: this.#hostSeatId,
       seats: this.#seats.map((seat) => seat.toSnapshot()),
-      options: { roundLimit: this.#options.roundLimit },
+      options: {
+        roundLimit: this.#options.roundLimit,
+        finance: { ...this.#options.finance },
+      },
       game: this.#game ? this.#game.toSnapshot() : null,
       createdAt: this.#createdAt,
       updatedAt: this.#updatedAt,

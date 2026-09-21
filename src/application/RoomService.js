@@ -178,7 +178,15 @@ export class RoomService {
         );
         break;
       case HOST_ACTIONS.SET_OPTIONS:
-        this.#guard(() => room.setOptions({ roundLimit: action.roundLimit ?? null, bySeatId, now }));
+        this.#guard(() =>
+          room.setOptions({
+            roundLimit: action.roundLimit ?? null,
+            // 생략하면 도메인이 기존 금융 옵션을 유지한다(가산 호환).
+            finance: action.finance,
+            bySeatId,
+            now,
+          }),
+        );
         break;
       case HOST_ACTIONS.SET_AUTOPILOT:
         this.#guard(() =>
