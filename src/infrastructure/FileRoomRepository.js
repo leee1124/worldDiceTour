@@ -4,6 +4,9 @@ import path from 'node:path';
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
 import { RoomSchemaError, parseRoomJson, serializeRoom } from './RoomSerializer.js';
 
+/** 해석할 수 없는 저장 파일에 붙이는 꼬리표. 이 확장자는 조회/목록 경로가 모두 무시한다. */
+const CORRUPT_SUFFIX = '.corrupt';
+
 /**
  * 방 상태를 `data/rooms/<CODE>.json`에 저장한다(서버 재시작 후 이어하기).
  * 이 디렉터리는 정적 서빙 대상이 아니다(정적 루트는 public/ 뿐) — 파일에 좌석 토큰이 들어 있다.
@@ -51,6 +54,24 @@ export class FileRoomRepository {
     return this.#parse(code, text);
   }
 
+  /**
+   * 해석할 수 없는 파일을 `<CODE>.json.corrupt`로 옮긴다.
+   * 그대로 두면 같은 코드의 방을 만들 수도, 고칠 수도 없는 "영구 유령 방"이 되므로
+   * 목록/조회 경로에서 비켜 놓고 원본은 진단용으로 남긴다.
+   */
+  async #quarantine(code, reason) {
+    const source = this.#pathOf(code);
+    const target = `${source}${CORRUPT_SUFFIX}`;
+    try {
+      await rename(source, target);
+      this.#logger.error(
+        `[FileRoomRepository] 손상된 저장 파일을 격리했습니다 ${code} → ${path.basename(target)}: ${reason}`,
+      );
+    } catch (error) {
+      this.#logger.error(`[FileRoomRepository] 손상 파일 격리 실패 ${code}: ${error.message}`);
+    }
+  }
+
   async findAll() {
     await this.init();
     let entries;
@@ -87,16 +108,14 @@ export class FileRoomRepository {
     }
   }
 
-  /** 스키마가 깨진 파일은 버리고(게임을 이어갈 수 없으므로) 로그를 남긴다. */
-  #parse(code, text) {
+  /** 스키마가 깨진 파일은 격리하고(게임을 이어갈 수 없으므로) 로그를 남긴다. */
+  async #parse(code, text) {
     try {
       return parseRoomJson(text, this.#random);
     } catch (error) {
-      if (error instanceof RoomSchemaError) {
-        this.#logger.error(`[FileRoomRepository] 저장 파일 스키마 오류 ${code}: ${error.message}`);
-        return null;
-      }
-      this.#logger.error(`[FileRoomRepository] 방 복원 실패 ${code}: ${error.message}`);
+      const label = error instanceof RoomSchemaError ? '저장 파일 스키마 오류' : '방 복원 실패';
+      this.#logger.error(`[FileRoomRepository] ${label} ${code}: ${error.message}`);
+      await this.#quarantine(code, error.message);
       return null;
     }
   }

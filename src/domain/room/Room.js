@@ -192,12 +192,17 @@ export class Room {
     return seat;
   }
 
-  /** 본인 퇴장 또는 호스트 강퇴. 호스트가 나가면 다음 좌석이 호스트를 이어받는다. */
+  /**
+   * 본인 퇴장 또는 호스트 강퇴. 호스트가 나가면 다음 좌석이 호스트를 이어받는다.
+   * **대기실에서만** 가능하다 — 진행 중인 게임의 플레이어를 없애면 턴 순서/채권 관계가 깨져
+   * 방을 되살릴 수 없기 때문이다(게임 중 "나가기"는 접속만 끊고, 호스트가 자동 진행으로 돌린다).
+   */
   removeSeat({ seatId, bySeatId, now }) {
     const seat = this.seatById(seatId);
     if (!seat) {
       throw DomainError.seatNotFound(`좌석을 찾을 수 없습니다: ${seatId}`);
     }
+    this.#assertLobby();
     if (seatId !== bySeatId) {
       this.assertHost(bySeatId);
     }

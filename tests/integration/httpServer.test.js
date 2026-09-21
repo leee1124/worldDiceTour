@@ -230,6 +230,26 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.body.room.seats.length, 1);
     });
 
+    it('게임 중에는 좌석을 지울 수 없고(409 ERR005) 방 조회는 계속 200이다', async () => {
+      // Given
+      const started = await createStartedRoom();
+
+      // When
+      const response = await request(baseUrl, {
+        method: 'DELETE',
+        path: `/api/rooms/${started.code}/seats/${started.guest.seatId}`,
+        token: started.guest.seatToken,
+      });
+
+      // Then
+      assert.equal(response.status, 409);
+      assert.equal(response.body.code, 'ERR005');
+      const room = await request(baseUrl, { path: `/api/rooms/${started.code}` });
+      assert.equal(room.status, 200);
+      assert.equal(room.body.room.seats.length, 2);
+      assert.equal(room.body.room.status, 'PLAYING');
+    });
+
     it('좌석 id 형식이 틀리면 400이다', async () => {
       // Given
       const created = await request(baseUrl, {

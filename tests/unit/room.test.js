@@ -158,6 +158,44 @@ describe('Room(방 Aggregate)', () => {
         code: DOMAIN_ERROR_CODES.SEAT_NOT_FOUND,
       });
     });
+
+    it('게임이 시작된 뒤에는 스스로 나갈 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource(), now: NOW });
+
+      // When / Then
+      assert.throws(() => room.removeSeat({ seatId: guest.id, bySeatId: guest.id, now: NOW }), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(room.seats.length, 2);
+      assert.equal(room.game.players.length, 2);
+    });
+
+    it('게임이 시작된 뒤에는 호스트도 좌석을 강퇴할 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource(), now: NOW });
+
+      // When / Then
+      assert.throws(() => room.removeSeat({ seatId: guest.id, bySeatId: host.id, now: NOW }), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(room.seats.length, 2);
+    });
+
+    it('종료된 방에서도 좌석을 제거할 수 없다', () => {
+      // Given
+      const { room, host, guest } = roomWithTwoSeats();
+      room.start({ bySeatId: host.id, random: new FakeRandomSource(), now: NOW });
+      room.finish(NOW);
+
+      // When / Then
+      assert.throws(() => room.removeSeat({ seatId: guest.id, bySeatId: guest.id, now: NOW }), {
+        code: DOMAIN_ERROR_CODES.INVALID_STATE,
+      });
+      assert.equal(room.seats.length, 2);
+    });
   });
 
   describe('호스트 권한', () => {

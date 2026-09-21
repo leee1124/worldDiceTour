@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -168,6 +168,56 @@ describe('FileRoomRepository(파일 저장소)', () => {
 
       // Then
       assert.deepEqual(rooms.map((room) => room.code), ['AB2C']);
+    });
+
+    it('깨진 파일은 .corrupt로 격리해 유령 방이 남지 않게 한다', async () => {
+      // Given
+      const logs = [];
+      const repository = new FileRoomRepository({
+        directory,
+        random: new FakeRandomSource(),
+        logger: { error: (message) => logs.push(message) },
+      });
+      await writeFile(path.join(directory, 'AB2C.json'), '{ not json', 'utf8');
+
+      // When
+      const room = await repository.findByCode('AB2C');
+
+      // Then
+      assert.equal(room, null);
+      const entries = await readdir(directory);
+      assert.deepEqual(entries, ['AB2C.json.corrupt']);
+      assert.ok(logs.some((message) => /격리/.test(message)), logs.join('\n'));
+    });
+
+    it('격리된 파일은 같은 코드로 방을 다시 만들 수 있게 비켜준다', async () => {
+      // Given
+      const repository = newRepository();
+      await writeFile(path.join(directory, 'AB2C.json'), 'broken', 'utf8');
+      await repository.findByCode('AB2C');
+
+      // When
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+
+      // Then
+      const reloaded = await repository.findByCode('AB2C');
+      assert.equal(reloaded.code, 'AB2C');
+      assert.equal(reloaded.seats.length, 1);
+    });
+
+    it('격리 파일은 목록 조회 대상이 아니다', async () => {
+      // Given
+      const repository = newRepository();
+      await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
+      await writeFile(path.join(directory, 'DEF2.json'), 'broken', 'utf8');
+
+      // When
+      await repository.findAll();
+      const rooms = await repository.findAll();
+
+      // Then
+      assert.deepEqual(rooms.map((room) => room.code), ['AB2C']);
+      assert.deepEqual((await readdir(directory)).sort(), ['AB2C.json', 'DEF2.json.corrupt']);
     });
 
     it('좌석 수가 한도를 넘는 스냅샷을 거부한다', () => {

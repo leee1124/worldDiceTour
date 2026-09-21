@@ -139,6 +139,45 @@ describe('RoomService(방 유스케이스)', () => {
       );
     });
 
+    it('게임이 진행 중이면 퇴장 요청을 ERR005로 거부하고 방은 그대로 남는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.leaveSeat({
+            code: started.code,
+            seatId: started.guests[0].seatId,
+            token: started.guests[0].seatToken,
+          }),
+        { code: 'ERR005' },
+      );
+      const room = await fixture.roomService.getRoom({ code: started.code });
+      assert.equal(room.status, ROOM_STATUS.PLAYING);
+      assert.equal(room.seats.length, 2);
+    });
+
+    it('게임이 진행 중이면 호스트의 강퇴도 ERR005로 거부한다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.leaveSeat({
+            code: started.code,
+            seatId: started.guests[0].seatId,
+            token: started.host.seatToken,
+          }),
+        { code: 'ERR005' },
+      );
+      const room = await fixture.roomService.getRoom({ code: started.code });
+      assert.equal(room.seats.length, 2);
+    });
+
     it('마지막 좌석이 나가면 방이 삭제된다', async () => {
       // Given
       const { roomService, repository } = createAppFixture({ random: codeRandom() });
