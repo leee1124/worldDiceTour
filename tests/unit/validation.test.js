@@ -9,7 +9,9 @@ import {
   parseJoinSeatBody,
   parsePresenceParam,
   requireSeatId,
+  safeText,
 } from '../../src/server/validation.js';
+import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
 
 const TOKEN = 'a'.repeat(64);
 
@@ -228,5 +230,115 @@ describe('입력 검증(화이트리스트)', () => {
       // Then
       assert.equal(pairs.length, 4);
     });
+  });
+
+  describe('원시 문자열화 공격(toString 오염)', () => {
+    /** JSON으로 보낼 수 있으면서 `${value}`를 터뜨리는 페이로드들. */
+    const hostilePayloads = [
+      ['toString이 숫자', { toString: 1 }],
+      ['toString이 null', { toString: null }],
+      ['toString이 객체', { toString: {} }],
+      ['toString과 valueOf가 모두 숫자', { toString: 1, valueOf: 1 }],
+    ];
+
+    for (const [label, hostile] of hostilePayloads) {
+      it(`${label}인 값도 ERR001로 거부한다(정수 검증)`, () => {
+        // Given / When / Then
+        assert.throws(
+          () => parseCommandBody({ type: COMMAND_TYPES.TRAVEL, payload: { destination: hostile } }),
+          { code: 'ERR001' },
+        );
+      });
+
+      it(`${label}인 값도 ERR001로 거부한다(커맨드 종류)`, () => {
+        // Given / When / Then
+        assert.throws(() => parseCommandBody({ type: hostile }), { code: 'ERR001' });
+      });
+
+      it(`${label}인 값도 ERR001로 거부한다(건물 목록)`, () => {
+        // Given / When / Then
+        assert.throws(
+          () => parseCommandBody({ type: COMMAND_TYPES.BUILD, payload: { buildings: [hostile] } }),
+          { code: 'ERR001' },
+        );
+      });
+
+      it(`${label}인 값도 ERR001로 거부한다(호스트 동작)`, () => {
+        // Given / When / Then
+        assert.throws(() => parseHostActionBody({ type: hostile }), { code: 'ERR001' });
+      });
+
+      it(`${label}인 값도 ERR001로 거부한다(카지노 선택값)`, () => {
+        // Given / When / Then
+        assert.throws(
+          () =>
+            parseCommandBody({
+              type: COMMAND_TYPES.CASINO_BET,
+              payload: { game: 'ODD_EVEN', bet: 10_000, choice: hostile },
+            }),
+          { code: 'ERR001' },
+        );
+      });
+
+      it(`${label}인 이름도 ERR001로 거부한다`, () => {
+        // Given / When / Then
+        assert.throws(() => parseCreateRoomBody({ hostName: hostile }), { code: 'ERR001' });
+      });
+    }
+
+    it('오류 메시지에는 공격자 값이 그대로 들어가지 않는다', () => {
+      // Given
+      const hostile = { toString: 1, secret: 'x'.repeat(5_000) };
+
+      // When
+      let detail = '';
+      try {
+        parseCommandBody({ type: COMMAND_TYPES.TRAVEL, payload: { destination: hostile } });
+      } catch (error) {
+        detail = error.detail ?? error.message;
+      }
+
+      // Then (길이가 제한되고 원본 문자열이 통째로 실리지 않는다)
+      assert.ok(detail.length < 500, `메시지가 너무 깁니다: ${detail.length}자`);
+      assert.equal(detail.includes('x'.repeat(200)), false);
+    });
+  });
+});
+
+describe('안전한 문자열화(safeText)', () => {
+  it('원시값은 그대로 보여준다', () => {
+    // Given / When / Then
+    assert.equal(safeText(42), '42');
+    assert.equal(safeText('hi'), 'hi');
+    assert.equal(safeText(null), 'null');
+    assert.equal(safeText(undefined), 'undefined');
+    assert.equal(safeText(true), 'true');
+  });
+
+  it('객체는 JSON으로, 길면 잘라서 보여준다', () => {
+    // Given / When
+    const text = safeText({ a: 1 });
+    const long = safeText({ a: 'y'.repeat(1_000) });
+
+    // Then
+    assert.equal(text, '{"a":1}');
+    assert.ok(long.length <= 130, `잘리지 않았습니다: ${long.length}자`);
+  });
+
+  it('toString이 오염된 객체에도 예외를 던지지 않는다', () => {
+    // Given / When / Then
+    assert.doesNotThrow(() => safeText({ toString: 1 }));
+    assert.doesNotThrow(() => safeText({ toString: null }));
+    assert.equal(typeof safeText({ toString: 1 }), 'string');
+  });
+
+  it('JSON으로 만들 수 없는 값도 종류만 알려준다', () => {
+    // Given (순환 참조)
+    const circular = {};
+    circular.self = circular;
+
+    // When / Then
+    assert.equal(typeof safeText(circular), 'string');
+    assert.match(safeText(circular), /object/);
   });
 });

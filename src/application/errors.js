@@ -19,6 +19,7 @@ export const ERROR_CATALOG = Object.freeze({
   ERR012: { status: 409, message: '좌석을 찾을 수 없습니다.' },
   ERR013: { status: 409, message: '게임을 시작할 수 없습니다.' },
   ERR014: { status: 405, message: '허용되지 않은 요청 방식입니다.' },
+  ERR015: { status: 403, message: '허용되지 않은 접속 주소입니다.' },
 });
 
 /** 도메인 사유 코드 → 클라이언트 에러 코드 매핑. */

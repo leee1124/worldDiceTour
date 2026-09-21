@@ -191,6 +191,19 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.body.code, 'ERR009');
     });
 
+    it('본문이 아주 커도 한도를 넘는 즉시 끊고 413을 돌려준다', async () => {
+      // Given (한도의 30배)
+      const huge = JSON.stringify({ hostName: 'a'.repeat(500_000) });
+
+      // When
+      const response = await request(baseUrl, { method: 'POST', path: '/api/rooms', body: huge });
+
+      // Then
+      assert.equal(response.status, 413);
+      assert.equal(response.body.code, 'ERR009');
+      assert.equal(response.headers.connection, 'close');
+    });
+
     it('JSON이 아니면 400이다', async () => {
       // Given / When
       const response = await request(baseUrl, {
@@ -277,6 +290,149 @@ describe('HTTP 서버(REST + SSE)', () => {
       // Then
       assert.equal(response.status, 405);
       assert.equal(response.body.code, 'ERR014');
+    });
+  });
+
+  describe('요청 헤더 방어', () => {
+    it('API JSON 응답에는 캐시 금지 헤더가 붙는다', async () => {
+      // Given / When
+      const response = await request(baseUrl, { path: '/api/rooms' });
+
+      // Then
+      assert.equal(response.status, 200);
+      assert.equal(response.headers['cache-control'], 'no-store');
+    });
+
+    it('에러 응답에도 캐시 금지 헤더가 붙는다', async () => {
+      // Given / When
+      const response = await request(baseUrl, { path: '/api/rooms/ZZZZ' });
+
+      // Then
+      assert.equal(response.status, 404);
+      assert.equal(response.headers['cache-control'], 'no-store');
+    });
+
+    it('연결 수와 헤더 타임아웃 상한이 설정돼 있다', () => {
+      // Given / When / Then
+      assert.equal(app.server.maxConnections, 256);
+      assert.equal(app.server.headersTimeout, 10_000);
+    });
+
+    describe('Content-Type 검사(CSRF 방어)', () => {
+      it('application/json이면 통과한다(charset 같은 파라미터 허용)', async () => {
+        // Given / When
+        const response = await request(baseUrl, {
+          method: 'POST',
+          path: '/api/rooms',
+          body: { hostName: '타입' },
+          headers: { 'content-type': 'application/json; charset=utf-8' },
+        });
+
+        // Then
+        assert.equal(response.status, 201);
+      });
+
+      const rejectedTypes = [
+        'text/plain',
+        'application/x-www-form-urlencoded',
+        'multipart/form-data; boundary=x',
+        'application/json-patch+json',
+        'text/plain; charset=utf-8',
+      ];
+
+      for (const contentType of rejectedTypes) {
+        it(`${contentType} 본문은 400 ERR001로 거부한다`, async () => {
+          // Given / When
+          const response = await request(baseUrl, {
+            method: 'POST',
+            path: '/api/rooms',
+            body: JSON.stringify({ hostName: '위조' }),
+            headers: { 'content-type': contentType },
+          });
+
+          // Then
+          assert.equal(response.status, 400);
+          assert.equal(response.body.code, 'ERR001');
+        });
+      }
+
+      it('본문이 있는데 Content-Type이 없으면 거부한다', async () => {
+        // Given / When
+        const response = await request(baseUrl, {
+          method: 'POST',
+          path: '/api/rooms',
+          body: JSON.stringify({ hostName: '위조' }),
+          headers: { 'content-type': '' },
+        });
+
+        // Then
+        assert.equal(response.status, 400);
+        assert.equal(response.body.code, 'ERR001');
+      });
+    });
+
+    describe('Host 헤더 검사(DNS 리바인딩 방어)', () => {
+      it('허용되지 않은 Host는 403 ERR015다', async () => {
+        // Given / When
+        const response = await request(baseUrl, {
+          path: '/api/rooms',
+          headers: { host: 'evil.example.com' },
+        });
+
+        // Then
+        assert.equal(response.status, 403);
+        assert.equal(response.body.code, 'ERR015');
+      });
+
+      it('정적 파일 요청도 같은 검사를 받는다', async () => {
+        // Given / When
+        const response = await request(baseUrl, {
+          path: '/',
+          headers: { host: 'evil.example.com' },
+        });
+
+        // Then
+        assert.equal(response.status, 403);
+        assert.equal(response.body.code, 'ERR015');
+      });
+
+      it('랜 사설 주소는 통과한다', async () => {
+        // Given / When
+        const response = await request(baseUrl, {
+          path: '/api/rooms',
+          headers: { host: '192.168.0.12:5173' },
+        });
+
+        // Then
+        assert.equal(response.status, 200);
+      });
+
+      it('점 없는 호스트명(mypc)과 mDNS 이름(mypc.local)도 통과한다', async () => {
+        // Given / When
+        const single = await request(baseUrl, { path: '/api/rooms', headers: { host: 'mypc:5173' } });
+        const mdns = await request(baseUrl, { path: '/api/rooms', headers: { host: 'mypc.local' } });
+
+        // Then
+        assert.equal(single.status, 200);
+        assert.equal(mdns.status, 200);
+      });
+    });
+
+    it('toString이 오염된 payload도 400 ERR001이며 500이 아니다', async () => {
+      // Given
+      const started = await createStartedRoom();
+
+      // When
+      const response = await request(baseUrl, {
+        method: 'POST',
+        path: `/api/rooms/${started.code}/commands`,
+        token: started.host.seatToken,
+        body: { type: 'TRAVEL', payload: { destination: { toString: 1 } } },
+      });
+
+      // Then
+      assert.equal(response.status, 400);
+      assert.equal(response.body.code, 'ERR001');
     });
   });
 

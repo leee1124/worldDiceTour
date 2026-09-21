@@ -22,6 +22,7 @@ export function createApp({
   logger = console,
   clock = { now: () => Date.now() },
   heartbeatMs,
+  allowedHosts = [],
 }) {
   const sseHub = new SseHub({ logger, ...(heartbeatMs ? { heartbeatMs } : {}) });
   const presence = { onlineSeatIds: (code) => sseHub.onlineSeatIds(code) };
@@ -69,7 +70,7 @@ export function createApp({
     logger,
   });
 
-  const server = createHttpServer({ controller, publicDir, logger });
+  const server = createHttpServer({ controller, publicDir, logger, allowedHosts });
 
   function currentPort() {
     const address = server.address();

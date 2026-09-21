@@ -14,13 +14,19 @@
 | 6 | 동작 | `SET_AUTOPILOT enabled:false`는 호스트 **또는 그 좌석 본인 토큰**으로 가능 | 돌아온 플레이어가 스스로 "직접 플레이로 복귀" 버튼을 누를 수 있다 |
 | 7 | 동작 | 자동 진행 중인 좌석의 게임 커맨드는 그 좌석 토큰이어도 `403 ERR003` | 자동 진행 중에는 행동 버튼을 비활성화하고 "복귀" 버튼만 노출할 것 |
 | 8 | **추가 필드** | `RoomDto.autoStalled`(boolean) — 자동 진행이 재시도까지 실패해 멈췄다는 일회성 신호 | `true`인 `room` 이벤트를 받으면 호스트에게 경고를 띄울 것. 다음 `room` 이벤트에서는 다시 `false` |
+| 9 | 동작 | 본문이 있는 요청은 `Content-Type: application/json`이 **필수**(파라미터 허용). 아니면 `400 ERR001` | `fetch`에 헤더를 반드시 붙일 것(`FormData`·`text/plain` 금지) |
+| 10 | **새 에러 코드** | `ERR015`(403) — 허용되지 않은 `Host` 헤더 | 랜 주소(사설 IP/localhost/`*.local`/단일 라벨)로만 접속. 그 외 도메인은 `ALLOWED_HOSTS` 환경변수에 등록 |
+| 11 | 동작 | 모든 API JSON 응답에 `cache-control: no-store` | 캐시 우회 쿼리 파라미터를 붙일 필요가 없다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
-- Base URL: `http://<호스트>:5173` (서버는 `0.0.0.0`에 바인딩. `PORT` 환경변수로 변경 가능)
+- Base URL: `http://<호스트>:5173` (서버는 `0.0.0.0`에 바인딩. `PORT` 환경변수로 변경 가능 — 1~65535 정수가 아니면 서버가 시작하지 않는다)
 - 요청/응답 본문은 모두 `application/json; charset=utf-8`
+- **본문이 있는 요청은 `Content-Type: application/json`이 필수다**(`; charset=utf-8` 같은 파라미터는 허용). 다른 타입이거나 헤더가 없으면 `400 ERR001` — 브라우저 폼으로는 이 타입을 만들 수 없으므로 사이트 간 요청 위조(CSRF)가 막힌다.
 - 인증 헤더: `Authorization: Bearer <seatToken>`
-- 요청 본문 최대 크기: **16KB** (초과 시 `ERR009`)
+- 요청 본문 최대 크기: **16KB**. 한도를 넘는 순간 수신을 멈추고 `413 ERR009`를 보낸 뒤 연결을 닫는다(`connection: close`).
+- **`Host` 헤더 검사(DNS 리바인딩 방어)**: 랜에서 실제로 쓰이는 주소만 받는다 — `localhost`, `127.0.0.0/8`, `[::1]`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, 점이 없는 단일 라벨 호스트명(`mypc`), `*.local`(mDNS). 각각 포트를 붙일 수 있다. 그 밖의 이름은 `ALLOWED_HOSTS` 환경변수(콤마 구분, 정확 일치)에 적어야 하며, 없으면 `403 ERR015`.
+- 모든 API JSON 응답에 `cache-control: no-store`가 붙는다.
 - **알 수 없는 필드는 무시**된다(화이트리스트 검증)
 - 모든 응답에 보안 헤더가 붙는다: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
 - 정적 파일은 `public/` 아래만 서빙된다. `data/rooms/*.json`(좌석 토큰 포함)은 **절대 서빙되지 않는다.**
@@ -58,6 +64,7 @@
 | `ERR012` | 409 | 좌석을 찾을 수 없습니다. | 없는 좌석 id 지정 |
 | `ERR013` | 409 | 게임을 시작할 수 없습니다. | 좌석 2명 미만 |
 | `ERR014` | 405 | 허용되지 않은 요청 방식입니다. | 잘못된 HTTP 메서드 |
+| `ERR015` | 403 | 허용되지 않은 접속 주소입니다. | `Host` 헤더가 랜 주소 화이트리스트에 없음(DNS 리바인딩 방어). 헤더 자체가 없어도 거부 |
 
 ---
 

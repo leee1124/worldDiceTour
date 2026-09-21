@@ -16,6 +16,43 @@ export const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 const BUILDING_LIST = Object.values(BUILDING_TYPES);
 const CASINO_GAME_LIST = Object.values(CASINO_GAMES);
 
+/** 오류 메시지에 실을 값의 최대 길이. */
+const MAX_DETAIL_LENGTH = 120;
+
+/**
+ * 외부 입력을 **절대 예외 없이** 사람이 읽을 수 있는 짧은 문자열로 바꾼다.
+ *
+ * `${value}`나 `String(value)`는 공격자가 보낸 `{"toString": 1}` 같은 값에서
+ * TypeError를 던진다. 그 예외가 검증 코드에서 새면 ERR001(400)이어야 할 요청이
+ * ERR010(500)이 되므로, 오류 메시지를 만들 때는 반드시 이 함수를 쓴다.
+ */
+export function safeText(value) {
+  if (value === null || value === undefined) {
+    return String(value);
+  }
+  const type = typeof value;
+  if (type === 'string') {
+    return truncate(value);
+  }
+  if (type === 'number' || type === 'boolean' || type === 'bigint') {
+    return truncate(String(value));
+  }
+  if (type === 'symbol' || type === 'function') {
+    return `<${type}>`;
+  }
+  try {
+    const json = JSON.stringify(value);
+    return json === undefined ? `<${type}>` : truncate(json);
+  } catch {
+    // 순환 참조 등 JSON으로 만들 수 없는 값. 종류만 알린다.
+    return `<${type}>`;
+  }
+}
+
+function truncate(text) {
+  return text.length > MAX_DETAIL_LENGTH ? `${text.slice(0, MAX_DETAIL_LENGTH)}…` : text;
+}
+
 function invalid(detail) {
   return new AppError('ERR001', detail);
 }
@@ -55,7 +92,7 @@ export function extractToken(headers) {
 
 function requireInteger(value, { min, max, field }) {
   if (!Number.isInteger(value) || value < min || value > max) {
-    throw invalid(`${field} 범위 오류: ${value}`);
+    throw invalid(`${field} 범위 오류: ${safeText(value)}`);
   }
   return value;
 }
@@ -72,7 +109,7 @@ function requireBuildings(value) {
   const seen = new Set();
   for (const item of value) {
     if (!BUILDING_LIST.includes(item) || seen.has(item)) {
-      throw invalid(`buildings 값 오류: ${item}`);
+      throw invalid(`buildings 값 오류: ${safeText(item)}`);
     }
     seen.add(item);
   }
@@ -105,7 +142,7 @@ export function parseHostActionBody(body) {
     case HOST_ACTIONS.SET_OPTIONS: {
       const roundLimit = body.roundLimit ?? null;
       if (!ALLOWED_ROUND_LIMITS.includes(roundLimit)) {
-        throw invalid(`roundLimit 값 오류: ${body.roundLimit}`);
+        throw invalid(`roundLimit 값 오류: ${safeText(body.roundLimit)}`);
       }
       return { type: HOST_ACTIONS.SET_OPTIONS, roundLimit };
     }
@@ -121,7 +158,7 @@ export function parseHostActionBody(body) {
     case HOST_ACTIONS.START:
       return { type: HOST_ACTIONS.START };
     default:
-      throw invalid(`알 수 없는 호스트 동작: ${body.type}`);
+      throw invalid(`알 수 없는 호스트 동작: ${safeText(body.type)}`);
   }
 }
 
@@ -132,7 +169,7 @@ export function parseCommandBody(body) {
   }
   const { type } = body;
   if (!ALL_COMMAND_TYPES.includes(type)) {
-    throw invalid(`알 수 없는 커맨드: ${type}`);
+    throw invalid(`알 수 없는 커맨드: ${safeText(type)}`);
   }
   const payload = isObject(body.payload) ? body.payload : {};
   return {
@@ -164,11 +201,11 @@ function parseCommandPayload(type, payload) {
 
 function parseCasinoBet(payload) {
   if (!CASINO_GAME_LIST.includes(payload.game)) {
-    throw invalid(`카지노 게임 값 오류: ${payload.game}`);
+    throw invalid(`카지노 게임 값 오류: ${safeText(payload.game)}`);
   }
   const bet = requireInteger(payload.bet, { min: 10_000, max: 500_000, field: 'bet' });
   if (bet % 10_000 !== 0) {
-    throw invalid(`bet 단위 오류: ${bet}`);
+    throw invalid(`bet 단위 오류: ${safeText(bet)}`);
   }
   let choice = null;
   if (payload.game === CASINO_GAMES.ODD_EVEN) {
@@ -181,7 +218,7 @@ function parseCasinoBet(payload) {
 
 function requireChoice(value, allowed) {
   if (!allowed.includes(value)) {
-    throw invalid(`선택값 오류: ${value}`);
+    throw invalid(`선택값 오류: ${safeText(value)}`);
   }
   return value;
 }
