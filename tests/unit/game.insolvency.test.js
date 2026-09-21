@@ -592,6 +592,29 @@ describe('Game(파산 선언)', () => {
     assertMoneyConserved(game, '나머지 배분');
   });
 
+  it('채권자가 자기 자신으로 기록된 깨진 채무에서도 돈이 사라지지 않는다', () => {
+    // Given (손상된 스냅샷: 자기에게 갚아야 하는 채무)
+    const game = buildGame({
+      cash: { s1: 1_000 },
+      phase: PHASES.AWAIT_LIQUIDATION,
+      debt: {
+        reason: 'TOLL',
+        items: [{ amount: 500_000, sink: 'PLAYER', toPlayerId: 's1' }],
+        event: { type: EVENT_TYPES.TOLL_PAID, payload: { payerId: 's1', amount: 500_000 } },
+        next: { kind: 'TURN_END' },
+      },
+      random: new FakeRandomSource([]),
+    });
+
+    // When
+    game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
+
+    // Then (자기에게 돌려주지 않고 은행으로 보내 총액이 보존된다)
+    assert.equal(game.playerById('s1').eliminated, true);
+    assert.equal(game.playerById('s1').cash, 0);
+    assertMoneyConserved(game, '자기 채권자 방어');
+  });
+
   it('은행에 대한 채무로 파산하면 남은 현금은 은행으로 간다', () => {
     // Given (건물 점검 티켓: 건물 3개 × 40,000 = 120,000원을 은행에 지불)
     const game = buildGame({

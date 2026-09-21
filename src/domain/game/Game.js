@@ -1183,21 +1183,25 @@ export class Game {
   /**
    * 파산 시 남은 현금을 받을 살아 있는 채권자들(좌석 순서).
    * `PAY_TO_ALL`처럼 채권자가 여러 명일 수 있으므로 목록으로 다룬다.
+   * 파산자 자신은 제외한다 — 자기에게 돌려주면 그 돈이 `eliminate()`에서 사라져
+   * 돈의 보존 불변식이 깨진다(손상된 스냅샷에 대한 방어).
    */
-  #bankruptcyCreditors(debt) {
+  #bankruptcyCreditors(debt, bankruptId) {
     const ids = new Set(
       (debt?.items ?? [])
         .filter((item) => item.sink === SINKS.PLAYER && item.toPlayerId)
         .map((item) => item.toPlayerId),
     );
-    return this.#players.filter((candidate) => ids.has(candidate.id) && !candidate.eliminated);
+    return this.#players.filter(
+      (candidate) => ids.has(candidate.id) && !candidate.eliminated && candidate.id !== bankruptId,
+    );
   }
 
   /** 파산: 남은 현금을 채권자에게 넘기고 모든 자산을 초기화한 뒤 탈락한다. */
   #bankrupt(player) {
     const debt = this.#turn.debt;
     const toJackpot = Boolean(debt?.items.some((item) => item.sink === SINKS.JACKPOT));
-    const creditors = this.#bankruptcyCreditors(debt);
+    const creditors = this.#bankruptcyCreditors(debt, player.id);
     const creditorId = creditors[0]?.id ?? null;
     const remaining = player.cash;
 
