@@ -83,7 +83,11 @@ export function eventTypes(events) {
   return events.map((event) => event.type);
 }
 
-/** 돈의 보존 불변식: 총현금 + 잭팟 = 초기 총액 + 은행 순유입. */
+/**
+ * 돈의 보존 불변식(2단):
+ * ① 총현금 + 잭팟 = 초기 총액 + 은행 순유입
+ * ② 은행 순유입 = 사유별 내역의 합 — 어떤 흐름이 장부를 우회했는지 특정한다.
+ */
 export function assertMoneyConserved(game, label = '') {
   const report = game.moneyReport();
   assert.equal(
@@ -91,4 +95,10 @@ export function assertMoneyConserved(game, label = '') {
     true,
     `돈 보존 불변식 위반 ${label}: ${JSON.stringify(report)}`,
   );
+  assert.equal(
+    Object.values(report.breakdown).reduce((sum, value) => sum + value, 0),
+    report.netFromBank,
+    `사유별 내역 합이 은행 순유입과 다르다 ${label}: ${JSON.stringify(report)}`,
+  );
+  assert.equal(report.breakdownBalanced, true, `설명되지 않은 은행 순유입이 있다 ${label}`);
 }

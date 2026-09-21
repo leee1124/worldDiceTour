@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { MoneyIntent } from '../shared/MoneyIntent.js';
 import { BankLedger } from './BankLedger.js';
 import { Board } from './Board.js';
 import { Casino } from './Casino.js';
@@ -14,6 +15,7 @@ import {
   STARTING_CASH,
 } from './Player.js';
 import { TicketDeck } from './TicketDeck.js';
+import { Treasury } from './Treasury.js';
 import { COMMAND_PHASES, COMMAND_TYPES } from './commands.js';
 import { EVENT_TYPES, GAME_OVER_REASONS, MONEY_REASONS } from './events.js';
 import { PHASES } from './phases.js';
@@ -55,6 +57,7 @@ export class Game {
   /** @type {TicketDeck} */ #deck;
   /** @type {Casino} */ #casino;
   /** @type {BankLedger} */ #ledger;
+  /** @type {Treasury} */ #treasury;
   /** @type {import('../shared/interfaces.js').RandomSource} */ #random;
   /** @type {Dice} */ #dice;
   #phase;
@@ -94,6 +97,7 @@ export class Game {
     this.#version = version;
     this.#options = { roundLimit: options.roundLimit ?? null };
     this.#initialTotal = initialTotal;
+    this.#treasury = new Treasury({ players, ledger, casino, initialTotal });
     this.#turn = { ...turn };
   }
 
@@ -306,20 +310,13 @@ export class Game {
     return scored.map((entry, order) => ({ ...entry, rank: order + 1 }));
   }
 
-  /** 돈의 보존 불변식 점검용 보고. */
+  /**
+   * 돈의 보존 불변식 점검용 보고.
+   * `breakdown`은 사유별 은행 순유입이며 `netFromBank === sum(breakdown)`이 성립한다
+   * (`breakdownBalanced`) — 어떤 흐름이 장부를 우회했는지 바로 특정할 수 있다.
+   */
   moneyReport() {
-    const totalCash = this.#players.reduce((sum, player) => sum + player.cash, 0);
-    const actual = totalCash + this.#casino.jackpot;
-    const expected = this.#initialTotal + this.#ledger.netFromBank;
-    return {
-      totalCash,
-      jackpot: this.#casino.jackpot,
-      initialTotal: this.#initialTotal,
-      netFromBank: this.#ledger.netFromBank,
-      actual,
-      expected,
-      balanced: actual === expected,
-    };
+    return this.#treasury.report();
   }
 
   // ── 커맨드 ──────────────────────────────────────────────────────────────
@@ -430,8 +427,12 @@ export class Game {
     if (!player.canPay(city.price)) {
       throw DomainError.insufficientCash(`매입 대금 ${city.price}원이 부족합니다`);
     }
-    player.pay(city.price);
-    this.#ledger.payToBank(city.price);
+    this.#treasury.payToBank({
+      playerId: player.id,
+      amount: city.price,
+      reason: MONEY_REASONS.PURCHASE,
+      meta: { cityIndex: city.index },
+    });
     city.buy(player.id);
     this.#emit(EVENT_TYPES.CITY_PURCHASED, {
       playerId: player.id,
@@ -499,8 +500,12 @@ export class Game {
     if (!player.canPay(cost)) {
       throw DomainError.insufficientCash(`건설비 ${cost}원이 부족합니다`);
     }
-    player.pay(cost);
-    this.#ledger.payToBank(cost);
+    this.#treasury.payToBank({
+      playerId: player.id,
+      amount: cost,
+      reason: MONEY_REASONS.BUILD,
+      meta: { cityIndex: city.index },
+    });
     city.build(buildings);
     this.#emit(EVENT_TYPES.BUILT, {
       playerId: player.id,
@@ -585,11 +590,23 @@ export class Game {
       throw DomainError.insufficientCash('인수 대금은 보유 현금으로만 지불할 수 있습니다');
     }
     const owner = this.playerById(city.ownerId);
-    player.pay(price);
+    const meta = { cityIndex: city.index };
     if (owner && !owner.eliminated) {
-      owner.receive(price);
+      this.#treasury.transfer({
+        fromId: player.id,
+        toId: owner.id,
+        amount: price,
+        reason: MONEY_REASONS.ACQUISITION,
+        meta,
+      });
     } else {
-      this.#ledger.payToBank(price);
+      // 탈락했거나 사라진 소유자에게는 줄 수 없으므로 은행이 받는다.
+      this.#treasury.payToBank({
+        playerId: player.id,
+        amount: price,
+        reason: MONEY_REASONS.ACQUISITION,
+        meta,
+      });
     }
     city.transferTo(player.id);
     this.#emit(EVENT_TYPES.ACQUIRED, {
@@ -615,12 +632,8 @@ export class Game {
   #casinoBet({ game, bet, choice = null }) {
     const player = this.#current;
     this.#casino.assertValidBet(bet, player.cash);
-    const jackpotBefore = this.#casino.jackpot;
     const result = this.#casino.play({ game, bet, choice }, this.#random);
-
-    player.pay(bet);
-    player.receive(result.payout);
-    this.#ledger.applyNet(result.payout - bet + result.jackpotAccumulated - result.jackpotWon);
+    const { jackpotChanged } = this.#treasury.apply(this.#casinoIntents(player, bet, result));
 
     this.#emit(EVENT_TYPES.CASINO_RESULT, {
       playerId: player.id,
@@ -631,7 +644,7 @@ export class Game {
       jackpotWon: result.jackpotWon,
       detail: result.detail,
     });
-    if (this.#casino.jackpot !== jackpotBefore) {
+    if (jackpotChanged) {
       this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
     }
 
@@ -639,6 +652,34 @@ export class Game {
     if (this.#turn.casinoRoundsLeft <= 0 || !this.#casino.canBet(player.cash)) {
       this.#leaveCasino(player);
     }
+  }
+
+  /**
+   * 카지노 한 판의 돈 이동.
+   * 진 베팅액의 절반(내림)은 잭팟으로, 나머지는 은행으로 간다. 배당은 은행에서 나오고
+   * 잭팟 당첨금만 잭팟에서 나온다 — 그래서 총합(현금 + 잭팟)의 변화가 장부 순유입과 정확히 맞는다.
+   */
+  #casinoIntents(player, bet, result) {
+    const playerId = player.id;
+    const reason = MONEY_REASONS.CASINO;
+    const meta = { game: result.game };
+    const toJackpot = result.jackpotAccumulated;
+    const toBank = bet - toJackpot;
+    const fromBank = result.payout - result.jackpotWon;
+    const intents = [];
+    if (toJackpot > 0) {
+      intents.push(MoneyIntent.toJackpot({ playerId, amount: toJackpot, reason, meta }));
+    }
+    if (toBank > 0) {
+      intents.push(MoneyIntent.toBank({ playerId, amount: toBank, reason, meta }));
+    }
+    if (fromBank > 0) {
+      intents.push(MoneyIntent.fromBank({ playerId, amount: fromBank, reason, meta }));
+    }
+    if (result.jackpotWon > 0) {
+      intents.push(MoneyIntent.fromJackpot({ playerId, amount: result.jackpotWon, reason, meta }));
+    }
+    return intents;
   }
 
   #casinoLeave() {
@@ -656,8 +697,11 @@ export class Game {
     if (!player.canPay(ISLAND_RESCUE_FEE)) {
       throw DomainError.insufficientCash(`구조비 ${ISLAND_RESCUE_FEE}원이 부족합니다`);
     }
-    player.pay(ISLAND_RESCUE_FEE);
-    this.#ledger.payToBank(ISLAND_RESCUE_FEE);
+    this.#treasury.payToBank({
+      playerId: player.id,
+      amount: ISLAND_RESCUE_FEE,
+      reason: MONEY_REASONS.ISLAND_RESCUE,
+    });
     player.leaveIsland();
     this.#emit(EVENT_TYPES.ISLAND_RESCUE_PAID, { playerId: player.id, amount: ISLAND_RESCUE_FEE });
     this.#emit(EVENT_TYPES.ISLAND_ESCAPED, { playerId: player.id, by: 'PAY' });
@@ -757,7 +801,11 @@ export class Game {
       }
     }
     if (received > 0) {
-      this.#ledger.receiveFromBank(received);
+      this.#treasury.receiveFromBank({
+        playerId: player.id,
+        amount: received,
+        reason: MONEY_REASONS.SALARY,
+      });
       this.#emit(EVENT_TYPES.SALARY_PAID, { playerId: player.id, amount: received });
     }
   }
@@ -944,8 +992,12 @@ export class Game {
 
   #gainFromBank(player, amount, ticketId) {
     if (amount > 0) {
-      player.receive(amount);
-      this.#ledger.receiveFromBank(amount);
+      this.#treasury.receiveFromBank({
+        playerId: player.id,
+        amount,
+        reason: MONEY_REASONS.TICKET,
+        meta: { ticketId },
+      });
       this.#emit(EVENT_TYPES.MONEY_GAINED, {
         playerId: player.id,
         amount,
@@ -991,13 +1043,22 @@ export class Game {
    * 자기 턴이 아닌 플레이어를 정리 페이즈로 보낼 수는 없으므로 보유 현금 한도까지만 받는다.
    */
   #collectFromAll(player, amount, ticketId) {
-    let collected = 0;
-    for (const other of this.livingPlayers()) {
-      if (other.id === player.id) {
-        continue;
-      }
-      const paid = other.pay(Math.min(amount, other.cash));
-      collected += paid;
+    const collected = this.livingPlayers()
+      .filter((other) => other.id !== player.id)
+      .map((other) => ({ other, paid: Math.min(amount, other.cash) }));
+
+    this.#treasury.apply(
+      collected.map(({ other, paid }) =>
+        MoneyIntent.transfer({
+          fromId: other.id,
+          toId: player.id,
+          amount: paid,
+          reason: MONEY_REASONS.TICKET,
+          meta: { ticketId },
+        }),
+      ),
+    );
+    for (const { other, paid } of collected) {
       this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
         fromId: other.id,
         toId: player.id,
@@ -1006,7 +1067,6 @@ export class Game {
         ticketId,
       });
     }
-    player.receive(collected);
     this.#endTurn();
   }
 
@@ -1085,26 +1145,12 @@ export class Game {
 
   #settleDebt() {
     const player = this.#current;
-    const { items, event } = this.#turn.debt;
+    const { items, event, reason } = this.#turn.debt;
     const wasLiquidation = this.#phase === PHASES.AWAIT_LIQUIDATION;
-    let jackpotChanged = false;
 
-    for (const item of items) {
-      player.pay(item.amount);
-      if (item.sink === SINKS.PLAYER) {
-        const creditor = this.playerById(item.toPlayerId);
-        if (creditor && !creditor.eliminated) {
-          creditor.receive(item.amount);
-        } else {
-          this.#ledger.payToBank(item.amount);
-        }
-      } else if (item.sink === SINKS.JACKPOT) {
-        this.#casino.accumulate(item.amount);
-        jackpotChanged = true;
-      } else {
-        this.#ledger.payToBank(item.amount);
-      }
-    }
+    const { jackpotChanged } = this.#treasury.apply(
+      items.map((item) => this.#debtIntent(player, item, reason)),
+    );
 
     this.#emit(event.type, event.payload);
     if (jackpotChanged) {
@@ -1123,6 +1169,25 @@ export class Game {
     this.#continueAfterPayment(next);
   }
 
+  /** 채무 항목 하나를 돈 이동 의사로 바꾼다(받을 사람이 없으면 은행이 받는다). */
+  #debtIntent(player, item, reason) {
+    if (item.sink === SINKS.JACKPOT) {
+      return MoneyIntent.toJackpot({ playerId: player.id, amount: item.amount, reason });
+    }
+    if (item.sink === SINKS.PLAYER) {
+      const creditor = this.playerById(item.toPlayerId);
+      if (creditor && !creditor.eliminated) {
+        return MoneyIntent.transfer({
+          fromId: player.id,
+          toId: creditor.id,
+          amount: item.amount,
+          reason,
+        });
+      }
+    }
+    return MoneyIntent.toBank({ playerId: player.id, amount: item.amount, reason });
+  }
+
   /** 정리 페이즈에서 한 걸음 진행한 뒤, 채무를 덮을 수 있으면 자동 정산한다. */
   #afterLiquidationStep() {
     if (this.#current.canPay(this.#debtTotal())) {
@@ -1135,8 +1200,12 @@ export class Game {
     const index = city.index;
     const name = city.name;
     city.reset();
-    player.receive(refund);
-    this.#ledger.receiveFromBank(refund);
+    this.#treasury.receiveFromBank({
+      playerId: player.id,
+      amount: refund,
+      reason: MONEY_REASONS.LIQUIDATION,
+      meta: { cityIndex: index },
+    });
     this.#emit(EVENT_TYPES.PROPERTY_SOLD, { playerId: player.id, index, name, refund });
   }
 
@@ -1165,8 +1234,12 @@ export class Game {
     if (!player.canTakeLoan()) {
       throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
     }
-    player.takeLoan(LOAN_PRINCIPAL, LOAN_DEBT);
-    this.#ledger.receiveFromBank(LOAN_PRINCIPAL);
+    const { principal } = player.takeLoan(LOAN_PRINCIPAL, LOAN_DEBT);
+    this.#treasury.receiveFromBank({
+      playerId: player.id,
+      amount: principal,
+      reason: MONEY_REASONS.LOAN,
+    });
     this.#emit(EVENT_TYPES.LOAN_TAKEN, {
       playerId: player.id,
       principal: LOAN_PRINCIPAL,
@@ -1206,14 +1279,23 @@ export class Game {
     const remaining = player.cash;
 
     if (remaining > 0) {
-      player.pay(remaining);
       if (creditors.length > 0) {
         this.#splitAmongCreditors(player, creditors, remaining);
       } else if (toJackpot) {
-        this.#casino.accumulate(remaining);
+        this.#treasury.apply([
+          MoneyIntent.toJackpot({
+            playerId: player.id,
+            amount: remaining,
+            reason: MONEY_REASONS.BANKRUPTCY,
+          }),
+        ]);
         this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
       } else {
-        this.#ledger.payToBank(remaining);
+        this.#treasury.payToBank({
+          playerId: player.id,
+          amount: remaining,
+          reason: MONEY_REASONS.BANKRUPTCY,
+        });
       }
     }
     const releasedIndexes = this.#board.releaseAllOf(player.id);
@@ -1242,13 +1324,26 @@ export class Game {
   #splitAmongCreditors(player, creditors, remaining) {
     const share = Math.floor(remaining / creditors.length);
     let leftover = remaining - share * creditors.length;
+    const shares = [];
     for (const creditor of creditors) {
       const amount = share + (leftover > 0 ? 1 : 0);
       leftover = Math.max(0, leftover - 1);
-      if (amount <= 0) {
-        continue;
+      if (amount > 0) {
+        shares.push({ creditor, amount });
       }
-      creditor.receive(amount);
+    }
+
+    this.#treasury.apply(
+      shares.map(({ creditor, amount }) =>
+        MoneyIntent.transfer({
+          fromId: player.id,
+          toId: creditor.id,
+          amount,
+          reason: MONEY_REASONS.BANKRUPTCY,
+        }),
+      ),
+    );
+    for (const { creditor, amount } of shares) {
       this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
         fromId: player.id,
         toId: creditor.id,

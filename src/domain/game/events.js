@@ -54,18 +54,9 @@ export const GAME_OVER_REASONS = Object.freeze({
   ROUND_LIMIT: 'ROUND_LIMIT',
 });
 
-/** 돈 이동 사유(이벤트 필드 `reason`). */
-export const MONEY_REASONS = Object.freeze({
-  SALARY: 'SALARY',
-  PURCHASE: 'PURCHASE',
-  BUILD: 'BUILD',
-  TOLL: 'TOLL',
-  TAX: 'TAX',
-  TICKET: 'TICKET',
-  CASINO: 'CASINO',
-  ISLAND_RESCUE: 'ISLAND_RESCUE',
-  LIQUIDATION: 'LIQUIDATION',
-  BANKRUPTCY: 'BANKRUPTCY',
-  ACQUISITION: 'ACQUISITION',
-  LOAN: 'LOAN',
-});
+/**
+ * 돈 이동 사유(이벤트 필드 `reason`).
+ * 정의는 돈 계층(`shared/MoneyIntent.js`)에 있다 — intent·장부 내역·이벤트가 **같은 목록**을
+ * 써야 하므로 단일 출처를 돈 계층에 두고 여기서는 이벤트 사용자를 위해 다시 내보낸다.
+ */
+export { MONEY_REASONS } from '../shared/MoneyIntent.js';

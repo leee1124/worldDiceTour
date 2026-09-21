@@ -1,4 +1,5 @@
 import { DomainError } from '../shared/DomainError.js';
+import { assertAmount } from '../shared/Money.js';
 
 /** 시작 자금. */
 export const STARTING_CASH = 3_000_000;
@@ -16,7 +17,10 @@ export const LOAN_PRINCIPAL = 1_000_000;
 export const LOAN_DEBT = 1_200_000;
 
 /**
- * 플레이어. 현금 입출과 자신의 상태(위치/조난/공항 이동권/연속 더블)를 스스로 관리한다.
+ * 플레이어. 현금 잔액과 자신의 상태(위치/조난/공항 이동권/연속 더블)를 스스로 관리한다.
+ *
+ * `pay()`/`receive()`는 **`Treasury`만 호출한다.** 현금 이동의 상대(은행·잭팟·다른 좌석)를
+ * 알아야 장부와 보존 불변식이 맞는데, 플레이어는 그것을 모르기 때문이다.
  */
 export class Player {
   #id;
@@ -98,36 +102,36 @@ export class Player {
     return !this.#loanUsed;
   }
 
-  /** 은행에서 원금을 받고 채무를 진다(게임당 1회). */
+  /**
+   * 대출 채무를 진다(게임당 1회).
+   * 현금 입금은 하지 않는다 — 원금은 은행에서 오는 돈이므로 `Treasury`가 옮긴다.
+   * @returns {{principal:number, debt:number}} 은행이 내줘야 할 원금과 새로 생긴 채무
+   */
   takeLoan(principal, debt) {
     if (!this.canTakeLoan()) {
       throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
     }
+    this.#assertAmount(principal);
+    this.#assertAmount(debt);
     this.#loanUsed = true;
     this.#loanDebt = debt;
-    this.receive(principal);
     return { principal, debt };
   }
 
   /**
-   * 월급을 받는다. 대출 채무가 남아 있으면 채무 상환에 먼저 압류된다.
-   * @returns {{seized:number, received:number}}
+   * 월급에서 대출 채무 상환분을 압류한다.
+   * 현금 입금은 하지 않는다 — 실제 수령액(`received`)은 `Treasury`가 은행에서 옮긴다.
+   * @returns {{seized:number, received:number}} 압류된 금액과 손에 남는 금액
    */
   seizeSalary(amount) {
     this.#assertAmount(amount);
     const seized = Math.min(this.#loanDebt, amount);
     this.#loanDebt -= seized;
-    const received = amount - seized;
-    if (received > 0) {
-      this.receive(received);
-    }
-    return { seized, received };
+    return { seized, received: amount - seized };
   }
 
   #assertAmount(amount) {
-    if (!Number.isInteger(amount) || amount < 0) {
-      throw DomainError.invalidArgument(`금액이 올바르지 않습니다: ${amount}`);
-    }
+    return assertAmount(amount);
   }
 
   canPay(amount) {

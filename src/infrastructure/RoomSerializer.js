@@ -117,19 +117,37 @@ function validateGameSnapshot(game, seats) {
     isPlainObject(game.casino) && isFiniteInteger(game.casino.jackpot) && game.casino.jackpot >= 0,
     `잭팟 오류: ${game.casino?.jackpot}`,
   );
-  assert(isPlainObject(game.ledger), '은행 장부 오류');
-  for (const field of ['fromBank', 'toBank']) {
-    assert(
-      isFiniteInteger(game.ledger[field]) && game.ledger[field] >= 0,
-      `장부 ${field} 오류: ${game.ledger[field]}`,
-    );
-  }
+  validateLedgerSnapshot(game.ledger);
   assert(
     game.initialTotal === undefined || (isFiniteInteger(game.initialTotal) && game.initialTotal >= 0),
     `초기 총액 오류: ${game.initialTotal}`,
   );
   assert(isPlainObject(game.deck) && Array.isArray(game.deck.drawPile), '티켓 덱 오류');
   validateTurnSnapshot(game, seatIds);
+}
+
+/**
+ * 은행 장부 검증.
+ * 사유별 내역(`byReason`)은 **없을 수도 있다** — schemaVersion 1 시절 저장된 방에는 없다.
+ * 있으면 사유가 화이트리스트에 있고 값이 안전 정수여야 한다.
+ */
+function validateLedgerSnapshot(ledger) {
+  assert(isPlainObject(ledger), '은행 장부 오류');
+  for (const field of ['fromBank', 'toBank']) {
+    assert(
+      isFiniteInteger(ledger[field]) && ledger[field] >= 0,
+      `장부 ${field} 오류: ${ledger[field]}`,
+    );
+  }
+  if (ledger.byReason === undefined || ledger.byReason === null) {
+    return;
+  }
+  assert(isPlainObject(ledger.byReason), '장부 사유별 내역이 객체가 아닙니다');
+  const reasons = Object.values(MONEY_REASONS);
+  for (const [reason, net] of Object.entries(ledger.byReason)) {
+    assert(reasons.includes(reason), `장부 사유 오류: ${reason}`);
+    assert(isFiniteInteger(net), `장부 사유(${reason}) 순액 오류: ${net}`);
+  }
 }
 
 /** 0~39 칸 번호. */
