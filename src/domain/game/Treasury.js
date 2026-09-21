@@ -58,6 +58,16 @@ export class Treasury {
       if (!(intent instanceof MoneyIntent)) {
         throw DomainError.invalidArgument('MoneyIntent가 아닌 값은 적용할 수 없습니다');
       }
+    }
+
+    // **전량을 먼저 검증한 뒤에 옮긴다(원자성).**
+    // 한 건씩 즉시 옮기면 목록 중간에서 실패했을 때 앞의 이동만 반영된 채 예외가 나가고,
+    // 그 순간 돈이 생기거나 사라져 **보존 불변식이 영구히 깨진다** — 그 상태는 커맨드가 실패해도
+    // 이미 메모리에 남고, 불변식을 건드리지 않는 다음 커맨드가 성공하면 그대로 파일에 저장된다.
+    // (실제로 "매도 명목금액은 받았는데 수수료를 못 내는" 경로에서 이 일이 일어났다.)
+    this.#assertApplicable(intents);
+
+    for (const intent of intents) {
       this.#move(intent);
       this.#observer?.onMoneyMoved(intent);
       if (intent.affectsLedger) {
@@ -72,6 +82,84 @@ export class Treasury {
 
     this.assertBalanced();
     return { jackpotChanged: this.#casino.jackpot !== jackpotBefore };
+  }
+
+  /**
+   * 목록 전체가 적용 가능한지 **옮기기 전에** 확인한다.
+   *
+   * 같은 좌석이 여러 번 등장할 수 있으므로(예: 매수의 명목금액 + 수수료) 잔액을 누적해서 본다.
+   * 잭팟도 같은 방식으로 누적한다. 여기서 통과한 목록은 `#move` 단계에서 실패하지 않는다.
+   */
+  #assertApplicable(intents) {
+    /** @type {Map<string, number>} 좌석 → 적용 중 잔액 */
+    const cash = new Map();
+    const balanceOf = (playerId) => {
+      if (!cash.has(playerId)) {
+        cash.set(playerId, this.#require(playerId).cash);
+      }
+      return cash.get(playerId);
+    };
+    let jackpot = this.#casino.jackpot;
+
+    for (const intent of intents) {
+      const amount = Math.abs(intent.amount);
+      const paying = intent.amount < 0;
+      const payerId = paying ? intent.playerId : intent.otherPlayerId;
+      const receiverId = paying ? intent.otherPlayerId : intent.playerId;
+
+      if (intent.counterparty === COUNTERPARTIES.PLAYER) {
+        this.#assertCanPay(payerId, balanceOf(payerId), amount);
+        cash.set(payerId, balanceOf(payerId) - amount);
+        this.#assertCanReceive(receiverId, balanceOf(receiverId), amount);
+        cash.set(receiverId, balanceOf(receiverId) + amount);
+        continue;
+      }
+
+      if (intent.counterparty === COUNTERPARTIES.JACKPOT) {
+        if (paying) {
+          this.#assertCanPay(intent.playerId, balanceOf(intent.playerId), amount);
+          cash.set(intent.playerId, balanceOf(intent.playerId) - amount);
+          jackpot += amount;
+          continue;
+        }
+        if (amount > jackpot) {
+          throw DomainError.invalidArgument(
+            `잭팟 적립금 ${jackpot}원에서 ${amount}원을 지급할 수 없습니다`,
+          );
+        }
+        jackpot -= amount;
+        this.#assertCanReceive(intent.playerId, balanceOf(intent.playerId), amount);
+        cash.set(intent.playerId, balanceOf(intent.playerId) + amount);
+        continue;
+      }
+
+      // BANK / EXCHANGE
+      if (paying) {
+        this.#assertCanPay(intent.playerId, balanceOf(intent.playerId), amount);
+        cash.set(intent.playerId, balanceOf(intent.playerId) - amount);
+      } else {
+        this.#assertCanReceive(intent.playerId, balanceOf(intent.playerId), amount);
+        cash.set(intent.playerId, balanceOf(intent.playerId) + amount);
+      }
+    }
+  }
+
+  #assertCanPay(playerId, balance, amount) {
+    this.#require(playerId);
+    if (balance < amount) {
+      throw DomainError.insufficientCash(
+        `현금 ${balance}원으로 ${amount}원을 지불할 수 없습니다: ${playerId}`,
+      );
+    }
+  }
+
+  #assertCanReceive(playerId, balance, amount) {
+    this.#require(playerId);
+    if (balance + amount > MAX_MONEY) {
+      throw DomainError.invalidArgument(
+        `보유 현금이 상한(${MAX_MONEY})을 넘습니다: ${playerId} ${balance} + ${amount}`,
+      );
+    }
   }
 
   /** 좌석 간 이동(가장 흔한 형태의 단축 통로). */

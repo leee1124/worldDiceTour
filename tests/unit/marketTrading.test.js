@@ -885,3 +885,50 @@ describe('스냅샷 키 오염 방어(프로토타입 키)', () => {
     assert.deepEqual(new DepositAccount(snapshot).toSnapshot(), snapshot);
   });
 });
+
+describe('매도 수수료 지불 능력(명목금액이 수수료보다 작을 때)', () => {
+  it('명목금액이 최소 수수료보다 작고 현금도 없으면 매도를 거부한다', () => {
+    // Given (손상된 방 파일이나 앞으로 붙을 저가 상품(코인 하한가 500원 < 수수료 1,000원)에서
+    //        일어난다. 검증 없이 체결하면 +명목이 적용된 뒤 −수수료가 터져 돈이 생긴다)
+    const cheap = Instrument.restore({ id: 'AIR', price: 100, state: 'LISTED', series: [100] });
+    const holdings = new Holdings();
+    holdings.add({ playerId: 's1', instrumentId: 'AIR', quantity: 5, price: 100 });
+
+    // When / Then (5 × 100 = 500원 < 수수료 1,000원, 보유 현금 0)
+    assert.throws(
+      () =>
+        new TradingDesk().sell({
+          playerId: 's1',
+          instrument: cheap,
+          quantity: 5,
+          cash: 0,
+          budget: TradeBudget.open(),
+          holdings,
+        }),
+      { code: DOMAIN_ERROR_CODES.INSUFFICIENT_CASH },
+    );
+    assert.equal(holdings.qtyOf('s1', 'AIR'), 5, '거부됐는데 주식이 사라졌다');
+  });
+
+  it('현금으로 차액을 메울 수 있으면 통과한다', () => {
+    // Given
+    const cheap = Instrument.restore({ id: 'AIR', price: 100, state: 'LISTED', series: [100] });
+    const holdings = new Holdings();
+    holdings.add({ playerId: 's1', instrumentId: 'AIR', quantity: 5, price: 100 });
+
+    // When (명목 500 + 현금 600 ≥ 수수료 1,000)
+    const result = new TradingDesk().sell({
+      playerId: 's1',
+      instrument: cheap,
+      quantity: 5,
+      cash: 600,
+      budget: TradeBudget.open(),
+      holdings,
+    });
+
+    // Then
+    assert.equal(result.notional, 500);
+    assert.equal(result.fee, 1_000);
+    assert.equal(holdings.qtyOf('s1', 'AIR'), 0);
+  });
+});

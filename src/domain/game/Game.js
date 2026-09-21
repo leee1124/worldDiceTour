@@ -1226,7 +1226,12 @@ export class Game {
 
   #sellStock({ instrumentId, quantity }) {
     this.#applyMarket(
-      this.#requireMarket().sell({ playerId: this.#current.id, instrumentId, quantity }),
+      this.#requireMarket().sell({
+        playerId: this.#current.id,
+        instrumentId,
+        quantity,
+        cash: this.#current.cash,
+      }),
     );
     this.#autoCloseTradingIfExhausted();
   }

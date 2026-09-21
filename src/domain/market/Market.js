@@ -241,13 +241,14 @@ export class Market {
     return { intents: result.intents, events: result.events };
   }
 
-  /** 매도. */
-  sell({ playerId, instrumentId, quantity }) {
+  /** 매도. `cash`는 수수료 지불 능력 확인에 쓴다(명목금액이 최소 수수료보다 작을 수 있다). */
+  sell({ playerId, instrumentId, quantity, cash = 0 }) {
     this.#assertWindow(playerId);
     const result = this.#desk.sell({
       playerId,
       instrument: this.#requireInstrument(instrumentId),
       quantity,
+      cash,
       budget: this.#window.budget,
       holdings: this.#holdings,
     });
@@ -749,6 +750,7 @@ export class Market {
           playerId,
           instrumentId: order.instrumentId,
           quantity: order.quantity,
+          cash,
         });
         return { ok: true, ...result, cashDelta: notional - TradingDesk.fee(notional) };
       }

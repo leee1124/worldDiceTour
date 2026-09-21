@@ -5,7 +5,7 @@ import { BankLedger } from '../../src/domain/game/BankLedger.js';
 import { Casino } from '../../src/domain/game/Casino.js';
 import { Player } from '../../src/domain/game/Player.js';
 import { Treasury } from '../../src/domain/game/Treasury.js';
-import { DomainError } from '../../src/domain/shared/DomainError.js';
+import { DOMAIN_ERROR_CODES, DomainError } from '../../src/domain/shared/DomainError.js';
 import { MAX_MONEY } from '../../src/domain/shared/Money.js';
 import { MoneyIntent } from '../../src/domain/shared/MoneyIntent.js';
 import { MONEY_REASONS } from '../../src/domain/game/events.js';
@@ -373,5 +373,82 @@ describe('Treasury(돈 이동의 유일한 통로)', () => {
       assert.deepEqual(ledger.breakdown, {});
       assert.equal(treasury.report().balanced, true);
     });
+  });
+});
+
+describe('Treasury.apply의 원자성(중간 실패가 돈을 만들지 않는다)', () => {
+  it('목록 중간에서 실패하면 **아무것도** 적용되지 않는다', () => {
+    // Given (현금 1,000원인 좌석이 +500을 받고 −5,000을 내는 목록.
+    //        한 건씩 즉시 적용하면 +500만 반영된 채 두 번째가 터져 돈이 생기고
+    //        보존 불변식이 영구히 깨진다 — 그 상태가 파일로 저장되면 그 방은 되살릴 수 없다)
+    const players = [new Player({ id: 's1', name: '하나', cash: 1_000 })];
+    const ledger = new BankLedger();
+    const casino = new Casino();
+    const treasury = new Treasury({ players, ledger, casino, initialTotal: 1_000 });
+
+    // When
+    assert.throws(
+      () =>
+        treasury.apply([
+          MoneyIntent.fromBank({ playerId: 's1', amount: 500, reason: MONEY_REASONS.SALARY }),
+          MoneyIntent.toBank({ playerId: 's1', amount: 5_000, reason: MONEY_REASONS.TAX }),
+        ]),
+      { code: DOMAIN_ERROR_CODES.INSUFFICIENT_CASH },
+    );
+
+    // Then
+    assert.equal(players[0].cash, 1_000, '첫 intent가 적용된 채로 남았다');
+    assert.equal(ledger.netFromBank, 0, '장부가 절반만 기록됐다');
+    assert.equal(treasury.report().balanced, true, '보존 불변식이 깨진 채로 남았다');
+  });
+
+  it('잭팟이 부족한 지급도 앞의 intent를 남기지 않는다', () => {
+    // Given
+    const players = [new Player({ id: 's1', name: '하나', cash: 1_000 })];
+    const casino = new Casino({ jackpot: 100 });
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino,
+      initialTotal: 1_100,
+    });
+
+    // When
+    assert.throws(() =>
+      treasury.apply([
+        MoneyIntent.fromBank({ playerId: 's1', amount: 700, reason: MONEY_REASONS.SALARY }),
+        MoneyIntent.fromJackpot({ playerId: 's1', amount: 9_999, reason: MONEY_REASONS.CASINO }),
+      ]),
+    );
+
+    // Then
+    assert.equal(players[0].cash, 1_000);
+    assert.equal(casino.jackpot, 100);
+    assert.equal(treasury.report().balanced, true);
+  });
+
+  it('모든 intent가 유효하면 그대로 전부 적용된다(정상 경로 불변)', () => {
+    // Given
+    const players = [
+      new Player({ id: 's1', name: '하나', cash: 1_000 }),
+      new Player({ id: 's2', name: '두리', cash: 1_000 }),
+    ];
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino: new Casino(),
+      initialTotal: 2_000,
+    });
+
+    // When
+    treasury.apply([
+      MoneyIntent.fromBank({ playerId: 's1', amount: 500, reason: MONEY_REASONS.SALARY }),
+      MoneyIntent.transfer({ fromId: 's1', toId: 's2', amount: 300, reason: MONEY_REASONS.TOLL }),
+    ]);
+
+    // Then
+    assert.equal(players[0].cash, 1_200);
+    assert.equal(players[1].cash, 1_300);
+    assert.equal(treasury.report().balanced, true);
   });
 });

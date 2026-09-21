@@ -82,8 +82,14 @@ export class TradingDesk {
     };
   }
 
-  /** 매도. */
-  sell({ playerId, instrument, quantity, budget, holdings }) {
+  /**
+   * 매도.
+   *
+   * **수수료를 낼 수 있는지 반드시 확인한다.** 최소 수수료(1,000원)가 있으므로 명목금액이 그보다
+   * 작을 수 있는데(저가 종목·손상된 가격, 앞으로 붙을 코인의 하한가), 검증 없이 체결하면
+   * "명목금액은 받았는데 수수료를 못 내는" 상태가 되어 돈이 생기고 보존 불변식이 깨진다.
+   */
+  sell({ playerId, instrument, quantity, cash = 0, budget, holdings }) {
     assertTradable(instrument);
     assertQuantity(quantity);
     const price = instrument.price;
@@ -94,6 +100,11 @@ export class TradingDesk {
     if (holdings.qtyOf(playerId, instrument.id) < quantity) {
       throw DomainError.insufficientCash(
         `보유 수량이 부족합니다: ${instrument.id} ${holdings.qtyOf(playerId, instrument.id)}주 < ${quantity}주`,
+      );
+    }
+    if (cash + notional < fee) {
+      throw DomainError.insufficientCash(
+        `수수료 ${fee}원을 낼 수 없습니다: 현금 ${cash}원 + 매도대금 ${notional}원`,
       );
     }
 
