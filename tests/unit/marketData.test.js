@@ -25,6 +25,8 @@ import {
   NEWS_EFFECT_TARGETS,
   newsCardsOfPhase,
 } from '../../src/domain/market/data/news.js';
+import { PriceProcess } from '../../src/domain/market/PriceProcess.js';
+import { FEE_MIN } from '../../src/domain/market/TradingDesk.js';
 
 /**
  * 시장 데이터 표가 설계서 §3.1~§3.3과 정확히 일치하는지 검증한다.
@@ -142,6 +144,24 @@ describe('시장 데이터: 주식 종목표(설계서 §3.1)', () => {
     assert.equal(instrumentSpecById('AIR').name, '한빛항공');
     assert.equal(instrumentSpecById('SKY').name, '새벽항공운수');
     assert.equal(instrumentSpecById('NOPE'), null);
+  });
+});
+
+describe('시장 데이터: 수수료와 최저가의 관계(미래 상품 방어)', () => {
+  it('상장될 수 있는 모든 종목의 하한가가 최소 수수료보다 크다', () => {
+    // Given (매도는 [+명목, −수수료] 두 intent다. 명목금액이 최소 수수료보다 작으면
+    //        "팔았는데 현금이 줄어드는" 주문이 되고, 현금이 없으면 아예 팔 수 없다.
+    //        `TradingDesk.sell`이 그 경우를 거부하지만, **애초에 그런 상품을 만들지 않는 것**이
+    //        더 안전하다. 앞으로 코인을 상장할 때 이 테스트가 먼저 깨져 경고한다.)
+    // When / Then
+    for (const spec of [...LISTED_INSTRUMENTS, ...RESERVE_INSTRUMENTS]) {
+      const params = CLASS_PARAMS[spec.klass];
+      const floor = PriceProcess.minPrice({ basePrice: spec.basePrice, ...params });
+      assert.ok(
+        floor > FEE_MIN,
+        `${spec.id}의 하한가 ${floor}원이 최소 수수료 ${FEE_MIN}원보다 작다 — 1주 매도가 손실이 된다`,
+      );
+    }
   });
 });
 

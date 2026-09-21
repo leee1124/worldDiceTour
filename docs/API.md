@@ -437,7 +437,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `CASINO` | `roundsLeft`, `limits: { min, max, unit }`, `jackpot` |
 | `ISLAND` | `remainingTurns`, `fee`(200000), `canPayFee` |
 | `TRAVEL` | `forbiddenIndexes: number[]` — 공항 칸(30)과 현재 칸. 공항 칸에 서 있으면 한 칸으로 합쳐져 `[30]` |
-| `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ assetKind, assetId, label, refund, quantity, maxQuantity, unitValue, index?, name? }]` — `assetKind`는 `"PROPERTY"` \| `"STOCK"` \| `"DEPOSIT"`. `index`·`name`은 **부동산 항목에만** 있다 |
+| `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ assetKind, assetId, name, label, refund, quantity, maxQuantity, unitValue, index? }]` — `assetKind`는 `"PROPERTY"` \| `"STOCK"` \| `"DEPOSIT"` |
 | `TRADE` | `budget`(9.3), `cash`, `deposit`, `holdings: [{ instrumentId, qty, avgCost, marketValue }]`, `afterTrade`(`"ROLL"` \| `"ISLAND"` \| `"TRAVEL"` — 창구를 닫으면 갈 곳) |
 
 `AWAIT_ROLL`과 `GAME_OVER`에서는 `pending`이 `null`이다.
@@ -447,14 +447,20 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | 필드 | `PROPERTY` | `STOCK` | `DEPOSIT` |
 |---|---|---|---|
 | `assetId` | 칸 번호 문자열(`"3"`) | 종목 id(`"AIR"`) | 항상 `"CASH"` |
-| `label` | 도시 이름 | 종목 이름 | `"예금"` |
+| `name` / `label` | 도시 이름 | 종목 이름 | `"예금"` |
 | `quantity` | `1` | 보유 수량 | 잔액(원) |
 | `maxQuantity` | `1` | 보유 수량 | 잔액(원) |
 | `unitValue` | 환급액 | 1주 현재가 | `1` |
 | `refund` | `invested × 0.5` | `수량 × 현재가`(수수료 면제) | 잔액 전액 |
-| `index`/`name` | 있음 | 없음 | 없음 |
+| `index` | 있음 | 없음 | 없음 |
 
-- `SELL_ASSET`의 `quantity`를 생략하면 **전량**을 판다. 예금은 10,000원 단위로만 인출할 수 있다.
+- **모든 자산군이 `name`과 `label`을 함께 싣는다**(같은 값). 자산군이 섞인 이 배열을 **렌더러
+  하나로** 그릴 수 있게 하기 위한 것이며, `index`만 부동산 전용이다. 매각을 보낼 때는
+  `assetKind`/`assetId`를 그대로 되돌려주는 `SELL_ASSET`을 쓴다(기존 `SELL`은 부동산 전용).
+- `SELL_ASSET`의 `quantity`를 생략하면 **부족액을 덮는 만큼만** 판다(전량이 아니다).
+- **정리 매각은 부족액을 덮는 수량까지만 허용된다.** 그보다 많이 보내면 `409 ERR018`이다 —
+  정리 매각은 수수료가 면제되고 창구 한도를 보지 않으므로, 작은 채무를 만들어 놓고 보유 전량을
+  털어 내는 길을 막는다. 나눌 수 없는 부동산 한 칸은 부족액을 넘어도 통째로 팔린다.
 - 상장폐지된 종목은 목록에 오르지 않는다(값이 0이므로).
 
 ### 건설 선택지와 바퀴 제한 (`options` / `lockedOptions`)
@@ -761,6 +767,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | 자동 진행 중인 좌석의 커맨드 | `403 ERR003` |
 | 현금·보유 수량·예금 잔액 부족 | `409 ERR008` |
 | 4번째 주문 / 창구 예산 초과 / 1건 한도 초과 / 보유 상한 / 예금 한도 / 예약 4건 | `409 ERR018` |
+| 정리 매각 수량이 부족액을 덮는 양을 넘음 | `409 ERR018` |
 | 좌석당 5초에 11번째 거래 커맨드 | `429 ERR019` (`retry-after: 1`) |
 | 투자 모드가 `OFF`인 방의 거래 커맨드 | `409 ERR005` |
 

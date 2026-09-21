@@ -58,30 +58,45 @@ describe('E2E: 증권거래소 골든 리플레이', () => {
     });
   }
 
-  it('모든 시나리오에서 돈의 보존 불변식이 최종 상태에서도 성립한다', () => {
-    // Given / When / Then
+  it('갓 재생한 결과에서 돈의 보존 불변식과 시장 건강성이 성립한다', async () => {
+    // Given (픽스처가 아니라 **방금 재생한 결과**를 검사한다 — 픽스처만 읽으면
+    //        프로덕션 코드를 지워도 통과하는 테스트가 된다)
+    const scenarios = [
+      { seed: 1, roundLimit: 30 },
+      { seed: 20_260_921, roundLimit: null },
+    ];
+
+    // When / Then
+    for (const scenario of scenarios) {
+      const actual = await replayScenario({ ...scenario, investmentMode: 'STOCKS' });
+
+      assert.equal(
+        actual.totalCash + actual.jackpot,
+        actual.initialTotal + actual.netFromBank,
+        `시드 ${scenario.seed}: 돈의 보존 불변식이 깨졌다`,
+      );
+      assert.ok(actual.market, `시드 ${scenario.seed}: 시장이 없다`);
+      assert.equal(
+        Object.keys(actual.market.prices).length,
+        5,
+        `시드 ${scenario.seed}: 상장 종목이 5개가 아니다`,
+      );
+      assert.ok(
+        actual.market.baseRateBp >= 25 && actual.market.baseRateBp <= 400,
+        `시드 ${scenario.seed}: 기준금리가 범위 밖이다`,
+      );
+    }
+  });
+
+  it('골든 파일 자체의 정합성(잘못 재생성한 골든을 막는 가드)', () => {
+    // Given / When / Then (이 검사는 픽스처만 본다 — 행동 테스트가 아니라 파일 가드다)
     for (const scenario of GOLDEN.scenarios) {
       assert.equal(
         scenario.totalCash + scenario.jackpot,
         scenario.initialTotal + scenario.netFromBank,
         `시드 ${scenario.seed}: 골든 기록 자체가 불변식을 어긴다`,
       );
-    }
-  });
-
-  it('모든 시나리오에서 시장이 살아 있었다(골든이 빈 시장을 굳히지 않았는지)', () => {
-    // Given / When / Then
-    for (const scenario of GOLDEN.scenarios) {
       assert.ok(scenario.market, `시드 ${scenario.seed}: 시장 지문이 없다`);
-      assert.equal(
-        Object.keys(scenario.market.prices).length,
-        5,
-        `시드 ${scenario.seed}: 상장 종목이 5개가 아니다`,
-      );
-      assert.ok(
-        scenario.market.baseRateBp >= 25 && scenario.market.baseRateBp <= 400,
-        `시드 ${scenario.seed}: 기준금리가 범위 밖이다`,
-      );
     }
   });
 });

@@ -160,22 +160,16 @@ describe('밸런스: 폭주하는 종목이 없다', () => {
     }
   });
 
-  it('시뮬레이션 요약을 사람이 읽을 수 있게 남긴다(SPEC 12장 표의 출처)', () => {
-    // Given / When
-    const lines = [
-      `시드 ${summary.seeds}개 × ${summary.rounds}라운드`,
-      `포트폴리오: 평균 ${percent(summary.portfolio.meanReturn)} / 중앙값 ${percent(
-        summary.portfolio.medianReturn,
-      )} / 1바퀴 ${percent(summary.portfolio.perLapReturn)} / 손실확률 ${percent(
-        summary.portfolio.lossRate,
-      )}`,
-      `배당 포함: ${percent(summary.portfolio.withDividendsMeanReturn)}`,
-      `1바퀴 구간 하락 확률: ${percent(summary.lapWindowLossRate)}`,
-      `예금: ${percent(summary.deposit.meanReturn)} (평균 금리 ${summary.deposit.meanBaseRateBp.toFixed(1)}bp)`,
-    ];
+  it('중앙값 기준 1바퀴 수익률도 함께 공표한다(평균만 보면 체감과 어긋난다)', () => {
+    // Given (평균은 큰 상승에 끌려 올라간다. 플레이어 절반이 실제로 보는 값은 중앙값 기준이므로
+    //        SPEC 12.3 표에 둘 다 싣고, 중앙값도 플러스임을 지킨다)
+    const medianPerLap = (1 + summary.portfolio.medianReturn) ** (ROUNDS_PER_LAP / ROUNDS) - 1;
 
-    // Then (값이 계산됐는지만 확인한다 — 기댓값은 위의 테스트들이 지킨다)
-    assert.equal(lines.length, 5);
-    assert.ok(lines.every((line) => line.length > 0));
+    // When / Then
+    assert.ok(medianPerLap > 0.04, `중앙값 기준 1바퀴 수익률이 너무 낮다: ${percent(medianPerLap)}`);
+    assert.ok(
+      medianPerLap < summary.portfolio.perLapReturn,
+      '중앙값이 평균보다 높다면 분포 계산이 잘못됐다',
+    );
   });
 });
