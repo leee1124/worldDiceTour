@@ -18,6 +18,13 @@ export const MONEY_REASONS = Object.freeze({
   BANKRUPTCY: 'BANKRUPTCY',
   ACQUISITION: 'ACQUISITION',
   LOAN: 'LOAN',
+  /** 증권거래소(투자 모드 STOCKS) — 설계서 §5.2. */
+  TRADE_BUY: 'TRADE_BUY',
+  TRADE_SELL: 'TRADE_SELL',
+  TRADE_FEE: 'TRADE_FEE',
+  DIVIDEND: 'DIVIDEND',
+  DEPOSIT: 'DEPOSIT',
+  DEPOSIT_INTEREST: 'DEPOSIT_INTEREST',
 });
 
 const REASON_LIST = Object.freeze(Object.values(MONEY_REASONS));

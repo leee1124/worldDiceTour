@@ -15,6 +15,14 @@ export const DOMAIN_ERROR_CODES = Object.freeze({
   ROOM_FULL: 'ROOM_FULL',
   SEAT_NOT_FOUND: 'SEAT_NOT_FOUND',
   NOT_ENOUGH_SEATS: 'NOT_ENOUGH_SEATS',
+  /**
+   * 거래 한도 위반(창구 주문 수·명목금액·종목 보유 상한·예금 한도·예약 주문 수).
+   *
+   * "형식이 틀렸다"(`INVALID_ARGUMENT`)도 "돈이 없다"(`INSUFFICIENT_CASH`)도 아니라
+   * **규칙이 허용하는 양을 넘었다**는 뜻이므로 별도 사유다. 화면이 "이번 창구에서는 더 살 수 없습니다"를
+   * 정확히 안내할 수 있어야 하기 때문이다.
+   */
+  TRADE_LIMIT: 'TRADE_LIMIT',
 });
 
 export class DomainError extends Error {
@@ -72,5 +80,9 @@ export class DomainError extends Error {
 
   static notEnoughSeats(message) {
     return new DomainError(DOMAIN_ERROR_CODES.NOT_ENOUGH_SEATS, message);
+  }
+
+  static tradeLimit(message) {
+    return new DomainError(DOMAIN_ERROR_CODES.TRADE_LIMIT, message);
   }
 }
