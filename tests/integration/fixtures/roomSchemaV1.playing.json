@@ -1,0 +1,282 @@
+{
+  "code": "KD4M",
+  "status": "PLAYING",
+  "hostSeatId": "seat-1",
+  "seats": [
+    {
+      "id": "seat-1",
+      "name": "하나",
+      "kind": "HUMAN",
+      "token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "autopilot": false
+    },
+    {
+      "id": "seat-2",
+      "name": "두리",
+      "kind": "HUMAN",
+      "token": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "autopilot": false
+    },
+    {
+      "id": "seat-3",
+      "name": "세찌",
+      "kind": "HUMAN",
+      "token": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "autopilot": false
+    },
+    {
+      "id": "seat-4",
+      "name": "네찌",
+      "kind": "HUMAN",
+      "token": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "autopilot": false
+    }
+  ],
+  "options": {
+    "roundLimit": 30
+  },
+  "game": {
+    "version": 140,
+    "phase": "AWAIT_BUILD",
+    "turnIndex": 3,
+    "round": 17,
+    "options": {
+      "roundLimit": 30
+    },
+    "initialTotal": 12000000,
+    "players": [
+      {
+        "id": "seat-1",
+        "name": "하나",
+        "cash": 727900,
+        "position": 30,
+        "eliminated": false,
+        "islandRemainingTurns": 0,
+        "airportPending": true,
+        "consecutiveDoubles": 0,
+        "loanUsed": true,
+        "loanDebt": 1200000
+      },
+      {
+        "id": "seat-2",
+        "name": "두리",
+        "cash": 1349800,
+        "position": 18,
+        "eliminated": false,
+        "islandRemainingTurns": 0,
+        "airportPending": false,
+        "consecutiveDoubles": 0,
+        "loanUsed": false,
+        "loanDebt": 0
+      },
+      {
+        "id": "seat-3",
+        "name": "세찌",
+        "cash": 179000,
+        "position": 13,
+        "eliminated": false,
+        "islandRemainingTurns": 0,
+        "airportPending": false,
+        "consecutiveDoubles": 0,
+        "loanUsed": true,
+        "loanDebt": 1000000
+      },
+      {
+        "id": "seat-4",
+        "name": "네찌",
+        "cash": 1629800,
+        "position": 31,
+        "eliminated": false,
+        "islandRemainingTurns": 0,
+        "airportPending": false,
+        "consecutiveDoubles": 0,
+        "loanUsed": false,
+        "loanDebt": 0
+      }
+    ],
+    "board": [
+      {
+        "index": 1,
+        "ownerId": "seat-2",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 4,
+        "ownerId": "seat-2",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 5,
+        "ownerId": "seat-2",
+        "buildings": [],
+        "landmark": false
+      },
+      {
+        "index": 6,
+        "ownerId": "seat-4",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 8,
+        "ownerId": "seat-4",
+        "buildings": [
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 13,
+        "ownerId": "seat-2",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": true
+      },
+      {
+        "index": 14,
+        "ownerId": "seat-4",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": true
+      },
+      {
+        "index": 16,
+        "ownerId": "seat-2",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 21,
+        "ownerId": "seat-4",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 23,
+        "ownerId": "seat-2",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 28,
+        "ownerId": "seat-4",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 29,
+        "ownerId": "seat-4",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 31,
+        "ownerId": "seat-4",
+        "buildings": [],
+        "landmark": false
+      },
+      {
+        "index": 33,
+        "ownerId": "seat-2",
+        "buildings": [
+          "VILLA",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 35,
+        "ownerId": "seat-4",
+        "buildings": [],
+        "landmark": false
+      },
+      {
+        "index": 36,
+        "ownerId": "seat-4",
+        "buildings": [
+          "VILLA",
+          "BUILDING",
+          "HOTEL"
+        ],
+        "landmark": false
+      },
+      {
+        "index": 39,
+        "ownerId": "seat-4",
+        "buildings": [
+          "HOTEL"
+        ],
+        "landmark": false
+      }
+    ],
+    "deck": {
+      "drawPile": [
+        "T04",
+        "T07",
+        "T08",
+        "T09",
+        "T11",
+        "T15",
+        "T16",
+        "T19"
+      ]
+    },
+    "casino": {
+      "jackpot": 326500
+    },
+    "ledger": {
+      "fromBank": 6370000,
+      "toBank": 14157000
+    },
+    "turn": {
+      "rollWasDouble": false,
+      "casinoRoundsLeft": 0,
+      "debt": null,
+      "buildIndex": 31,
+      "acquireIndex": null
+    }
+  },
+  "createdAt": 1700000000000,
+  "updatedAt": 1700000000000,
+  "seatSequence": 4
+}

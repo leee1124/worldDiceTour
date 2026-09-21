@@ -1,0 +1,28 @@
+{
+  "code": "AB2C",
+  "status": "LOBBY",
+  "hostSeatId": "seat-1",
+  "seats": [
+    {
+      "id": "seat-1",
+      "name": "하나",
+      "kind": "HUMAN",
+      "token": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autopilot": false
+    },
+    {
+      "id": "seat-2",
+      "name": "두리",
+      "kind": "HUMAN",
+      "token": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "autopilot": false
+    }
+  ],
+  "options": {
+    "roundLimit": 30
+  },
+  "game": null,
+  "createdAt": 1700000000000,
+  "updatedAt": 1700000000000,
+  "seatSequence": 2
+}
