@@ -1,173 +1,557 @@
 {
-  "_about": "증권거래소(투자 모드 STOCKS) 계약 샘플. docs/API.md 9장과 짝을 이룬다. view는 AWAIT_TRADE 페이즈의 완전한 GameViewDto이고, messages는 SSE `game` 메시지 예시 4개다. 실제 서버 응답과 필드 구성이 같도록 유지한다.",
+  "_about": "증권거래소(투자 모드 STOCKS) 계약 샘플. docs/API.md 9장과 짝을 이룬다. 이 파일은 scripts로 실제 게임을 돌려 생성했으므로 필드 구성이 구현과 정확히 일치한다. view는 AWAIT_TRADE 페이즈의 완전한 GameViewDto이고, messages는 SSE `game` 메시지의 events 배열 예시다.",
   "view": {
-    "version": 87,
+    "version": 4,
     "phase": "AWAIT_TRADE",
-    "round": 5,
+    "round": 1,
     "roundLimit": 30,
     "currentSeatId": "seat-1",
     "actingSeatId": "seat-1",
-    "jackpot": 340000,
+    "jackpot": 0,
     "isOver": false,
     "players": [
       {
         "seatId": "seat-1",
         "name": "하나",
-        "cash": 1480000,
-        "position": 12,
-        "lap": 2,
+        "cash": 2015200,
+        "position": 0,
+        "lap": 1,
         "eliminated": false,
         "islandRemainingTurns": 0,
         "airportPending": false,
         "loanUsed": false,
         "loanDebt": 0,
-        "cityCount": 3,
-        "resortCount": 1,
-        "totalAssets": 3072000,
-        "stockValue": 512000,
+        "cityCount": 0,
+        "resortCount": 0,
+        "totalAssets": 2995200,
+        "stockValue": 480000,
         "depositBalance": 500000,
         "netWorth": {
-          "cash": 1480000,
-          "property": 580000,
-          "stock": 512000,
+          "cash": 2015200,
+          "property": 0,
+          "stock": 480000,
           "deposit": 500000,
           "loanDebt": 0,
-          "total": 3072000
+          "total": 2995200
         }
       },
       {
         "seatId": "seat-2",
         "name": "두리",
-        "cash": 2120000,
-        "position": 24,
-        "lap": 2,
+        "cash": 3000000,
+        "position": 0,
+        "lap": 1,
         "eliminated": false,
         "islandRemainingTurns": 0,
         "airportPending": false,
         "loanUsed": false,
         "loanDebt": 0,
-        "cityCount": 2,
+        "cityCount": 0,
         "resortCount": 0,
-        "totalAssets": 2733000,
-        "stockValue": 613000,
+        "totalAssets": 3000000,
+        "stockValue": 0,
         "depositBalance": 0,
         "netWorth": {
-          "cash": 2120000,
+          "cash": 3000000,
           "property": 0,
-          "stock": 613000,
+          "stock": 0,
           "deposit": 0,
           "loanDebt": 0,
-          "total": 2733000
+          "total": 3000000
         }
       },
       {
         "seatId": "seat-3",
         "name": "세찌",
-        "cash": 910000,
-        "position": 3,
-        "lap": 2,
+        "cash": 3000000,
+        "position": 0,
+        "lap": 1,
         "eliminated": false,
-        "islandRemainingTurns": 2,
+        "islandRemainingTurns": 0,
         "airportPending": false,
-        "loanUsed": true,
-        "loanDebt": 1000000,
-        "cityCount": 4,
+        "loanUsed": false,
+        "loanDebt": 0,
+        "cityCount": 0,
         "resortCount": 0,
-        "totalAssets": 1092000,
+        "totalAssets": 3000000,
         "stockValue": 0,
         "depositBalance": 0,
         "netWorth": {
-          "cash": 910000,
-          "property": 1182000,
+          "cash": 3000000,
+          "property": 0,
           "stock": 0,
           "deposit": 0,
-          "loanDebt": 1000000,
-          "total": 1092000
+          "loanDebt": 0,
+          "total": 3000000
         }
       },
       {
         "seatId": "seat-4",
         "name": "네오",
-        "cash": 0,
-        "position": 20,
+        "cash": 3000000,
+        "position": 0,
         "lap": 1,
-        "eliminated": true,
+        "eliminated": false,
         "islandRemainingTurns": 0,
         "airportPending": false,
-        "loanUsed": true,
-        "loanDebt": 400000,
+        "loanUsed": false,
+        "loanDebt": 0,
         "cityCount": 0,
         "resortCount": 0,
-        "totalAssets": 0,
+        "totalAssets": 3000000,
         "stockValue": 0,
         "depositBalance": 0,
         "netWorth": {
-          "cash": 0,
+          "cash": 3000000,
           "property": 0,
           "stock": 0,
           "deposit": 0,
           "loanDebt": 0,
-          "total": 0
+          "total": 3000000
         }
       }
     ],
     "board": [
-      { "index": 0, "name": "출발", "kind": "START" },
+      {
+        "index": 0,
+        "name": "출발",
+        "kind": "START"
+      },
+      {
+        "index": 1,
+        "name": "하노이",
+        "kind": "CITY",
+        "price": 60000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 2,
+        "name": "행운 티켓",
+        "kind": "TICKET"
+      },
       {
         "index": 3,
         "name": "방콕",
         "kind": "CITY",
         "price": 70000,
-        "ownerId": "seat-3",
-        "buildings": ["VILLA"],
+        "ownerId": null,
+        "buildings": [],
         "landmark": false,
-        "invested": 91000,
-        "toll": 28000,
-        "acquisitionPrice": 182000
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
       },
-      { "index": 10, "name": "조난 섬", "kind": "ISLAND" },
-      { "index": 20, "name": "라스베이거스 카지노", "kind": "CASINO" },
-      { "index": 30, "name": "세계일주 공항", "kind": "AIRPORT" }
+      {
+        "index": 4,
+        "name": "자카르타",
+        "kind": "CITY",
+        "price": 80000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 5,
+        "name": "제주 올레길",
+        "kind": "RESORT",
+        "price": 200000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 6,
+        "name": "뭄바이",
+        "kind": "CITY",
+        "price": 100000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 7,
+        "name": "행운 티켓",
+        "kind": "TICKET"
+      },
+      {
+        "index": 8,
+        "name": "두바이",
+        "kind": "CITY",
+        "price": 120000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 9,
+        "name": "카이로",
+        "kind": "CITY",
+        "price": 120000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 10,
+        "name": "조난 섬",
+        "kind": "ISLAND"
+      },
+      {
+        "index": 11,
+        "name": "이스탄불",
+        "kind": "CITY",
+        "price": 140000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 12,
+        "name": "행운 티켓",
+        "kind": "TICKET"
+      },
+      {
+        "index": 13,
+        "name": "아테네",
+        "kind": "CITY",
+        "price": 160000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 14,
+        "name": "프라하",
+        "kind": "CITY",
+        "price": 160000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 15,
+        "name": "알프스 설원열차",
+        "kind": "RESORT",
+        "price": 200000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 16,
+        "name": "빈",
+        "kind": "CITY",
+        "price": 180000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 17,
+        "name": "암스테르담",
+        "kind": "CITY",
+        "price": 200000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 18,
+        "name": "세관",
+        "kind": "TAX"
+      },
+      {
+        "index": 19,
+        "name": "바르셀로나",
+        "kind": "CITY",
+        "price": 220000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 20,
+        "name": "라스베이거스 카지노",
+        "kind": "CASINO"
+      },
+      {
+        "index": 21,
+        "name": "멕시코시티",
+        "kind": "CITY",
+        "price": 240000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 22,
+        "name": "행운 티켓",
+        "kind": "TICKET"
+      },
+      {
+        "index": 23,
+        "name": "리우데자네이루",
+        "kind": "CITY",
+        "price": 260000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 24,
+        "name": "부에노스아이레스",
+        "kind": "CITY",
+        "price": 260000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 25,
+        "name": "카리브 크루즈",
+        "kind": "RESORT",
+        "price": 200000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 26,
+        "name": "토론토",
+        "kind": "CITY",
+        "price": 280000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 27,
+        "name": "행운 티켓",
+        "kind": "TICKET"
+      },
+      {
+        "index": 28,
+        "name": "시카고",
+        "kind": "CITY",
+        "price": 300000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 29,
+        "name": "샌프란시스코",
+        "kind": "CITY",
+        "price": 320000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 30,
+        "name": "세계일주 공항",
+        "kind": "AIRPORT"
+      },
+      {
+        "index": 31,
+        "name": "시드니",
+        "kind": "CITY",
+        "price": 350000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 32,
+        "name": "행운 티켓",
+        "kind": "TICKET"
+      },
+      {
+        "index": 33,
+        "name": "베를린",
+        "kind": "CITY",
+        "price": 380000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 34,
+        "name": "파리",
+        "kind": "CITY",
+        "price": 400000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 35,
+        "name": "오로라 관측소",
+        "kind": "RESORT",
+        "price": 200000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 36,
+        "name": "런던",
+        "kind": "CITY",
+        "price": 450000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 37,
+        "name": "도쿄",
+        "kind": "CITY",
+        "price": 500000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 38,
+        "name": "뉴욕",
+        "kind": "CITY",
+        "price": 600000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      },
+      {
+        "index": 39,
+        "name": "서울",
+        "kind": "CITY",
+        "price": 800000,
+        "ownerId": null,
+        "buildings": [],
+        "landmark": false,
+        "invested": 0,
+        "toll": 0,
+        "acquisitionPrice": null
+      }
     ],
     "pending": {
       "kind": "TRADE",
-      "cash": 1480000,
+      "cash": 2015200,
       "deposit": 500000,
       "afterTrade": "ROLL",
       "holdings": [
-        { "instrumentId": "AIR", "qty": 40, "avgCost": 12000, "marketValue": 512000 }
+        {
+          "instrumentId": "AIR",
+          "qty": 40,
+          "avgCost": 12000,
+          "marketValue": 480000
+        }
       ],
       "budget": {
         "seatId": "seat-1",
         "open": true,
-        "ordersUsed": 1,
-        "ordersLeft": 2,
+        "ordersUsed": 2,
+        "ordersLeft": 1,
         "ordersMax": 3,
-        "notionalUsed": 512000,
-        "notionalLeft": 1488000,
+        "notionalUsed": 480000,
+        "notionalLeft": 1520000,
         "notionalMax": 2000000
       }
     },
-    "rankings": null,
     "market": {
       "investmentMode": "STOCKS",
-      "cycle": { "phase": "EXPANSION", "label": "호황", "age": 2, "driftBp": 150, "volMulPct": 100 },
-      "baseRateBp": 125,
-      "news": {
-        "id": "NE1",
-        "headline": "국제선 좌석이 모자란다",
-        "explanation": "여행 수요가 늘어난 좌석 공급을 앞질렀습니다.",
-        "round": 5,
-        "cyclePhase": "EXPANSION",
-        "effects": [
-          { "target": "SECTOR", "sector": "AIRLINE", "bp": 600 },
-          { "target": "SECTOR", "sector": "HOTEL", "bp": 400 }
-        ]
+      "cycle": {
+        "phase": "RECOVERY",
+        "label": "회복",
+        "age": 1,
+        "driftBp": 150,
+        "volMulPct": 80
       },
-      "pendingNudges": [
-        { "sector": "CONSTRUCTION", "bp": 300, "label": "건설" },
-        { "sector": "ENTERTAINMENT", "bp": 500, "label": "카지노·엔터" }
-      ],
+      "baseRateBp": 50,
+      "news": null,
+      "pendingNudges": [],
       "instruments": [
         {
           "id": "AIR",
@@ -176,13 +560,15 @@
           "sectorLabel": "항공",
           "klass": "STOCK",
           "state": "LISTED",
-          "price": 12800,
+          "price": 12000,
           "prevPrice": 12000,
-          "changeBp": 666,
+          "changeBp": 0,
           "basePrice": 12000,
           "tickUnit": 100,
           "dividendBp": 150,
-          "series": [12000, 12300, 12100, 12000, 12800]
+          "series": [
+            12000
+          ]
         },
         {
           "id": "CON",
@@ -191,13 +577,15 @@
           "sectorLabel": "건설",
           "klass": "STOCK",
           "state": "LISTED",
-          "price": 8600,
-          "prevPrice": 8300,
-          "changeBp": 361,
+          "price": 8000,
+          "prevPrice": 8000,
+          "changeBp": 0,
           "basePrice": 8000,
           "tickUnit": 100,
           "dividendBp": 200,
-          "series": [8000, 8200, 8100, 8300, 8600]
+          "series": [
+            8000
+          ]
         },
         {
           "id": "HOT",
@@ -206,13 +594,15 @@
           "sectorLabel": "호텔·관광",
           "klass": "STOCK",
           "state": "LISTED",
-          "price": 16300,
-          "prevPrice": 15600,
-          "changeBp": 448,
+          "price": 15000,
+          "prevPrice": 15000,
+          "changeBp": 0,
           "basePrice": 15000,
           "tickUnit": 100,
           "dividendBp": 250,
-          "series": [15000, 15200, 15500, 15600, 16300]
+          "series": [
+            15000
+          ]
         },
         {
           "id": "ENT",
@@ -221,13 +611,15 @@
           "sectorLabel": "카지노·엔터",
           "klass": "STOCK",
           "state": "LISTED",
-          "price": 5300,
-          "prevPrice": 5800,
-          "changeBp": -862,
+          "price": 6000,
+          "prevPrice": 6000,
+          "changeBp": 0,
           "basePrice": 6000,
           "tickUnit": 100,
           "dividendBp": 0,
-          "series": [6000, 6400, 6100, 5800, 5300]
+          "series": [
+            6000
+          ]
         },
         {
           "id": "NRG",
@@ -236,28 +628,39 @@
           "sectorLabel": "에너지",
           "klass": "STOCK",
           "state": "LISTED",
-          "price": 20600,
-          "prevPrice": 20300,
-          "changeBp": 147,
+          "price": 20000,
+          "prevPrice": 20000,
+          "changeBp": 0,
           "basePrice": 20000,
           "tickUnit": 100,
           "dividendBp": 350,
-          "series": [20000, 20100, 20400, 20300, 20600]
+          "series": [
+            20000
+          ]
         }
       ],
       "holdings": {
-        "seat-1": [{ "instrumentId": "AIR", "qty": 40, "avgCost": 12000, "marketValue": 512000 }],
-        "seat-2": [
-          { "instrumentId": "CON", "qty": 50, "avgCost": 8200, "marketValue": 430000 },
-          { "instrumentId": "NRG", "qty": 9, "avgCost": 20100, "marketValue": 185400 }
+        "seat-1": [
+          {
+            "instrumentId": "AIR",
+            "qty": 40,
+            "avgCost": 12000,
+            "marketValue": 480000
+          }
         ],
+        "seat-2": [],
         "seat-3": [],
         "seat-4": []
       },
-      "deposits": { "seat-1": 500000, "seat-2": 0, "seat-3": 0, "seat-4": 0 },
+      "deposits": {
+        "seat-1": 500000,
+        "seat-2": 0,
+        "seat-3": 0,
+        "seat-4": 0
+      },
       "orderQueue": [
         {
-          "id": "ord-2",
+          "id": "ord-1",
           "seatId": "seat-2",
           "kind": "BUY_STOCK",
           "instrumentId": "CON",
@@ -265,9 +668,9 @@
           "amount": null
         },
         {
-          "id": "ord-5",
+          "id": "ord-2",
           "seatId": "seat-3",
-          "kind": "WITHDRAW",
+          "kind": "DEPOSIT",
           "instrumentId": null,
           "quantity": null,
           "amount": 200000
@@ -276,11 +679,11 @@
       "budget": {
         "seatId": "seat-1",
         "open": true,
-        "ordersUsed": 1,
-        "ordersLeft": 2,
+        "ordersUsed": 2,
+        "ordersLeft": 1,
         "ordersMax": 3,
-        "notionalUsed": 512000,
-        "notionalLeft": 1488000,
+        "notionalUsed": 480000,
+        "notionalLeft": 1520000,
         "notionalMax": 2000000
       },
       "rules": {
@@ -299,46 +702,87 @@
         "baseRateMaxBp": 400,
         "seriesLength": 30
       }
-    }
+    },
+    "rankings": null
   },
   "messages": [
     {
-      "_about": "① 라운드 틱: 국면 전이 → 뉴스 → 금리 → 시세 → 예금 이자. ROUND_ADVANCED 1회당 정확히 1번만 돈다.",
+      "_about": "① 라운드 틱: 국면 전이 → 뉴스 → 금리 → 시세 → 상장폐지 → 신규상장 → 예금 이자 순서로 고정돼 있다. ROUND_ADVANCED 1회당 정확히 1번 돈다.",
       "events": [
-        { "type": "TURN_ENDED", "playerId": "seat-4" },
-        { "type": "ROUND_ADVANCED", "round": 5 },
-        { "type": "CYCLE_CHANGED", "from": "RECOVERY", "to": "EXPANSION", "round": 5 },
+        {
+          "type": "PURCHASE_DECLINED",
+          "playerId": "seat-4",
+          "index": 9
+        },
+        {
+          "type": "TURN_ENDED",
+          "playerId": "seat-4"
+        },
+        {
+          "type": "ROUND_ADVANCED",
+          "round": 2
+        },
         {
           "type": "NEWS_PUBLISHED",
-          "id": "NE1",
-          "headline": "국제선 좌석이 모자란다",
-          "explanation": "여행 수요가 늘어난 좌석 공급을 앞질렀습니다.",
-          "round": 5,
-          "cyclePhase": "EXPANSION",
+          "id": "NV2",
+          "headline": "멈췄던 공사가 재개된다",
+          "explanation": "금리가 낮아지자 자금이 다시 돌기 시작했습니다.",
           "effects": [
-            { "target": "SECTOR", "sector": "AIRLINE", "bp": 600 },
-            { "target": "SECTOR", "sector": "HOTEL", "bp": 400 }
-          ]
+            {
+              "target": "SECTOR",
+              "sector": "CONSTRUCTION",
+              "bp": 600
+            }
+          ],
+          "round": 2,
+          "cyclePhase": "RECOVERY"
         },
         {
           "type": "PRICES_UPDATED",
-          "round": 5,
+          "round": 2,
           "changes": [
-            { "instrumentId": "AIR", "from": 12000, "to": 12800, "changeBp": 666, "state": "LISTED" },
-            { "instrumentId": "CON", "from": 8300, "to": 8600, "changeBp": 361, "state": "LISTED" },
-            { "instrumentId": "HOT", "from": 15600, "to": 16300, "changeBp": 448, "state": "LISTED" },
-            { "instrumentId": "ENT", "from": 5800, "to": 5300, "changeBp": -862, "state": "LISTED" },
-            { "instrumentId": "NRG", "from": 20300, "to": 20600, "changeBp": 147, "state": "LISTED" }
+            {
+              "instrumentId": "AIR",
+              "from": 12000,
+              "to": 11900,
+              "changeBp": -83,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "CON",
+              "from": 8000,
+              "to": 8300,
+              "changeBp": 375,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "HOT",
+              "from": 15000,
+              "to": 15100,
+              "changeBp": 66,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "ENT",
+              "from": 6000,
+              "to": 5800,
+              "changeBp": -333,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "NRG",
+              "from": 20000,
+              "to": 20900,
+              "changeBp": 450,
+              "state": "LISTED"
+            }
           ]
         },
         {
-          "type": "DEPOSIT_INTEREST_PAID",
+          "type": "TURN_STARTED",
           "playerId": "seat-1",
-          "amount": 6250,
-          "balance": 500000,
-          "baseRateBp": 125
+          "round": 2
         },
-        { "type": "TURN_STARTED", "playerId": "seat-1", "round": 5 },
         {
           "type": "TRADING_OPENED",
           "playerId": "seat-1",
@@ -349,7 +793,7 @@
       ]
     },
     {
-      "_about": "② 매수 체결. 명목금액 512,000원 + 수수료 5,120원 = 실제 지출 517,120원.",
+      "_about": "② 매수 체결. 명목금액과 수수료가 따로 발행되므로 사유별 손익이 분리된다(MONEY_* 이벤트는 티켓 효과 전용이라 여기서는 나오지 않는다).",
       "events": [
         {
           "type": "ORDER_FILLED",
@@ -358,58 +802,143 @@
           "instrumentId": "AIR",
           "name": "한빛항공",
           "quantity": 40,
-          "price": 12800,
-          "notional": 512000,
-          "fee": 5120,
+          "price": 12000,
+          "notional": 480000,
+          "fee": 4800,
           "viaLiquidation": false
-        },
-        { "type": "MONEY_LOST", "playerId": "seat-1", "amount": 512000, "reason": "TRADE_BUY" },
-        { "type": "MONEY_LOST", "playerId": "seat-1", "amount": 5120, "reason": "TRADE_FEE" }
+        }
       ]
     },
     {
-      "_about": "③ 출발 칸 통과: 바퀴 증가 → 월급 → 배당(상장 종목만). 1주 배당 = floor(12800 × 150 / 10000) = 192원.",
+      "_about": "③ 출발 칸 통과: 바퀴 증가 → 월급 → 배당(상장 종목만) 순서. 무배당 종목은 이벤트가 없다.",
       "events": [
-        { "type": "DICE_ROLLED", "playerId": "seat-1", "die1": 4, "die2": 5, "sum": 9, "isDouble": false },
-        { "type": "MOVED", "playerId": "seat-1", "from": 36, "to": 5, "steps": 9, "passedStart": true },
-        { "type": "LAP_ADVANCED", "playerId": "seat-1", "lap": 3 },
-        { "type": "SALARY_PAID", "playerId": "seat-1", "amount": 200000 },
+        {
+          "type": "DICE_ROLLED",
+          "playerId": "seat-1",
+          "die1": 5,
+          "die2": 1,
+          "sum": 6,
+          "isDouble": false
+        },
+        {
+          "type": "MOVED",
+          "playerId": "seat-1",
+          "from": 39,
+          "to": 5,
+          "steps": 6,
+          "passedStart": true
+        },
+        {
+          "type": "LAP_ADVANCED",
+          "playerId": "seat-1",
+          "lap": 2
+        },
+        {
+          "type": "SALARY_PAID",
+          "playerId": "seat-1",
+          "amount": 200000
+        },
         {
           "type": "DIVIDEND_PAID",
           "playerId": "seat-1",
           "instrumentId": "AIR",
           "name": "한빛항공",
           "quantity": 40,
-          "perShare": 192,
-          "amount": 7680
+          "perShare": 180,
+          "amount": 7200
         },
-        { "type": "LANDED", "playerId": "seat-1", "index": 5, "kind": "CITY", "name": "하노이" }
+        {
+          "type": "LANDED",
+          "playerId": "seat-1",
+          "index": 5,
+          "kind": "RESORT",
+          "name": "제주 올레길"
+        }
       ]
     },
     {
-      "_about": "④ 상장폐지: 기준가의 20% 이하로 떨어지면 보유 수량이 전액 소각된다(현금 이동 없음). 다음 틱에 예비 풀에서 신규 상장되어 항상 5종목을 유지한다.",
+      "_about": "④ 상장폐지: 기준가의 20% 이하로 떨어지면 보유 수량이 전액 소각된다(현금 이동 없음).",
       "events": [
-        { "type": "ROUND_ADVANCED", "round": 14 },
+        {
+          "type": "PURCHASE_DECLINED",
+          "playerId": "seat-4",
+          "index": 4
+        },
+        {
+          "type": "TURN_ENDED",
+          "playerId": "seat-4"
+        },
+        {
+          "type": "ROUND_ADVANCED",
+          "round": 2
+        },
         {
           "type": "NEWS_PUBLISHED",
           "id": "NR5",
           "headline": "지갑 닫힌 주말",
           "explanation": "오락비는 가장 먼저 줄고 가장 늦게 돌아옵니다.",
-          "round": 14,
-          "cyclePhase": "RECESSION",
           "effects": [
-            { "target": "SECTOR", "sector": "ENTERTAINMENT", "bp": -1400 },
-            { "target": "SECTOR", "sector": "HOTEL", "bp": -400 }
-          ]
+            {
+              "target": "SECTOR",
+              "sector": "ENTERTAINMENT",
+              "bp": -1400
+            },
+            {
+              "target": "SECTOR",
+              "sector": "HOTEL",
+              "bp": -400
+            }
+          ],
+          "round": 2,
+          "cyclePhase": "RECESSION"
         },
         {
           "type": "PRICES_UPDATED",
-          "round": 14,
+          "round": 2,
           "changes": [
-            { "instrumentId": "ENT", "from": 1400, "to": 1200, "changeBp": -1428, "state": "DELISTED" }
+            {
+              "instrumentId": "AIR",
+              "from": 12000,
+              "to": 11500,
+              "changeBp": -416,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "CON",
+              "from": 8000,
+              "to": 7100,
+              "changeBp": -1125,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "HOT",
+              "from": 15000,
+              "to": 13800,
+              "changeBp": -800,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "ENT",
+              "from": 1300,
+              "to": 1200,
+              "changeBp": -769,
+              "state": "DELISTED"
+            },
+            {
+              "instrumentId": "NRG",
+              "from": 20000,
+              "to": 19100,
+              "changeBp": -450,
+              "state": "LISTED"
+            }
           ]
         },
-        { "type": "INSTRUMENT_DELISTED", "instrumentId": "ENT", "name": "네온엔터카지노", "price": 1200 },
+        {
+          "type": "INSTRUMENT_DELISTED",
+          "instrumentId": "ENT",
+          "name": "네온엔터카지노",
+          "price": 1200
+        },
         {
           "type": "HOLDINGS_WIPED",
           "playerId": "seat-2",
@@ -418,11 +947,140 @@
           "costBasis": 480000
         },
         {
+          "type": "TURN_STARTED",
+          "playerId": "seat-1",
+          "round": 2
+        },
+        {
+          "type": "TRADING_OPENED",
+          "playerId": "seat-1",
+          "ordersLeft": 3,
+          "notionalLeft": 2000000,
+          "afterTrade": "ROLL"
+        }
+      ]
+    },
+    {
+      "_about": "⑤ 다음 틱에 예비 풀에서 신규 상장되어 목록은 항상 5종목을 유지한다.",
+      "events": [
+        {
+          "type": "DICE_ROLLED",
+          "playerId": "seat-4",
+          "die1": 3,
+          "die2": 5,
+          "sum": 8,
+          "isDouble": false
+        },
+        {
+          "type": "MOVED",
+          "playerId": "seat-4",
+          "from": 4,
+          "to": 12,
+          "steps": 8,
+          "passedStart": false
+        },
+        {
+          "type": "LANDED",
+          "playerId": "seat-4",
+          "index": 12,
+          "kind": "TICKET",
+          "name": "행운 티켓"
+        },
+        {
+          "type": "TICKET_DRAWN",
+          "playerId": "seat-4",
+          "ticketId": "T20",
+          "text": "세무조사! 현금의 5%를 납부합니다(잭팟 적립).",
+          "effect": {
+            "type": "TAX_RATE",
+            "rate": 0.05
+          }
+        },
+        {
+          "type": "TAX_PAID",
+          "playerId": "seat-4",
+          "amount": 151500,
+          "ticketId": "T20"
+        },
+        {
+          "type": "JACKPOT_CHANGED",
+          "jackpot": 151500
+        },
+        {
+          "type": "TURN_ENDED",
+          "playerId": "seat-4"
+        },
+        {
+          "type": "ROUND_ADVANCED",
+          "round": 3
+        },
+        {
+          "type": "NEWS_PUBLISHED",
+          "id": "NR2",
+          "headline": "공사 중단 현장이 늘어난다",
+          "explanation": "자금이 마르면 삽부터 멈춥니다.",
+          "effects": [
+            {
+              "target": "SECTOR",
+              "sector": "CONSTRUCTION",
+              "bp": -1200
+            }
+          ],
+          "round": 3,
+          "cyclePhase": "RECESSION"
+        },
+        {
+          "type": "PRICES_UPDATED",
+          "round": 3,
+          "changes": [
+            {
+              "instrumentId": "AIR",
+              "from": 11500,
+              "to": 12300,
+              "changeBp": 695,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "CON",
+              "from": 7100,
+              "to": 5700,
+              "changeBp": -1971,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "HOT",
+              "from": 13800,
+              "to": 13500,
+              "changeBp": -217,
+              "state": "LISTED"
+            },
+            {
+              "instrumentId": "NRG",
+              "from": 19100,
+              "to": 19300,
+              "changeBp": 104,
+              "state": "LISTED"
+            }
+          ]
+        },
+        {
           "type": "INSTRUMENT_LISTED",
           "instrumentId": "SKY",
           "name": "새벽항공운수",
           "sector": "AIRLINE",
           "price": 9000
+        },
+        {
+          "type": "TURN_STARTED",
+          "playerId": "seat-1",
+          "round": 3
+        },
+        {
+          "type": "TRADING_OPENED",
+          "playerId": "seat-1",
+          "ordersLeft": 3,
+          "notionalLeft": 2000000,
+          "afterTrade": "ROLL"
         }
       ]
     }

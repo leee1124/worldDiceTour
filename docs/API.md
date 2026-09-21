@@ -38,7 +38,7 @@
 |---|---|---|---|
 | 23 | **옵션 값 개방** | `SET_OPTIONS`의 `finance.investmentMode`가 이제 `"OFF"`와 **`"STOCKS"`** 두 값을 받는다. 나머지 금융 옵션(`financeSystem` `"ADVANCED"`, `tradeTimerSec` `30`/`45`, `scenario` `"BUBBLE"`/`"DEPRESSION"`)은 **여전히 `400 ERR001`** | 로비 호스트 도구의 "투자 모드" 행을 실제 토글로 바꿀 것. 대기실에서만 바꿀 수 있고 `START` 시점 값이 판 내내 고정된다 |
 | 24 | **새 페이즈** | `AWAIT_TRADE` — 자기 턴 시작 직후(조난/공항/굴리기 **앞**)에 열리는 거래 창구. 커맨드 `BUY_STOCK` `SELL_STOCK` `DEPOSIT` `WITHDRAW` `CLOSE_TRADING` | 거래 모달을 이 페이즈에서 연다. **`CLOSE_TRADING`을 보내야 주사위/조난/공항 화면으로 넘어간다**(서버가 예산 소진 시 자동으로 닫기도 한다) |
-| 25 | **새 커맨드** | `QUEUE_ORDER` / `CANCEL_QUEUED_ORDER` — **모든 페이즈에서 자기 좌석에 한해** 허용(남의 턴 예약 주문). 게임 상태는 바뀌지 않고 큐만 바뀌지만 `version`은 +1 된다 | 남의 턴에도 "예약 주문" 버튼을 열 수 있다. 예약은 **내 차례 시작 시 자동 체결**되며 그때 전면 재검증된다 |
+| 25 | **새 커맨드** | `QUEUE_ORDER` / `CANCEL_QUEUED_ORDER` — **모든 페이즈에서 자기 좌석에 한해** 허용(남의 턴 예약 주문). 게임 상태는 바뀌지 않고 큐만 바뀌지만 `version`은 +1 된다. 투자 모드가 `OFF`인 방에서는 `409 ERR005` | 남의 턴에도 "예약 주문" 버튼을 열 수 있다. 예약은 **내 차례 시작 시 자동 체결**되며 그때 전면 재검증된다 |
 | 26 | **새 커맨드** | `SELL_ASSET { assetKind, assetId, quantity? }` — 정리 페이즈에서 자산군을 가리지 않는 매각. 기존 `SELL { cityIndex }`는 **그대로 동작한다**(하위호환) | 정리 모달은 `pending.sellable[].assetKind`/`assetId`를 그대로 되돌려주는 `SELL_ASSET`으로 바꾸면 주식·예금까지 한 버튼으로 처리된다 |
 | 27 | **추가 필드** | `GameViewDto.market` — 시세·국면·뉴스·전원 보유/예금·예약 주문·내 예산·수수료 규칙이 담긴 공개 스냅샷. 투자 모드가 `OFF`면 **`null`** | 남의 턴에도 항상 그려지는 시세 패널/티커의 유일한 입력이다 |
 | 28 | **추가 필드** | `GameViewDto.players[]`에 `stockValue`·`depositBalance`·`netWorth`(내역 객체) 가산. `totalAssets`의 **뜻이 넓어졌다** — 이제 주식 평가액과 예금도 포함한다 | 플레이어 패널의 총자산 내역을 `현금 / 부동산 / 주식 / 예금 / −대출`로 분해해 보여 줄 것. `totalAssets === netWorth.total` |
@@ -395,7 +395,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `AWAIT_TRAVEL` | `TRAVEL` | `{ destination: 0~39 }` (공항 칸 30과 현재 칸은 불가) |
 | `AWAIT_LIQUIDATION` | `SELL`, `SELL_ASSET`, `AUTO_SELL`, `TAKE_LOAN`, `DECLARE_BANKRUPTCY` | `SELL`: `{ cityIndex: 0~39 }` · `SELL_ASSET`: 아래 9.4 |
 | `GAME_OVER` | 없음(모든 커맨드 `ERR005`) | — |
-| **모든 페이즈**(`GAME_OVER` 제외) | `QUEUE_ORDER`, `CANCEL_QUEUED_ORDER` — **자기 좌석만**(내 차례가 아니어도 된다) | 아래 9.4 |
+| **모든 페이즈**(`GAME_OVER` 제외) | `QUEUE_ORDER`, `CANCEL_QUEUED_ORDER` — **자기 좌석만**(내 차례가 아니어도 된다). 투자 모드 `OFF`면 `ERR005` | 아래 9.4 |
 
 ### 커맨드 상세
 
@@ -759,6 +759,11 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | 현금·보유 수량·예금 잔액 부족 | `409 ERR008` |
 | 4번째 주문 / 창구 예산 초과 / 1건 한도 초과 / 보유 상한 / 예금 한도 / 예약 4건 | `409 ERR018` |
 | 좌석당 5초에 11번째 거래 커맨드 | `429 ERR019` (`retry-after: 1`) |
+| 투자 모드가 `OFF`인 방의 거래 커맨드 | `409 ERR005` |
+
+> 레이트 리밋은 **막혀도 판이 멈추지 않는 커맨드에만** 걸린다: `BUY_STOCK` `SELL_STOCK`
+> `DEPOSIT` `WITHDRAW` `QUEUE_ORDER` `CANCEL_QUEUED_ORDER`. `CLOSE_TRADING`과 정리 매각
+> (`SELL_ASSET`/`AUTO_SELL`)은 거부되면 그 좌석이 턴을 진행할 수 없으므로 제한하지 않는다.
 
 **거절돼도 상태는 절대 바뀌지 않는다**(`version`도 그대로). 클라이언트는 서버가 준 `view`를 유일한 진실로 삼으면 된다.
 
@@ -799,7 +804,15 @@ TURN_STARTED
 
 ### 9.7 샘플
 
-`docs/fixtures/marketView.sample.json`에 실제 서버가 만드는 모양의 샘플이 있다:
-- `view`: `AWAIT_TRADE` 페이즈의 완전한 `GameViewDto`(시세·보유·예약·예산 포함)
-- `messages`: SSE `game` 메시지 4개 — ① 라운드 틱(`NEWS_PUBLISHED` + `PRICES_UPDATED`)
-  ② 매수 체결(`ORDER_FILLED`) ③ 출발 통과 배당(`DIVIDEND_PAID`) ④ 상장폐지(`INSTRUMENT_DELISTED` + `HOLDINGS_WIPED` + `INSTRUMENT_LISTED`)
+`docs/fixtures/marketView.sample.json`에 샘플이 있다. **실제 게임을 돌려 생성한 파일**이므로
+필드 구성이 구현과 정확히 일치한다(문서와 코드가 어긋날 수 없다).
+
+- `view`: `AWAIT_TRADE` 페이즈의 완전한 `GameViewDto`(보드 40칸·시세·전원 보유·예약·예산 포함)
+- `messages[].events`: SSE `game` 메시지의 `events` 배열 5종
+  1. 라운드 틱 — `ROUND_ADVANCED` → `NEWS_PUBLISHED` → `PRICES_UPDATED` → `TURN_STARTED` → `TRADING_OPENED`
+  2. 매수 체결 — `ORDER_FILLED`
+  3. 출발 통과 — `LAP_ADVANCED` → `SALARY_PAID` → `DIVIDEND_PAID`
+  4. 상장폐지 — `PRICES_UPDATED` → `INSTRUMENT_DELISTED` → `HOLDINGS_WIPED`
+  5. 신규 상장 — 다음 틱의 `INSTRUMENT_LISTED`(목록은 항상 5종목)
+
+> 한 커맨드의 `events`에는 이렇게 **여러 사건이 함께** 담긴다. 연출 큐는 배열 순서대로 재생하면 된다.
