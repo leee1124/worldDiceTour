@@ -1,5 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
 import { assertAmount } from '../shared/Money.js';
+import { BuildingUnlocks, FIRST_LAP } from './buildings.js';
 
 /** 시작 자금. */
 export const STARTING_CASH = 3_000_000;
@@ -17,7 +18,7 @@ export const LOAN_PRINCIPAL = 1_000_000;
 export const LOAN_DEBT = 1_200_000;
 
 /**
- * 플레이어. 현금 잔액과 자신의 상태(위치/조난/공항 이동권/연속 더블)를 스스로 관리한다.
+ * 플레이어. 현금 잔액과 자신의 상태(위치/조난/공항 이동권/연속 더블/바퀴 수)를 스스로 관리한다.
  *
  * `pay()`/`receive()`는 **`Treasury`만 호출한다.** 현금 이동의 상대(은행·잭팟·다른 좌석)를
  * 알아야 장부와 보존 불변식이 맞는데, 플레이어는 그것을 모르기 때문이다.
@@ -33,6 +34,7 @@ export class Player {
   #consecutiveDoubles;
   #loanUsed;
   #loanDebt;
+  #lap;
 
   constructor({
     id,
@@ -45,6 +47,7 @@ export class Player {
     consecutiveDoubles = 0,
     loanUsed = false,
     loanDebt = 0,
+    lap = FIRST_LAP,
   }) {
     this.#id = id;
     this.#name = name;
@@ -56,6 +59,8 @@ export class Player {
     this.#consecutiveDoubles = consecutiveDoubles;
     this.#loanUsed = loanUsed;
     this.#loanDebt = loanDebt;
+    // 바퀴 수가 없는 예전 스냅샷은 1바퀴로 복원된다(명세 10장 D24).
+    this.#lap = BuildingUnlocks.assertLap(lap);
   }
 
   get id() {
@@ -96,6 +101,17 @@ export class Player {
 
   get loanDebt() {
     return this.#loanDebt;
+  }
+
+  /** 지금 몇 바퀴째인지(1부터). 지을 수 있는 건물이 여기서 결정된다. */
+  get lap() {
+    return this.#lap;
+  }
+
+  /** 출발 칸을 앞으로 지나거나 도착해 월급을 받는 순간 한 바퀴를 마친다. */
+  advanceLap() {
+    this.#lap += 1;
+    return this.#lap;
   }
 
   canTakeLoan() {
@@ -211,6 +227,7 @@ export class Player {
       consecutiveDoubles: this.#consecutiveDoubles,
       loanUsed: this.#loanUsed,
       loanDebt: this.#loanDebt,
+      lap: this.#lap,
     };
   }
 }

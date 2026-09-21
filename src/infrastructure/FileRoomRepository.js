@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, stat, unlink as fsUnlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
@@ -24,6 +24,7 @@ export class FileRoomRepository {
   #directory;
   #random;
   #logger;
+  #unlink;
   /** @type {Map<string, object>} code → RoomSummary */
   #summaries = new Map();
   /**
@@ -35,10 +36,16 @@ export class FileRoomRepository {
   /** 디렉터리 생성은 한 번만(저장마다 mkdir 시스템 호출을 하지 않는다). */
   #ready = null;
 
-  constructor({ directory, random, logger }) {
+  /**
+   * @param {{directory:string, random:object, logger?:object, unlink?:Function}} params
+   *   `unlink`은 테스트에서 삭제 실패(EACCES 등)를 플랫폼 독립적으로 주입하기 위한 선택적 시드다.
+   *   기본은 `node:fs/promises`의 `unlink`.
+   */
+  constructor({ directory, random, logger, unlink }) {
     this.#directory = directory;
     this.#random = random;
     this.#logger = logger ?? console;
+    this.#unlink = unlink ?? fsUnlink;
   }
 
   /** 저장 디렉터리를 만들고 요약 색인을 다시 세운다. */
@@ -160,7 +167,7 @@ export class FileRoomRepository {
       return;
     }
     try {
-      await unlink(this.#pathOf(code));
+      await this.#unlink(this.#pathOf(code));
     } catch (error) {
       if (error.code !== 'ENOENT') {
         // 파일이 남아 있는데 색인에서 지우면 목록·개수 상한이 디스크와 어긋난다.

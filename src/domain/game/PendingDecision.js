@@ -34,7 +34,8 @@ export function buildPendingDecision({ phase, player, board, turn, casino, payme
         kind: 'BUILD',
         index: city.index,
         name: city.name,
-        options: city.buildOptions(),
+        // 건설자의 바퀴에 따라 `options`/`lockedOptions`가 갈린다(규칙은 City가 안다).
+        ...city.buildOffer({ lap: player.lap }),
         buildings: city.buildings,
         landmark: city.landmark,
       };
@@ -84,14 +85,19 @@ export function buildPendingDecision({ phase, player, board, turn, casino, payme
   }
 }
 
-/** 출발 칸 보너스로 건설할 수 있는 내 도시 목록. */
+/**
+ * 출발 칸 보너스로 건설할 수 있는 내 도시 목록.
+ * 그 바퀴에 지을 것이 **하나도 없는** 도시는 후보에서 빠진다(빈 기회를 열지 않는다).
+ */
 export function startBuildCandidates(board, player) {
-  return board.buildableBy(player.id, player.cash).map((city) => ({
-    index: city.index,
-    name: city.name,
-    price: city.price,
-    options: city.buildOptions(),
-  }));
+  return board
+    .buildableBy(player.id, { cash: player.cash, lap: player.lap })
+    .map((city) => ({
+      index: city.index,
+      name: city.name,
+      price: city.price,
+      ...city.buildOffer({ lap: player.lap }),
+    }));
 }
 
 /**

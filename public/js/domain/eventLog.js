@@ -37,6 +37,15 @@ const DEFAULT_CONTEXT = {
 
 const line = (kind, text) => ({ kind, text });
 
+/**
+ * 새 바퀴에 들어설 때 함께 알려 줄 해금 안내(명세 4장: 1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔).
+ * 서버 도메인 `BuildingUnlocks`와 어긋나면 tests/e2e/clientLogic.test.js가 먼저 깨진다.
+ */
+export const LAP_UNLOCK_HINTS = Object.freeze({
+  2: ' — 이제 빌딩까지 지을 수 있습니다',
+  3: ' — 이제 호텔까지 지을 수 있습니다',
+});
+
 /** 이벤트 종류별 문장 생성기. 각 함수는 (event, ctx) → {kind, text}. */
 const FORMATTERS = {
   /* ── 턴 흐름 ─────────────────────────────────────────────── */
@@ -79,6 +88,14 @@ const FORMATTERS = {
     const champion = winner?.name ? `${subject(winner.name)} 우승!` : '';
     return line(LINE_KINDS.SPECIAL, `🏆 게임 종료 — ${reason}. ${champion}`.trim());
   },
+
+  LAP_ADVANCED: (event, ctx) =>
+    line(
+      LINE_KINDS.SPECIAL,
+      `🔄 ${subject(ctx.name(event.playerId))} ${event.lap}바퀴에 들어섰습니다${
+        LAP_UNLOCK_HINTS[event.lap] ?? ''
+      }.`,
+    ),
 
   /* ── 돈 ─────────────────────────────────────────────────── */
   SALARY_PAID: (event, ctx) =>

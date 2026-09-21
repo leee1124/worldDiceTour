@@ -11,6 +11,7 @@ import { CONTINUATIONS, SINKS } from '../domain/game/payment/DebtNote.js';
 import { Casino } from '../domain/game/Casino.js';
 import { EVENT_TYPES, MONEY_REASONS } from '../domain/game/events.js';
 import { MAX_MONEY } from '../domain/shared/Money.js';
+import { FIRST_LAP } from '../domain/game/buildings.js';
 import { BOARD_SIZE, BOARD_SPACES, OWNABLE_KINDS } from '../domain/game/data/board.js';
 
 /** 저장 파일 스키마 위반. 호출자는 이 파일을 버리고 로그를 남긴다. */
@@ -286,6 +287,11 @@ function validatePlayersSnapshot(players, { seatIds }) {
     assert(isBoardIndex(player.position), `위치 오류: ${describe(player.position)}`);
     assert(typeof player.eliminated === 'boolean', 'eliminated 값 오류');
     assert(isMoney(player.loanDebt) && player.loanDebt >= 0, '대출 채무 오류');
+    // 바퀴 수는 규칙 변경 뒤에 생긴 필드다. 없으면 1바퀴로 복원하므로 있을 때만 검증한다.
+    assert(
+      player.lap === undefined || (isFiniteInteger(player.lap) && player.lap >= FIRST_LAP),
+      `바퀴 수 오류: ${describe(player.lap)}`,
+    );
   }
 }
 

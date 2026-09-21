@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -242,26 +242,30 @@ describe('FileRoomRepository(파일 저장소)', () => {
     });
 
     it('삭제가 실패하면 색인에서 지우지 않는다(목록과 디스크가 어긋나지 않게)', async () => {
-      // Given (디렉터리를 읽기 전용으로 만들어 unlink를 실패시킨다)
+      // Given (chmod는 Windows에서 효과가 없으므로 unlink 실패를 직접 주입한다)
       const logs = [];
       const repository = new FileRoomRepository({
         directory,
         random: new FakeRandomSource(),
         logger: { error: (message) => logs.push(message) },
+        unlink: async () => {
+          const error = new Error('EACCES: permission denied, unlink');
+          error.code = 'EACCES';
+          throw error;
+        },
       });
       await repository.save(Room.create({ code: 'AB2C', hostName: '하나', token: 'a'.repeat(64), now: NOW }));
-      await chmod(directory, 0o500);
 
       // When
       await repository.delete('AB2C');
 
       // Then (파일이 남아 있으므로 색인에도 남아 있어야 한다)
-      await chmod(directory, 0o755);
       assert.ok(logs.some((message) => /삭제 실패/.test(message)), logs.join(' | '));
       assert.deepEqual(
         (await repository.findAllSummaries()).map((summary) => summary.code),
         ['AB2C'],
       );
+      assert.equal((await readdir(directory)).includes('AB2C.json'), true);
     });
   });
 

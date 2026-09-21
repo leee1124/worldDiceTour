@@ -8,11 +8,11 @@
 import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
 import { phasePrompt } from '../domain/labels.js';
-import { countTo, DURATIONS, scaled, wait } from '../animation/timing.js';
+import { currentLocationLabel } from '../domain/locationLabel.js';
+import { countTo, DURATIONS } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
-import { isMySeatOnAutopilot, isMyTurn, seatNameOf, slotOf } from '../store.js';
-
-const PIPS_PER_DIE = 9;
+import { isMySeatOnAutopilot, isMyTurn, seatNameOf, slotOf, spaceOf } from '../store.js';
+import { createDicePair } from './diceView.js';
 
 /** 페이즈별 "결정 창 열기" 버튼 문구. */
 const DECISION_LABELS = Object.freeze({
@@ -24,11 +24,6 @@ const DECISION_LABELS = Object.freeze({
   AWAIT_ISLAND_CHOICE: '탈출 방법 고르기',
   AWAIT_LIQUIDATION: '지불 정리하기',
 });
-
-function createDie(label) {
-  const pips = Array.from({ length: PIPS_PER_DIE }, () => el('span', { class: 'pip', 'aria-hidden': 'true' }));
-  return el('div', { class: 'die', dataset: { face: '1' }, role: 'img', 'aria-label': `${label} 1` }, pips);
-}
 
 export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLeaveGame, onResumeControl }) {
   const roundNode = el('span', { class: 'core-stat-value' });
@@ -44,10 +39,10 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
   const promptTitle = el('p', { class: 'prompt-title' });
   const promptHint = el('p', { class: 'prompt-hint' });
 
-  const die1 = createDie('주사위 1');
-  const die2 = createDie('주사위 2');
-  const diceSum = el('span', { class: 'dice-sum' });
-  const diceRow = el('div', { class: 'dice-row' }, [die1, die2, diceSum]);
+  // "내 말이 어디 있는지 모르겠다" — 그림만으로는 부족해서 칸 이름을 글자로도 말해 준다.
+  const locationNode = el('p', { class: 'core-location', text: currentLocationLabel(null) });
+
+  const dice = createDicePair();
 
   const actionsNode = el('div', { class: 'core-actions' });
 
@@ -58,10 +53,11 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
     ]),
     el('div', { class: 'core-turn', role: 'status', 'aria-live': 'polite' }, [
       el('div', { class: 'turn-line' }, [turnChip, turnNameNode, turnTagNode]),
+      locationNode,
       promptTitle,
       promptHint,
     ]),
-    diceRow,
+    dice.element,
     actionsNode,
     el('details', { class: 'reserved-panel' }, [
       el('summary', { class: 'reserved-summary' }, [
@@ -83,11 +79,8 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
 
   let lastJackpot = null;
   let rollButton = null;
-
-  function setDie(node, value, label) {
-    node.dataset.face = String(value);
-    node.setAttribute('aria-label', `${label} ${value}`);
-  }
+  /** 같은 눈을 함께 보여 줄 다른 주사위 묶음(모바일 상황판). */
+  const diceMirrors = [];
 
   function renderActions(state) {
     clear(actionsNode);
@@ -186,6 +179,15 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
       toggleClass(turnTagNode, 'turn-tag--mine', myTurn);
       toggleClass(element, 'board-core--my-turn', myTurn);
 
+      // 이 줄은 aria-live 영역 안이다 — 값이 그대로면 다시 쓰지 않는다(같은 문장을 반복해 읽지 않게).
+      const currentPlayer = view.players.find((player) => player.seatId === view.currentSeatId) ?? null;
+      const locationText = currentLocationLabel(
+        currentPlayer ? spaceOf(state, currentPlayer.position)?.name ?? null : null,
+      );
+      if (locationNode.textContent !== locationText) {
+        setText(locationNode, locationText);
+      }
+
       const prompt = phasePrompt(view.isOver ? 'GAME_OVER' : view.phase);
       setText(promptTitle, myTurn || view.isOver ? prompt.title : `${currentName}의 차례입니다`);
       setText(promptHint, prompt.hint);
@@ -193,20 +195,39 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
       renderActions(state);
     },
 
+    /** 같은 눈을 함께 보여 줄 주사위 묶음을 등록한다(모바일 상황판). */
+    attachDiceMirror(pair) {
+      diceMirrors.push(pair);
+    },
+
+    /** 다른 방으로 옮길 때: 이전 방의 눈이 남아 있으면 안 된다. */
+    resetDice() {
+      dice.reset();
+      for (const mirror of diceMirrors) {
+        mirror.reset();
+      }
+    },
+
     /** 서버가 정한 눈으로 주사위 연출을 재생한다(난수는 클라이언트가 만들지 않는다). */
-    async rollDice(value1, value2) {
-      die1.classList.add('die--rolling');
-      die2.classList.add('die--rolling');
-      setText(diceSum, '');
-      await wait(scaled(DURATIONS.dice));
-      die1.classList.remove('die--rolling');
-      die2.classList.remove('die--rolling');
-      setDie(die1, value1, '주사위 1');
-      setDie(die2, value2, '주사위 2');
-      setText(diceSum, `= ${value1 + value2}`);
-      diceRow.classList.add('dice-row--settled');
-      await wait(scaled(180));
-      diceRow.classList.remove('dice-row--settled');
+    async rollDice(value1, value2, options = {}) {
+      for (const mirror of diceMirrors) {
+        mirror.setRolling(true);
+      }
+      await dice.roll(value1, value2, options);
+      for (const mirror of diceMirrors) {
+        mirror.show(value1, value2, options);
+      }
+    },
+
+    /**
+     * 연출 없이 눈만 맞춘다.
+     * 큐가 밀려 빨리 감기로 넘어갈 때도 **모든 기기가 같은 눈을 본다**(DICE_ROLLED가 유일한 출처).
+     */
+    showDice(value1, value2, options = {}) {
+      dice.show(value1, value2, options);
+      for (const mirror of diceMirrors) {
+        mirror.show(value1, value2, options);
+      }
     },
 
     /** 잭팟 금액이 바뀌면 숫자를 굴려 보여 준다. */

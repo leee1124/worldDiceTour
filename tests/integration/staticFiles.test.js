@@ -93,22 +93,28 @@ describe('정적 파일 서빙(경로 탈출 방지)', () => {
   });
 
   it('파일 조회가 실패하면 사유를 로그에 남긴다', async () => {
-    // Given (읽을 수 없는 디렉터리 안의 파일)
+    // Given (chmod는 Windows에서 효과가 없으므로 stat 실패를 직접 주입한다)
     const logs = [];
     const blocked = path.join(root, 'blocked');
     await mkdir(blocked, { recursive: true });
     await writeFile(path.join(blocked, 'a.js'), 'x', 'utf8');
-    const { chmod } = await import('node:fs/promises');
-    await chmod(blocked, 0o000);
+    const failingStat = async (target) => {
+      const error = new Error(`EACCES: permission denied, stat '${target}'`);
+      error.code = 'EACCES';
+      throw error;
+    };
 
     // When
     await assert.rejects(
-      () => readStaticFile(root, '/blocked/a.js', { logger: { error: (m) => logs.push(m) } }),
+      () =>
+        readStaticFile(root, '/blocked/a.js', {
+          logger: { error: (m) => logs.push(m) },
+          stat: failingStat,
+        }),
       { code: 'ERR011' },
     );
 
     // Then (권한 문제는 조용히 넘기지 않는다)
-    await chmod(blocked, 0o755);
     assert.ok(
       logs.some((message) => /EACCES|EPERM/.test(message)),
       `사유가 기록되지 않았습니다: ${logs.join(' | ')}`,

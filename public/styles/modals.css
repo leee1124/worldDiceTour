@@ -197,9 +197,23 @@
 
 .city-summary-builds {
   display: flex;
-  gap: 0.3rem;
-  margin-top: 0.3rem;
-  font-size: 1.3rem;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+/* 모달 안 배지는 보드와 달리 항상 같은 크기로 읽힌다. */
+.city-summary-builds .build-slot {
+  --badge: 22px;
+  flex: 0 0 auto;
+}
+
+.city-summary-builds .build-slot-text {
+  display: inline;
+}
+
+.city-summary-builds .build-landmark {
+  font-size: 0.85rem;
 }
 
 .city-summary-empty {
@@ -277,6 +291,21 @@
 
 .check-row--static {
   cursor: default;
+}
+
+/* 바퀴가 모자라 아직 못 짓는 건물 행(🔒). 눌러도 아무 일이 없다는 것을 흐리게 알린다. */
+.check-row--locked {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.check-row--locked:hover {
+  border-color: var(--line);
+}
+
+.check-note {
+  color: var(--text-500);
+  font-size: 0.78rem;
 }
 
 .check-input {
@@ -769,4 +798,72 @@
 .toll-parties {
   color: var(--text-500);
   font-size: 0.8rem;
+}
+
+/* ── 칸 상세: 건물 세 종의 지음/안 지음 ─────────────────────── */
+
+.build-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.build-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* 시트 안의 배지는 항상 같은 크기로 읽힌다(보드처럼 줄어들지 않는다). */
+.build-status .build-slot {
+  --badge: 20px;
+  flex: 0 0 auto;
+}
+
+.build-status .build-slot-text {
+  display: inline;
+}
+
+.build-status-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.build-status-state {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.build-status-row--on .build-status-state {
+  color: var(--ok);
+}
+
+.build-status-row--off .build-status-state {
+  color: var(--text-500);
+}
+
+.build-status-row--off .build-status-label {
+  color: var(--text-500);
+  font-weight: 600;
+}
+
+.build-status--landmark {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.build-status--landmark .build-landmark {
+  flex: 0 0 auto;
+  font-size: 0.86rem;
+}
+
+.build-status-note {
+  color: var(--text-500);
+  font-size: 0.78rem;
 }

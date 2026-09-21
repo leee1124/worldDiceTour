@@ -42,8 +42,9 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
   });
 
   it('건설 후에도 최소 현금이 남는 범위에서 가장 비싼 조합을 고른다', () => {
-    // Given (방콕: 별장 21,000 / 빌딩 42,000 / 호텔 63,000)
+    // Given (3바퀴 방콕: 별장 21,000 / 빌딩 42,000 / 호텔 63,000)
     const game = buildGame({
+      laps: { s1: 3 },
       cash: { s1: 400_000 },
       cities: [{ index: 3, ownerId: 's1' }],
       random: new FakeRandomSource([1, 2]),
@@ -418,6 +419,100 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
       // Then
       assert.equal(game.phase, PHASES.AWAIT_START_BUILD);
       assert.equal(decideFor(game).type, COMMAND_TYPES.SKIP_START_BUILD);
+    });
+  });
+
+  describe('바퀴별 건설 제한', () => {
+    it('1바퀴에는 서버가 준 별장만 짓는다', () => {
+      // Given (현금은 충분하지만 1바퀴다)
+      const game = buildGame({
+        laps: { s1: 1 },
+        cash: { s1: 2_000_000 },
+        cities: [{ index: 3, ownerId: 's1' }],
+        random: new FakeRandomSource([1, 2]),
+      });
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const decision = decideFor(game);
+
+      // Then
+      assert.deepEqual(decision.payload.buildings, [BUILDING_TYPES.VILLA]);
+    });
+
+    it('2바퀴에는 호텔을 고르지 않는다', () => {
+      // Given
+      const game = buildGame({
+        laps: { s1: 2 },
+        cash: { s1: 2_000_000 },
+        cities: [{ index: 3, ownerId: 's1' }],
+        random: new FakeRandomSource([1, 2]),
+      });
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // When
+      const decision = decideFor(game);
+
+      // Then
+      assert.deepEqual(decision.payload.buildings, [BUILDING_TYPES.BUILDING, BUILDING_TYPES.VILLA]);
+    });
+
+    it('잠긴 선택지가 섞여 들어와도 고르지 않는다(방어)', () => {
+      // Given (서버가 실수로 잠긴 건물을 options에 넣은 뷰)
+      const view = {
+        phase: PHASES.AWAIT_BUILD,
+        isOver: false,
+        currentSeatId: 's1',
+        players: [{ seatId: 's1', cash: 5_000_000, lap: 1 }],
+        pending: {
+          kind: 'BUILD',
+          index: 3,
+          options: [
+            { type: BUILDING_TYPES.VILLA, cost: 21_000, locked: false, unlockLap: 1 },
+            { type: BUILDING_TYPES.HOTEL, cost: 63_000, locked: true, unlockLap: 3 },
+          ],
+          lockedOptions: [{ type: BUILDING_TYPES.HOTEL, cost: 63_000, locked: true, unlockLap: 3 }],
+        },
+      };
+
+      // When
+      const decision = policy.decide(view);
+
+      // Then
+      assert.deepEqual(decision.payload.buildings, [BUILDING_TYPES.VILLA]);
+    });
+
+    it('출발 보너스에서도 잠긴 선택지는 고르지 않는다(방어)', () => {
+      // Given
+      const view = {
+        phase: PHASES.AWAIT_START_BUILD,
+        isOver: false,
+        currentSeatId: 's1',
+        players: [{ seatId: 's1', cash: 5_000_000, lap: 2 }],
+        pending: {
+          kind: 'START_BUILD',
+          candidates: [
+            {
+              index: 39,
+              price: 800_000,
+              options: [
+                { type: BUILDING_TYPES.VILLA, cost: 240_000, locked: false, unlockLap: 1 },
+                { type: BUILDING_TYPES.HOTEL, cost: 720_000, locked: true, unlockLap: 3 },
+              ],
+              lockedOptions: [
+                { type: BUILDING_TYPES.HOTEL, cost: 720_000, locked: true, unlockLap: 3 },
+              ],
+            },
+          ],
+        },
+      };
+
+      // When
+      const decision = policy.decide(view);
+
+      // Then
+      assert.equal(decision.payload.cityIndex, 39);
+      assert.deepEqual(decision.payload.buildings, [BUILDING_TYPES.VILLA]);
     });
   });
 

@@ -86,9 +86,10 @@ export class AutoPlayerPolicy {
   /**
    * 건설 조합 선택.
    * 랜드마크는 현금이 건설비의 2배 이상일 때만, 일반 건물은 건설 후 최소 현금이 남는 범위에서
-   * 비싼 것부터 담는다.
+   * 비싼 것부터 담는다. 바퀴가 모자라 잠긴 선택지는 절대 고르지 않는다(서버가 거부한다).
    */
-  #chooseBuildings(cash, options = []) {
+  #chooseBuildings(cash, allOptions = []) {
+    const options = allOptions.filter((option) => !option.locked);
     const landmark = options.find((option) => option.type === BUILDING_TYPES.LANDMARK);
     if (landmark) {
       return cash >= landmark.cost * LANDMARK_CASH_RATIO ? [BUILDING_TYPES.LANDMARK] : [];

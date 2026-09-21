@@ -13,7 +13,15 @@ const CONNECTION_LABELS = Object.freeze({
   [CONNECTION.CLOSED]: '연결 끊김 — 다시 시도 중…',
 });
 
-export function createGameView({ boardView, centerView, playersView, logView, onReconnectNow }) {
+export function createGameView({
+  boardView,
+  centerView,
+  playersView,
+  logView,
+  statusStrip,
+  legendView,
+  onReconnectNow,
+}) {
   // 보드 중앙 코어는 보드와 같은 무대 안에 둔다(넓은 화면에서는 겹쳐 놓이고, 세로에서는 아래로 내려간다).
   boardView.element.appendChild(centerView.element);
 
@@ -43,7 +51,12 @@ export function createGameView({ boardView, centerView, playersView, logView, on
     stalledBanner,
     announcer,
     el('div', { class: 'game-layout' }, [
-      el('div', { class: 'game-main' }, [boardView.element]),
+      // 보드만 가로로 넘칠 수 있게 감싼다(게임 열 자체가 스크롤 상자가 되면 상황판의 sticky가 죽는다).
+      el('div', { class: 'game-main' }, [
+        el('div', { class: 'board-scroll' }, [boardView.element]),
+        statusStrip.element,
+        legendView.element,
+      ]),
       el('div', { class: 'game-side' }, [playersView.element, logView.element]),
     ]),
   ]);
@@ -52,6 +65,10 @@ export function createGameView({ boardView, centerView, playersView, logView, on
     element,
 
     update(state) {
+      if (state.view) {
+        statusStrip.update(state);
+        legendView.update(state);
+      }
       setText(codeNode, state.room?.code ?? '----');
       setText(statusNode, state.room?.status === 'FINISHED' ? '게임 종료' : '진행 중');
       const connection = state.connection ?? CONNECTION.IDLE;

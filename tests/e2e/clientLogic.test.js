@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { EVENT_TYPES } from '../../src/domain/game/events.js';
 import { BUILDING_TYPES, City } from '../../src/domain/game/City.js';
+import { BASIC_BUILDINGS, BuildingUnlocks } from '../../src/domain/game/buildings.js';
 import { BOARD_SPACES, SPACE_KINDS } from '../../src/domain/game/data/board.js';
 
 import { formatCompactWon, formatMoney, formatSignedWon, formatWon } from '../../public/js/format.js';
@@ -15,9 +16,18 @@ import {
   hopPath,
   sideOf,
 } from '../../public/js/domain/boardLayout.js';
-import { formatEventLine } from '../../public/js/domain/eventLog.js';
+import { LAP_UNLOCK_HINTS, formatEventLine } from '../../public/js/domain/eventLog.js';
 import { canBet, clampBet, quickChips, stepBet } from '../../public/js/domain/betRules.js';
-import { buildCostOf, comboCost, predictToll, validateSelection } from '../../public/js/domain/buildRules.js';
+import {
+  LAP_RULE_TEXT,
+  buildCostOf,
+  buildRows,
+  comboCost,
+  lapLabel,
+  predictToll,
+  unlockNotice,
+  validateSelection,
+} from '../../public/js/domain/buildRules.js';
 import { EventPlaybackQueue } from '../../public/js/animation/EventQueue.js';
 import { direction, object, subject, topic } from '../../public/js/domain/particles.js';
 
@@ -167,6 +177,7 @@ const EVENT_SAMPLES = {
   TURN_STARTED: { playerId: 'seat-1', round: 2 },
   DICE_ROLLED: { playerId: 'seat-1', die1: 3, die2: 3, sum: 6, isDouble: true },
   MOVED: { playerId: 'seat-1', from: 0, to: 6, steps: 6, passedStart: false },
+  LAP_ADVANCED: { playerId: 'seat-1', lap: 2 },
   SALARY_PAID: { playerId: 'seat-1', amount: 200_000 },
   LANDED: { playerId: 'seat-1', index: 6, kind: 'CITY', name: '뭄바이' },
   CITY_PURCHASED: { playerId: 'seat-1', index: 6, name: '뭄바이', price: 100_000 },
@@ -225,10 +236,10 @@ const EVENT_SAMPLES = {
   },
 };
 
-test('게임 로그: 서버의 43종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
+test('게임 로그: 서버의 44종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
   // Given 서버가 정의한 모든 이벤트 종류
   const types = Object.keys(EVENT_TYPES);
-  assert.equal(types.length, 43);
+  assert.equal(types.length, 44);
 
   // When 각 이벤트를 로그 문장으로 바꾸면
   for (const type of types) {
@@ -418,6 +429,99 @@ test('건설 미리보기: 랜드마크는 단독 선택만 허용한다', () =>
     false,
     '서버가 제안하지 않은 건물은 고를 수 없다',
   );
+});
+
+test('건설 미리보기: 바퀴로 잠긴 건물은 잠긴 행으로 만들어 준다', () => {
+  // Given 1바퀴 플레이어에게 서버가 준 선택지
+  const pending = {
+    options: [{ type: 'VILLA', cost: 21_000, locked: false, unlockLap: 1 }],
+    lockedOptions: [
+      { type: 'BUILDING', cost: 42_000, locked: true, unlockLap: 2 },
+      { type: 'HOTEL', cost: 63_000, locked: true, unlockLap: 3 },
+    ],
+  };
+
+  // When 모달에 그릴 행 목록을 만들면
+  const rows = buildRows(pending);
+
+  // Then 별장 · 빌딩 · 호텔 순서로 나오고 잠긴 행에는 안내 문구가 붙는다
+  assert.deepEqual(rows, [
+    { type: 'VILLA', cost: 21_000, locked: false, unlockLap: 1, notice: '' },
+    { type: 'BUILDING', cost: 42_000, locked: true, unlockLap: 2, notice: '2바퀴부터 지을 수 있습니다' },
+    { type: 'HOTEL', cost: 63_000, locked: true, unlockLap: 3, notice: '3바퀴부터 지을 수 있습니다' },
+  ]);
+});
+
+test('건설 미리보기: 랜드마크 기회와 잠긴 것이 없는 기회에는 잠긴 행이 없다', () => {
+  // Given
+  const landmarkOffer = { options: [{ type: 'LANDMARK', cost: 70_000 }], lockedOptions: [] };
+  const openOffer = {
+    options: [
+      { type: 'VILLA', cost: 21_000 },
+      { type: 'BUILDING', cost: 42_000 },
+      { type: 'HOTEL', cost: 63_000 },
+    ],
+  };
+
+  // When / Then
+  assert.deepEqual(buildRows(landmarkOffer), [
+    { type: 'LANDMARK', cost: 70_000, locked: false, unlockLap: 1, notice: '' },
+  ]);
+  assert.equal(buildRows(openOffer).length, 3);
+  assert.equal(
+    buildRows(openOffer).every((row) => row.locked === false),
+    true,
+  );
+});
+
+test('건설 미리보기: 선택지가 비어 있거나 망가져도 빈 목록으로 넘어간다', () => {
+  // Given / When / Then
+  assert.deepEqual(buildRows(undefined), []);
+  assert.deepEqual(buildRows({}), []);
+  assert.deepEqual(buildRows({ options: 'nope', lockedOptions: 7 }), []);
+  assert.deepEqual(buildRows({ options: [{ cost: 1 }] }), []);
+});
+
+test('건설 미리보기: 잠긴 건물은 고를 수 없다', () => {
+  // Given 1바퀴 기회(호텔은 잠김)
+  const options = [{ type: 'VILLA', cost: 21_000, locked: false, unlockLap: 1 }];
+
+  // When / Then 서버가 제안하지 않은 건물이므로 유효하지 않다
+  assert.equal(validateSelection(['HOTEL'], options).ok, false);
+  assert.equal(validateSelection(['VILLA', 'BUILDING'], options).ok, false);
+  assert.equal(validateSelection(['VILLA'], options).ok, true);
+});
+
+test('건설 미리보기: 클라이언트 안내 문구가 서버 해금 규칙과 어긋나지 않는다', () => {
+  // Given 서버 도메인의 해금 표(BuildingUnlocks)
+  // When 클라이언트가 화면에 쓰는 문구를 만들면
+  // Then 건물마다 서버가 정한 해금 바퀴가 그대로 들어 있다
+  for (const type of BASIC_BUILDINGS) {
+    const lap = BuildingUnlocks.unlockLapOf(type);
+    assert.ok(
+      LAP_RULE_TEXT.includes(`${lap}바퀴`),
+      `${type}의 해금 바퀴 ${lap}이 안내 문구에 없다: ${LAP_RULE_TEXT}`,
+    );
+    assert.equal(unlockNotice(lap), lap > 1 ? `${lap}바퀴부터 지을 수 있습니다` : '');
+  }
+
+  // 로그의 해금 힌트는 "새로 열리는 바퀴"와 정확히 같은 키를 갖는다
+  assert.deepEqual(
+    Object.keys(LAP_UNLOCK_HINTS).map(Number).sort((a, b) => a - b),
+    [...new Set(BASIC_BUILDINGS.map((type) => BuildingUnlocks.unlockLapOf(type)))]
+      .filter((lap) => lap > 1)
+      .sort((a, b) => a - b),
+  );
+});
+
+test('건설 미리보기: 바퀴 안내 문구는 규칙을 그대로 옮긴다', () => {
+  // Given / When / Then
+  assert.equal(LAP_RULE_TEXT, '1바퀴: 별장 · 2바퀴: 빌딩 · 3바퀴부터: 호텔');
+  assert.equal(unlockNotice(2), '2바퀴부터 지을 수 있습니다');
+  assert.equal(unlockNotice(1), '');
+  assert.equal(unlockNotice(undefined), '');
+  assert.equal(lapLabel(3), '3바퀴');
+  assert.equal(lapLabel(undefined), '1바퀴');
 });
 
 /* ------------------------------------------------------------------ */

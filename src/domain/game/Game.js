@@ -445,10 +445,13 @@ export class Game {
     this.#endTurn();
   }
 
-  /** 건설 기회를 제안한다. 지을 것이 없거나 현금이 없으면 턴을 끝낸다(규칙은 City가 안다). */
+  /**
+   * 건설 기회를 제안한다. 그 바퀴에 지을 것이 없거나 현금이 없으면 턴을 끝낸다
+   * (무엇을 지을 수 있는지는 `City`가 안다).
+   */
   #offerBuild(player, cityIndex) {
     const city = this.#board.cityAt(cityIndex);
-    if (!city.isOwnedBy(player.id) || !city.canOfferBuildWith(player.cash)) {
+    if (!city.isOwnedBy(player.id) || !city.canOfferBuildWith(player.cash, { lap: player.lap })) {
       this.#endTurn();
       return;
     }
@@ -458,7 +461,7 @@ export class Game {
       playerId: player.id,
       index: city.index,
       name: city.name,
-      options: city.buildOptions(),
+      ...city.buildOffer({ lap: player.lap }),
     });
   }
 

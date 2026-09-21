@@ -55,13 +55,16 @@ export class CityTrade {
   /**
    * 고른 건물 조합을 검증하고 짓는다. 건설비는 은행으로 간다.
    * 랜드마크 완성은 `BUILT`와 함께 `LANDMARK_BUILT`를 남긴다.
+   *
+   * 바퀴가 모자란 건물을 고르면 `City`가 거부한다 — 클라이언트가 잠긴 선택지를 보냈더라도
+   * 상태는 하나도 바뀌지 않는다(검증이 모든 변경보다 먼저다).
    * @returns {{intents: object[], events: object[]}}
    */
   build({ player, city, buildings }) {
     if (!city.isOwnedBy(player.id)) {
       throw DomainError.invalidArgument(`내 도시가 아닙니다: ${city.index}`);
     }
-    city.assertCanBuild(buildings);
+    city.assertCanBuild(buildings, { lap: player.lap });
     const cost = city.costOf(buildings);
     if (!player.canPay(cost)) {
       throw DomainError.insufficientCash(`건설비 ${cost}원이 부족합니다`);
@@ -74,7 +77,7 @@ export class CityTrade {
         meta: { cityIndex: city.index },
       }),
     ];
-    city.build(buildings);
+    city.build(buildings, { lap: player.lap });
 
     const base = { playerId: player.id, index: city.index, name: city.name };
     const events = [

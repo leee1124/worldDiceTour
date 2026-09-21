@@ -26,6 +26,7 @@ export function buildGame({
   islandTurns = {},
   airportPending = [],
   consecutiveDoubles = {},
+  laps = {},
   loans = {},
   cities = [],
   jackpot = 0,
@@ -45,6 +46,7 @@ export function buildGame({
     islandRemainingTurns: islandTurns[seat.id] ?? 0,
     airportPending: airportPending.includes(seat.id),
     consecutiveDoubles: consecutiveDoubles[seat.id] ?? 0,
+    lap: laps[seat.id] ?? 1,
     loanUsed: loans[seat.id]?.used ?? false,
     loanDebt: loans[seat.id]?.debt ?? 0,
   }));
