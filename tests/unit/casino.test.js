@@ -106,7 +106,8 @@ describe('Casino(라스베이거스 카지노)', () => {
       // Then
       assert.equal(result.payout, 0);
       assert.equal(result.jackpotAccumulated, 15_000);
-      assert.equal(casino.jackpot, 15_000);
+      // play()는 판정만 한다. 실제 적립은 Treasury가 MoneyIntent로 적용한다.
+      assert.equal(casino.jackpot, 0);
     });
 
     it('선택값이 홀/짝이 아니면 거부한다', () => {
@@ -212,7 +213,8 @@ describe('Casino(라스베이거스 카지노)', () => {
       // Then
       assert.equal(result.jackpotWon, 500_000);
       assert.equal(result.payout, 100_000 + 500_000);
-      assert.equal(casino.jackpot, 0);
+      // play()는 판정만 한다. 실제 지급은 Treasury가 MoneyIntent로 적용한다.
+      assert.equal(casino.jackpot, 500_000);
     });
 
     it('모두 다르면 잃고 절반(내림)이 잭팟에 적립된다', () => {
@@ -227,7 +229,9 @@ describe('Casino(라스베이거스 카지노)', () => {
 
       // Then
       assert.equal(result.payout, 0);
-      assert.equal(casino.jackpot, 25_000);
+      assert.equal(result.jackpotAccumulated, 25_000);
+      // play()는 판정만 한다. 실제 적립은 Treasury가 MoneyIntent로 적용한다.
+      assert.equal(casino.jackpot, 0);
     });
   });
 

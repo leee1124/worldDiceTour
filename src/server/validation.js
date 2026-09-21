@@ -3,6 +3,7 @@ import { BUILDING_TYPES } from '../domain/game/City.js';
 import { CASINO_GAMES, HIGH_LOW_SEVEN_CHOICES, ODD_EVEN_CHOICES } from '../domain/game/Casino.js';
 import { BOARD_SIZE } from '../domain/game/data/board.js';
 import { ALLOWED_ROUND_LIMITS } from '../domain/room/Room.js';
+import { ALLOWED_FINANCE_OPTIONS, FINANCE_OPTION_KEYS } from '../domain/room/FinanceOptions.js';
 import { HOST_ACTIONS } from '../application/hostActions.js';
 import { AppError } from '../application/errors.js';
 
@@ -144,7 +145,11 @@ export function parseHostActionBody(body) {
       if (!ALLOWED_ROUND_LIMITS.includes(roundLimit)) {
         throw invalid(`roundLimit 값 오류: ${safeText(body.roundLimit)}`);
       }
-      return { type: HOST_ACTIONS.SET_OPTIONS, roundLimit };
+      const action = { type: HOST_ACTIONS.SET_OPTIONS, roundLimit };
+      if (body.finance !== undefined) {
+        action.finance = requireFinanceOptions(body.finance);
+      }
+      return action;
     }
     case HOST_ACTIONS.SET_AUTOPILOT:
       if (typeof body.enabled !== 'boolean') {
@@ -160,6 +165,36 @@ export function parseHostActionBody(body) {
     default:
       throw invalid(`알 수 없는 호스트 동작: ${safeText(body.type)}`);
   }
+}
+
+/**
+ * 금융 옵션 화이트리스트.
+ * 아직 기능이 없는 값(`STOCKS`·`ADVANCED`·`30`·`BUBBLE` 등)은 **거부**한다 —
+ * 켤 수는 있는데 아무 일도 일어나지 않는 옵션을 만들지 않는다. 기능이 들어올 때
+ * `ALLOWED_FINANCE_OPTIONS`에 값을 추가하면 이 검증이 자동으로 열린다.
+ */
+function requireFinanceOptions(value) {
+  if (!isObject(value)) {
+    throw invalid(`finance 형식 오류: ${safeText(value)}`);
+  }
+  for (const key of Object.keys(value)) {
+    if (!FINANCE_OPTION_KEYS.includes(key)) {
+      throw invalid(`알 수 없는 finance 옵션: ${safeText(key)}`);
+    }
+  }
+  // **보낸 키만** 통과시킨다. 빈 자리를 기본값으로 채워 넘기면 도메인의 "생략한 옵션은 유지"
+  // 규칙이 죽어, 한 항목만 바꾸려던 호스트가 나머지를 조용히 기본값으로 되돌리게 된다.
+  const checked = {};
+  for (const key of FINANCE_OPTION_KEYS) {
+    if (value[key] === undefined) {
+      continue;
+    }
+    if (!ALLOWED_FINANCE_OPTIONS[key].includes(value[key])) {
+      throw invalid(`finance.${key} 값 오류: ${safeText(value[key])}`);
+    }
+    checked[key] = value[key];
+  }
+  return checked;
 }
 
 /** 게임 커맨드 본문. 커맨드별 payload 화이트리스트. */

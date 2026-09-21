@@ -1,4 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
+import { assertAmount } from '../shared/Money.js';
+import { MONEY_REASONS, MoneyIntent } from '../shared/MoneyIntent.js';
 import { Dice } from './Dice.js';
 
 export const CASINO_GAMES = Object.freeze({
@@ -20,7 +22,10 @@ const MAX_ROUNDS_PER_VISIT = 3;
 
 /**
  * 카지노. 잭팟 적립금을 보유하고 3종 게임의 승패/배당을 판정한다.
- * 플레이어 현금 이동은 Game이 담당하며, 카지노는 잭팟 적립/지급만 스스로 처리한다.
+ *
+ * `play()`는 **판정만 하는 순수 함수**다 — 현금도 잭팟도 건드리지 않고 "이렇게 움직여야 한다"는
+ * 결과(`payout`/`jackpotWon`/`jackpotAccumulated`)만 돌려준다. 실제 이동은 `Treasury`가
+ * 돈 이동 의사(MoneyIntent)로 적용한다. 그래서 잭팟을 포함한 모든 돈의 이동 경로가 한 곳으로 모인다.
  */
 export class Casino {
   #jackpot;
@@ -37,20 +42,32 @@ export class Casino {
     return this.#jackpot;
   }
 
-  /** 세관/세무조사 납부액 등을 잭팟에 적립한다. */
+  /**
+   * 잭팟에 적립한다. **`Treasury`만 호출한다**(돈 이동의 단일 경로).
+   * 세관 납부액·진 베팅액의 절반 등이 여기로 쌓인다.
+   */
   accumulate(amount) {
     if (!Number.isInteger(amount) || amount < 0) {
       throw DomainError.invalidArgument(`잭팟 적립액이 올바르지 않습니다: ${amount}`);
     }
+    assertAmount(amount, '잭팟 적립액');
+    // 적립액만이 아니라 **누적 결과**도 상한 안이어야 한다. 손상된 스냅샷이 반복 적립으로
+    // 안전 정수 경계까지 자라는 것을 그 자리에서 멈춘다.
+    assertAmount(this.#jackpot + amount, '잭팟 적립금');
     this.#jackpot += amount;
     return amount;
   }
 
-  /** 잭팟 적립금 전액을 지급하고 0으로 초기화한다. */
-  claimJackpot() {
-    const won = this.#jackpot;
-    this.#jackpot = 0;
-    return won;
+  /** 잭팟에서 지급한다. **`Treasury`만 호출한다.** */
+  payOut(amount) {
+    assertAmount(amount, '잭팟 지급액');
+    if (amount > this.#jackpot) {
+      throw DomainError.invalidState(
+        `잭팟 적립금 ${this.#jackpot}원보다 많이 지급할 수 없습니다: ${amount}`,
+      );
+    }
+    this.#jackpot -= amount;
+    return amount;
   }
 
   /** 보유 현금 기준 베팅 한도. */
@@ -79,20 +96,19 @@ export class Casino {
   }
 
   /**
-   * 한 판을 진행한다. 잭팟 적립/지급은 내부에서 처리하고 결과를 돌려준다.
+   * 한 판을 판정한다. **상태를 바꾸지 않는다** — 돈을 어떻게 움직여야 하는지만 알려준다.
+   *
+   * - `payout`: 플레이어가 받을 총액(잭팟 당첨금 포함, 베팅액 반환 포함)
+   * - `jackpotWon`: 그중 잭팟에서 나오는 금액(나머지는 은행에서 나온다)
+   * - `jackpotAccumulated`: 진 베팅액의 절반(내림). 잭팟으로 쌓일 금액
+   *
    * @returns {{game:string, bet:number, win:boolean, payout:number, jackpotWon:number, jackpotAccumulated:number, detail:object}}
    */
   play({ game, bet, choice }, random) {
     const outcome = this.#judge({ game, bet, choice }, random);
-    let jackpotWon = 0;
-    let jackpotAccumulated = 0;
-
-    if (outcome.jackpot) {
-      jackpotWon = this.claimJackpot();
-    }
-    if (outcome.payout === 0) {
-      jackpotAccumulated = this.accumulate(Math.floor(bet / 2));
-    }
+    // 잭팟 당첨은 항상 배당이 있는 판(슬롯 7️⃣ 3개)이므로 적립과 동시에 일어나지 않는다.
+    const jackpotWon = outcome.jackpot ? this.#jackpot : 0;
+    const jackpotAccumulated = outcome.payout === 0 ? Math.floor(bet / 2) : 0;
 
     return {
       game,
@@ -103,6 +119,30 @@ export class Casino {
       jackpotAccumulated,
       detail: outcome.detail,
     };
+  }
+
+  /**
+   * 한 판의 돈 이동 의사.
+   *
+   * 진 베팅액의 절반(내림)은 잭팟으로, 나머지는 은행으로 간다. 배당은 은행에서 나오고
+   * 잭팟 당첨금만 잭팟에서 나온다 — 그래서 총합(현금 + 잭팟)의 변화가 장부 순유입과 정확히 맞는다.
+   * 잭팟 당첨은 항상 배당이 있는 판이므로 적립과 지급이 같은 판에 함께 일어나지 않는다.
+   *
+   * @param {{playerId:string, bet:number, result:object}} params `result`는 `play()`의 반환값
+   * @returns {import('../shared/MoneyIntent.js').MoneyIntent[]}
+   */
+  moneyIntentsFor({ playerId, bet, result }) {
+    const reason = MONEY_REASONS.CASINO;
+    const meta = { game: result.game };
+    const amounts = [
+      [result.jackpotAccumulated, MoneyIntent.toJackpot],
+      [bet - result.jackpotAccumulated, MoneyIntent.toBank],
+      [result.payout - result.jackpotWon, MoneyIntent.fromBank],
+      [result.jackpotWon, MoneyIntent.fromJackpot],
+    ];
+    return amounts
+      .filter(([amount]) => amount > 0)
+      .map(([amount, make]) => make({ playerId, amount, reason, meta }));
   }
 
   #judge({ game, bet, choice }, random) {

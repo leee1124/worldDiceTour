@@ -162,6 +162,38 @@ export class City {
     return BuildingUnlocks.lockedTypes(lap).filter((type) => !this.#buildings.has(type));
   }
 
+  /** 이번 건설 기회에 고를 수 있는 건물과 비용. */
+  /**
+   * 이번 건설 기회의 선택지.
+   *
+   * `options`는 **지금 고를 수 있는** 건물, `lockedOptions`는 아직 바퀴가 모자라 고를 수 없는
+   * 건물이다(화면에 "2바퀴부터"를 보여 주기 위한 정보이며 커맨드로는 고를 수 없다).
+   * 각 항목은 `locked`와 `unlockLap`을 함께 담아, 클라이언트가 규칙을 다시 구현하지 않아도 되게 한다.
+   *
+   * @param {{lap:number}} builder 건설자의 바퀴 수(빠뜨리면 규칙 우회가 되므로 필수)
+   */
+  buildOffer({ lap } = {}) {
+    const describe = (type, locked) => ({
+      type,
+      cost: this.buildCost(type),
+      locked,
+      unlockLap: BuildingUnlocks.unlockLapOf(type),
+    });
+    return {
+      options: this.buildableTypes({ lap }).map((type) => describe(type, false)),
+      lockedOptions: this.lockedTypes({ lap }).map((type) => describe(type, true)),
+    };
+  }
+
+  /**
+   * 그 바퀴에 지을 것이 있고 가장 싼 것을 낼 현금이 있는지.
+   * 잠긴 건물은 세지 않는다 — 열리지 않은 건물 때문에 빈 건설 기회를 열지 않기 위해서다.
+   */
+  canOfferBuildWith(cash, { lap } = {}) {
+    const { options } = this.buildOffer({ lap });
+    return options.length > 0 && cash >= Math.min(...options.map((option) => option.cost));
+  }
+
   /** 건설 가능 여부만 검증한다(상태 변경 없음). */
   assertCanBuild(types, { lap } = {}) {
     BuildingUnlocks.assertLap(lap);

@@ -35,7 +35,8 @@ export function toRoomDto(room, { onlineSeatIds = [], autoStalled = false } = {}
     code: room.code,
     status: room.status,
     hostSeatId: room.hostSeatId,
-    options: { roundLimit: room.options.roundLimit },
+    // `finance`는 가산 필드다(기존 UI는 `roundLimit`만 읽어도 된다).
+    options: { roundLimit: room.options.roundLimit, finance: room.options.finance },
     maxSeats: MAX_SEATS,
     seats: room.seats.map((seat) => ({
       id: seat.id,
@@ -84,6 +85,9 @@ export function toGameViewDto(game) {
     round: game.round,
     roundLimit: game.options.roundLimit,
     currentSeatId: game.currentPlayerId,
+    // 지금 결정을 내릴 좌석. 오늘은 `currentSeatId`와 항상 같고, 앞으로 경매처럼
+    // 턴 소유자가 아닌 좌석이 행동하는 구간에서만 달라진다.
+    actingSeatId: game.actingSeatId,
     jackpot: game.jackpot,
     isOver: game.isOver(),
     players: game.players.map((player) => ({
@@ -99,9 +103,9 @@ export function toGameViewDto(game) {
       loanDebt: player.loanDebt,
       cityCount: board.cityCountOf(player.id),
       resortCount: board.resortCountOf(player.id),
-      totalAssets: player.eliminated
-        ? 0
-        : player.cash + board.totalAssetValueOf(player.id) - player.loanDebt,
+      // 순위와 같은 함수(`NetWorth`)를 쓴다 — 예전엔 같은 공식이 여기 복제돼 있어서
+      // 자산군이 늘어나면 화면과 순위가 어긋날 수밖에 없었다.
+      totalAssets: game.netWorthOf(player.id),
     })),
     board: Array.from({ length: board.size }, (_unused, index) => toSpaceDto(board, index)),
     pending: game.pendingDecision,

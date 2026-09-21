@@ -83,6 +83,18 @@ async function playToEnd(app, code, policy) {
       true,
       `돈 보존 불변식 위반 (커맨드 ${commands}, ${decision.type}): ${JSON.stringify(report)}`,
     );
+    // 2단 불변식: 은행 순유입은 사유별 내역의 합과 정확히 같아야 한다
+    // (다르면 어떤 흐름이 Treasury/장부를 우회한 것이다).
+    assert.equal(
+      Object.values(report.breakdown).reduce((sum, value) => sum + value, 0),
+      report.netFromBank,
+      `사유별 내역 합 불일치 (커맨드 ${commands}, ${decision.type}): ${JSON.stringify(report)}`,
+    );
+    assert.equal(
+      report.breakdownBalanced,
+      true,
+      `설명되지 않은 은행 순유입 (커맨드 ${commands}, ${decision.type})`,
+    );
   }
   return { commands, room: lastRoom };
 }
