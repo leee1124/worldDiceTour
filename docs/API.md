@@ -436,11 +436,11 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 |---|---|---|
 | `CITY_PURCHASED` | `playerId`, `index`, `name`, `price` | 매입 |
 | `PURCHASE_DECLINED` | `playerId`, `index` | 매입 포기 |
-| `BUILD_OFFERED` | `playerId`, `index`, `name`, `options` | 건설 기회 열림 |
+| `BUILD_OFFERED` | `playerId`, `index`, `name`, `options`, `lockedOptions` | 건설 기회 열림. 두 목록은 같은 순간의 `pending`과 같다(6장) |
 | `BUILT` | `playerId`, `index`, `name`, `buildings`, `cost` | 건설 완료(지은 목록) |
 | `LANDMARK_BUILT` | `playerId`, `index`, `name`, `cost` | 랜드마크 완성(`BUILT`와 함께 발생) |
 | `BUILD_DECLINED` | `playerId`, `index` | 건설 포기(`index`는 출발 보너스 포기 시 `null`) |
-| `START_BONUS_OFFERED` | `playerId`, `candidates` | 출발 칸 보너스 |
+| `START_BONUS_OFFERED` | `playerId`, `candidates` | 출발 칸 보너스. 후보마다 `options`·`lockedOptions`가 있고, 그 바퀴에 지을 것이 없는 도시는 후보에 없다 |
 | `ACQUIRE_OFFERED` | `playerId`, `index`, `name`, `ownerId`, `price` | 인수 제안 |
 | `ACQUIRED` | `playerId`, `index`, `name`, `fromId`, `price` | 인수 성립 |
 | `ACQUIRE_DECLINED` | `playerId`, `index` | 인수 포기 |
