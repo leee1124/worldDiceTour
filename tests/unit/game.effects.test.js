@@ -152,12 +152,12 @@ describe('Game(행운 티켓 효과)', () => {
     assertMoneyConserved(game, '한턱 쏘기');
   });
 
-  it('건물 점검 티켓은 건물 단계 합계 × 40,000원을 낸다', () => {
+  it('건물 점검 티켓은 건물 수 × 40,000원을 낸다', () => {
     // Given
     const game = ticketGame('T17', {
       cities: [
-        { index: 1, ownerId: 's1', level: 2 },
-        { index: 3, ownerId: 's1', level: 1 },
+        { index: 1, ownerId: 's1', buildings: ['VILLA', 'BUILDING'] },
+        { index: 3, ownerId: 's1', buildings: ['VILLA'] },
       ],
     });
 
@@ -172,9 +172,9 @@ describe('Game(행운 티켓 효과)', () => {
     // Given
     const game = ticketGame('T18', {
       cities: [
-        { index: 1, ownerId: 's1', level: 0 },
-        { index: 3, ownerId: 's1', level: 0 },
-        { index: 5, ownerId: 's1', level: 0 },
+        { index: 1, ownerId: 's1' },
+        { index: 3, ownerId: 's1' },
+        { index: 5, ownerId: 's1' },
       ],
     });
 
@@ -337,7 +337,7 @@ describe('Game(조난 섬)', () => {
     const game = buildGame({
       positions: { s1: 0, s2: 0 },
       islandTurns: { s2: 3 },
-      cities: [{ index: 3, ownerId: 's2', level: 0 }],
+      cities: [{ index: 3, ownerId: 's2' }],
       random: new FakeRandomSource([1, 2]),
     });
 
@@ -553,133 +553,19 @@ describe('Game(라스베이거스 카지노)', () => {
   });
 });
 
-describe('Game(정리와 파산)', () => {
-  it('통행료를 낼 현금이 부족하면 정리 페이즈로 들어간다', () => {
-    // Given
-    const game = buildGame({
-      cash: { s1: 10_000 },
-      cities: [
-        { index: 3, ownerId: 's2', level: 3 },
-        { index: 39, ownerId: 's1', level: 0 },
-      ],
-      random: new FakeRandomSource([1, 2]),
-    });
-
-    // When
-    const events = game.execute('s1', COMMAND_TYPES.ROLL);
-
-    // Then
-    assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
-    const required = findEvent(events, EVENT_TYPES.LIQUIDATION_REQUIRED);
-    assert.equal(required.debt, 175_000);
-    assert.equal(game.pendingDecision.sellable.length, 1);
-  });
-
-  it('자산을 매각해 채무를 정산하면 턴이 끝난다', () => {
-    // Given
-    const game = buildGame({
-      cash: { s1: 5_000 },
-      cities: [
-        { index: 3, ownerId: 's2', level: 0 },
-        { index: 39, ownerId: 's1', level: 0 },
-      ],
-      random: new FakeRandomSource([1, 2]),
-    });
-    game.execute('s1', COMMAND_TYPES.ROLL);
-
-    // When
-    const events = game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 39 });
-
-    // Then
-    assert.ok(eventTypes(events).includes(EVENT_TYPES.ASSET_SOLD));
-    assert.ok(eventTypes(events).includes(EVENT_TYPES.TOLL_PAID));
-    assert.equal(game.board.cityAt(39).isOwned(), false);
-    assert.equal(game.playerById('s1').cash, 5_000 + 400_000 - 7_000);
-    assert.equal(game.currentPlayerId, 's2');
-    assertMoneyConserved(game, '정리 정산');
-  });
-
-  it('내 소유가 아닌 칸은 매각할 수 없다', () => {
-    // Given
-    const game = buildGame({
-      cash: { s1: 5_000 },
-      cities: [
-        { index: 3, ownerId: 's2', level: 0 },
-        { index: 39, ownerId: 's1', level: 0 },
-      ],
-      random: new FakeRandomSource([1, 2]),
-    });
-    game.execute('s1', COMMAND_TYPES.ROLL);
-
-    // When / Then
-    assert.throws(() => game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 3 }), {
-      code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
-    });
-    assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
-  });
-
-  it('모두 매각해도 부족하면 즉시 파산하고 도시가 초기화된다', () => {
-    // Given
-    const game = buildGame({
-      cash: { s1: 10_000 },
-      cities: [
-        { index: 39, ownerId: 's2', level: 3 },
-        { index: 1, ownerId: 's1', level: 0 },
-      ],
-      positions: { s1: 36 },
-      random: new FakeRandomSource([1, 2]),
-    });
-
-    // When
-    const events = game.execute('s1', COMMAND_TYPES.ROLL);
-
-    // Then
-    const bankrupt = findEvent(events, EVENT_TYPES.BANKRUPT);
-    assert.equal(bankrupt.playerId, 's1');
-    assert.equal(game.playerById('s1').eliminated, true);
-    assert.equal(game.board.cityAt(1).isOwned(), false);
-    assert.equal(game.isOver(), true);
-    assertMoneyConserved(game, '파산');
-  });
-
-  it('파산 시 남은 현금은 채권자에게 넘어간다', () => {
-    // Given
-    const game = buildGame({
-      seats: [
-        { id: 's1', name: '하나' },
-        { id: 's2', name: '두리' },
-        { id: 's3', name: '세찌' },
-      ],
-      cash: { s1: 10_000 },
-      cities: [{ index: 39, ownerId: 's2', level: 3 }],
-      positions: { s1: 36 },
-      random: new FakeRandomSource([1, 2]),
-    });
-
-    // When
-    game.execute('s1', COMMAND_TYPES.ROLL);
-
-    // Then
-    assert.equal(game.playerById('s2').cash, STARTING_CASH + 10_000);
-    assert.equal(game.playerById('s1').cash, 0);
-    assert.equal(game.isOver(), false);
-    assert.equal(game.currentPlayerId, 's2');
-    assertMoneyConserved(game, '파산 정산');
-  });
-});
-
 describe('Game(게임 종료)', () => {
-  it('한 명만 남으면 게임이 끝나고 순위를 계산한다', () => {
+  it('마지막 한 명이 남으면 순위를 계산하고 끝난다', () => {
     // Given
     const game = buildGame({
       cash: { s1: 10_000 },
-      cities: [{ index: 39, ownerId: 's2', level: 3 }],
+      cities: [{ index: 39, ownerId: 's2', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: true }],
       positions: { s1: 36 },
       random: new FakeRandomSource([1, 2]),
     });
+    game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When
-    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+    const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
 
     // Then
     const over = findEvent(events, EVENT_TYPES.GAME_OVER);

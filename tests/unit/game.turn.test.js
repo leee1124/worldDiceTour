@@ -128,6 +128,8 @@ describe('Game(게임 시작과 턴 진행)', () => {
       assert.equal(game.playerById('s1').cash, STARTING_CASH - 70_000);
       assert.equal(game.board.cityAt(3).isOwnedBy('s1'), true);
       assert.equal(findEvent(events, EVENT_TYPES.CITY_PURCHASED).price, 70_000);
+      assert.equal(game.phase, PHASES.AWAIT_BUILD, '매입 직후 건설 기회가 주어진다');
+      game.execute('s1', COMMAND_TYPES.SKIP_BUILD);
       assert.equal(game.currentPlayerId, 's2');
       assertMoneyConserved(game, '매입 후');
     });
@@ -159,76 +161,11 @@ describe('Game(게임 시작과 턴 진행)', () => {
     });
   });
 
-  describe('건설', () => {
-    it('내 도시에 도착하면 한 단계 건설할 수 있고 건설비는 가격의 50%다', () => {
-      // Given
-      const game = buildGame({
-        cities: [{ index: 3, ownerId: 's1', level: 0 }],
-        random: new FakeRandomSource([1, 2]),
-      });
-      game.execute('s1', COMMAND_TYPES.ROLL);
-
-      // When
-      assert.equal(game.phase, PHASES.AWAIT_BUILD);
-      const events = game.execute('s1', COMMAND_TYPES.BUILD);
-
-      // Then
-      assert.equal(game.board.cityAt(3).level, 1);
-      assert.equal(game.playerById('s1').cash, STARTING_CASH - 35_000);
-      assert.equal(findEvent(events, EVENT_TYPES.CITY_UPGRADED).level, 1);
-      assertMoneyConserved(game, '건설 후');
-    });
-
-    it('건설을 건너뛸 수 있다', () => {
-      // Given
-      const game = buildGame({
-        cities: [{ index: 3, ownerId: 's1', level: 0 }],
-        random: new FakeRandomSource([1, 2]),
-      });
-      game.execute('s1', COMMAND_TYPES.ROLL);
-
-      // When
-      game.execute('s1', COMMAND_TYPES.SKIP_BUILD);
-
-      // Then
-      assert.equal(game.board.cityAt(3).level, 0);
-      assert.equal(game.currentPlayerId, 's2');
-    });
-
-    it('이미 랜드마크(3단계)면 건설 단계 없이 턴이 끝난다', () => {
-      // Given
-      const game = buildGame({
-        cities: [{ index: 3, ownerId: 's1', level: 3 }],
-        random: new FakeRandomSource([1, 2]),
-      });
-
-      // When
-      game.execute('s1', COMMAND_TYPES.ROLL);
-
-      // Then
-      assert.equal(game.currentPlayerId, 's2');
-    });
-
-    it('내 휴양지에 도착해도 건설할 수 없다', () => {
-      // Given
-      const game = buildGame({
-        cities: [{ index: 5, ownerId: 's1', level: 0 }],
-        random: new FakeRandomSource([2, 3]),
-      });
-
-      // When
-      game.execute('s1', COMMAND_TYPES.ROLL);
-
-      // Then
-      assert.equal(game.currentPlayerId, 's2');
-    });
-  });
-
   describe('통행료', () => {
     it('남의 도시에 도착하면 통행료를 소유자에게 지불한다', () => {
-      // Given
+      // Given (방콕 70,000원 + 별장 → 배율 0.4)
       const game = buildGame({
-        cities: [{ index: 3, ownerId: 's2', level: 1 }],
+        cities: [{ index: 3, ownerId: 's2', buildings: ['VILLA'] }],
         random: new FakeRandomSource([1, 2]),
       });
 
@@ -237,9 +174,9 @@ describe('Game(게임 시작과 턴 진행)', () => {
 
       // Then
       const toll = findEvent(events, EVENT_TYPES.TOLL_PAID);
-      assert.equal(toll.amount, 35_000);
-      assert.equal(game.playerById('s1').cash, STARTING_CASH - 35_000);
-      assert.equal(game.playerById('s2').cash, STARTING_CASH + 35_000);
+      assert.equal(toll.amount, 28_000);
+      assert.equal(game.playerById('s1').cash, STARTING_CASH - 28_000);
+      assert.equal(game.playerById('s2').cash, STARTING_CASH + 28_000);
       assertMoneyConserved(game, '통행료 후');
     });
 
@@ -247,8 +184,8 @@ describe('Game(게임 시작과 턴 진행)', () => {
       // Given
       const game = buildGame({
         cities: [
-          { index: 5, ownerId: 's2', level: 0 },
-          { index: 15, ownerId: 's2', level: 0 },
+          { index: 5, ownerId: 's2' },
+          { index: 15, ownerId: 's2' },
         ],
         random: new FakeRandomSource([2, 3]),
       });
@@ -269,7 +206,7 @@ describe('Game(게임 시작과 턴 진행)', () => {
           { id: 's3', name: '세찌' },
         ],
         eliminated: ['s3'],
-        cities: [{ index: 3, ownerId: 's3', level: 0 }],
+        cities: [{ index: 3, ownerId: 's3' }],
         random: new FakeRandomSource([1, 2]),
       });
 

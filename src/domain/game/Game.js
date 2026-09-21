@@ -3,8 +3,11 @@ import { BankLedger } from './BankLedger.js';
 import { Board } from './Board.js';
 import { Casino } from './Casino.js';
 import { Dice } from './Dice.js';
+import { BUILDING_TYPES } from './City.js';
 import {
   ISLAND_RESCUE_FEE,
+  LOAN_DEBT,
+  LOAN_PRINCIPAL,
   MAX_CONSECUTIVE_DOUBLES,
   Player,
   SALARY,
@@ -26,6 +29,16 @@ const CUSTOMS_TAX_RATE = 0.1;
 const MAX_TICKET_CHAIN = 3;
 /** 돈이 향하는 곳. */
 const SINKS = Object.freeze({ PLAYER: 'PLAYER', BANK: 'BANK', JACKPOT: 'JACKPOT' });
+/** 지불이 끝난 뒤 이어질 흐름. */
+const CONTINUATIONS = Object.freeze({ TURN_END: 'TURN_END', ACQUIRE: 'ACQUIRE' });
+/** 턴 안에서만 쓰는 임시 상태의 초기값. */
+const EMPTY_TURN = Object.freeze({
+  rollWasDouble: false,
+  casinoRoundsLeft: 0,
+  debt: null,
+  buildIndex: null,
+  acquireIndex: null,
+});
 
 /**
  * 게임 Aggregate Root.
@@ -62,7 +75,7 @@ export class Game {
     version = 0,
     options = { roundLimit: null },
     initialTotal,
-    turn = { rollWasDouble: false, casinoRoundsLeft: 0, debt: null },
+    turn = { ...EMPTY_TURN },
   }) {
     this.#board = board;
     this.#players = players;
@@ -122,7 +135,7 @@ export class Game {
       initialTotal:
         snapshot.initialTotal ??
         players.reduce((sum, player) => sum + player.cash, 0) + (snapshot.casino?.jackpot ?? 0),
-      turn: snapshot.turn ?? { rollWasDouble: false, casinoRoundsLeft: 0, debt: null },
+      turn: { ...EMPTY_TURN, ...(snapshot.turn ?? {}) },
     });
   }
 
@@ -192,14 +205,26 @@ export class Game {
         return { kind: 'BUY', index: city.index, name: city.name, price: city.price };
       }
       case PHASES.AWAIT_BUILD: {
-        const city = this.#board.cityAt(player.position);
+        const city = this.#board.cityAt(this.#turn.buildIndex);
         return {
           kind: 'BUILD',
           index: city.index,
           name: city.name,
-          cost: city.upgradeCost(),
-          currentLevel: city.level,
-          nextLevel: city.level + 1,
+          options: this.#buildOptionsOf(city),
+          buildings: city.buildings,
+          landmark: city.landmark,
+        };
+      }
+      case PHASES.AWAIT_START_BUILD:
+        return { kind: 'START_BUILD', candidates: this.#startBuildCandidates(player) };
+      case PHASES.AWAIT_ACQUIRE: {
+        const city = this.#board.cityAt(this.#turn.acquireIndex);
+        return {
+          kind: 'ACQUIRE',
+          index: city.index,
+          name: city.name,
+          ownerId: city.ownerId,
+          price: city.acquisitionPrice(),
         };
       }
       case PHASES.AWAIT_CASINO:
@@ -218,17 +243,21 @@ export class Game {
         };
       case PHASES.AWAIT_TRAVEL:
         return { kind: 'TRAVEL', forbiddenIndexes: [this.#board.indexOfKind(SPACE_KINDS.AIRPORT)] };
-      case PHASES.AWAIT_LIQUIDATION:
+      case PHASES.AWAIT_LIQUIDATION: {
+        const sellable = this.#board.ownedBy(player.id).map((city) => ({
+          index: city.index,
+          name: city.name,
+          refund: city.liquidationValue(),
+        }));
         return {
           kind: 'LIQUIDATION',
-          debt: this.#debtTotal(),
-          creditorId: this.#turn.debt?.items.find((item) => item.sink === SINKS.PLAYER)?.toPlayerId ?? null,
-          sellable: this.#board.ownedBy(player.id).map((city) => ({
-            index: city.index,
-            name: city.name,
-            refund: city.liquidationValue(),
-          })),
+          amountDue: this.#debtTotal(),
+          creditorId: this.#primaryCreditorId(),
+          canSell: sellable.length > 0,
+          canLoan: player.canTakeLoan(),
+          sellable,
         };
+      }
       default:
         return null;
     }
@@ -241,7 +270,10 @@ export class Game {
       name: player.name,
       eliminated: player.eliminated,
       cash: player.cash,
-      totalAssets: player.eliminated ? 0 : player.cash + this.#board.totalAssetValueOf(player.id),
+      loanDebt: player.loanDebt,
+      totalAssets: player.eliminated
+        ? 0
+        : player.cash + this.#board.totalAssetValueOf(player.id) - player.loanDebt,
     }));
     scored.sort((a, b) => {
       if (a.eliminated !== b.eliminated) {
@@ -305,9 +337,17 @@ export class Game {
       case COMMAND_TYPES.SKIP_BUY:
         return this.#skipBuy();
       case COMMAND_TYPES.BUILD:
-        return this.#build();
+        return this.#build(payload);
       case COMMAND_TYPES.SKIP_BUILD:
         return this.#skipBuild();
+      case COMMAND_TYPES.START_BUILD:
+        return this.#startBuild(payload);
+      case COMMAND_TYPES.SKIP_START_BUILD:
+        return this.#skipStartBuild();
+      case COMMAND_TYPES.ACQUIRE:
+        return this.#acquire();
+      case COMMAND_TYPES.SKIP_ACQUIRE:
+        return this.#skipAcquire();
       case COMMAND_TYPES.CASINO_BET:
         return this.#casinoBet(payload);
       case COMMAND_TYPES.CASINO_LEAVE:
@@ -320,6 +360,12 @@ export class Game {
         return this.#travel(payload);
       case COMMAND_TYPES.SELL:
         return this.#sell(payload);
+      case COMMAND_TYPES.AUTO_SELL:
+        return this.#autoSell();
+      case COMMAND_TYPES.TAKE_LOAN:
+        return this.#takeLoan();
+      case COMMAND_TYPES.DECLARE_BANKRUPTCY:
+        return this.#declareBankruptcy();
       default:
         throw DomainError.invalidArgument(`처리할 수 없는 커맨드입니다: ${type}`);
     }
@@ -371,7 +417,7 @@ export class Game {
       name: city.name,
       price: city.price,
     });
-    this.#endTurn();
+    this.#offerBuild(player, city.index);
   }
 
   #skipBuy() {
@@ -380,35 +426,166 @@ export class Game {
     this.#endTurn();
   }
 
-  #build() {
-    const player = this.#current;
-    const city = this.#board.cityAt(player.position);
-    if (!city.isOwnedBy(player.id)) {
-      throw DomainError.invalidState('내 도시에서만 건설할 수 있습니다');
+  /** 이번 건설 기회에 고를 수 있는 건물과 비용. */
+  #buildOptionsOf(city) {
+    return city.buildableTypes().map((type) => ({ type, cost: city.buildCost(type) }));
+  }
+
+  /** 건설 기회를 열 수 있는지(지을 것이 있고 가장 싼 것을 낼 현금이 있는지). */
+  #canOfferBuild(player, city) {
+    const options = this.#buildOptionsOf(city);
+    return options.length > 0 && player.canPay(Math.min(...options.map((option) => option.cost)));
+  }
+
+  /** 건설 기회를 제안한다. 지을 것이 없거나 현금이 없으면 턴을 끝낸다. */
+  #offerBuild(player, cityIndex) {
+    const city = this.#board.cityAt(cityIndex);
+    if (!city.isOwnedBy(player.id) || !this.#canOfferBuild(player, city)) {
+      this.#endTurn();
+      return;
     }
-    if (!city.canUpgrade()) {
-      throw DomainError.invalidState(`더 건설할 수 없습니다: ${city.name}`);
-    }
-    const cost = city.upgradeCost();
-    if (!player.canPay(cost)) {
-      throw DomainError.insufficientCash(`건설비 ${cost}원이 부족합니다`);
-    }
-    player.pay(cost);
-    this.#ledger.payToBank(cost);
-    city.upgrade();
-    this.#emit(EVENT_TYPES.CITY_UPGRADED, {
+    this.#turn.buildIndex = cityIndex;
+    this.#phase = PHASES.AWAIT_BUILD;
+    this.#emit(EVENT_TYPES.BUILD_OFFERED, {
       playerId: player.id,
       index: city.index,
       name: city.name,
-      level: city.level,
-      cost,
+      options: this.#buildOptionsOf(city),
     });
+  }
+
+  #build({ buildings }) {
+    const player = this.#current;
+    const city = this.#board.cityAt(this.#turn.buildIndex);
+    this.#performBuild(player, city, buildings);
     this.#endTurn();
   }
 
   #skipBuild() {
     const player = this.#current;
-    this.#emit(EVENT_TYPES.BUILD_DECLINED, { playerId: player.id, index: player.position });
+    this.#emit(EVENT_TYPES.BUILD_DECLINED, { playerId: player.id, index: this.#turn.buildIndex });
+    this.#endTurn();
+  }
+
+  /** 고른 건물 조합을 검증하고 짓는다. */
+  #performBuild(player, city, buildings) {
+    if (!city.isOwnedBy(player.id)) {
+      throw DomainError.invalidArgument(`내 도시가 아닙니다: ${city.index}`);
+    }
+    city.assertCanBuild(buildings);
+    const cost = city.costOf(buildings);
+    if (!player.canPay(cost)) {
+      throw DomainError.insufficientCash(`건설비 ${cost}원이 부족합니다`);
+    }
+    player.pay(cost);
+    this.#ledger.payToBank(cost);
+    city.build(buildings);
+    this.#emit(EVENT_TYPES.BUILT, {
+      playerId: player.id,
+      index: city.index,
+      name: city.name,
+      buildings: [...buildings],
+      cost,
+    });
+    if (buildings.includes(BUILDING_TYPES.LANDMARK)) {
+      this.#emit(EVENT_TYPES.LANDMARK_BUILT, {
+        playerId: player.id,
+        index: city.index,
+        name: city.name,
+        cost,
+      });
+    }
+  }
+
+  /** 출발 칸 보너스로 건설할 수 있는 내 도시 목록. */
+  #startBuildCandidates(player) {
+    return this.#board
+      .ownedBy(player.id)
+      .filter((city) => this.#canOfferBuild(player, city))
+      .map((city) => ({
+        index: city.index,
+        name: city.name,
+        options: this.#buildOptionsOf(city),
+      }));
+  }
+
+  #offerStartBuild(player) {
+    const candidates = this.#startBuildCandidates(player);
+    if (candidates.length === 0) {
+      this.#endTurn();
+      return;
+    }
+    this.#phase = PHASES.AWAIT_START_BUILD;
+    this.#emit(EVENT_TYPES.START_BONUS_OFFERED, { playerId: player.id, candidates });
+  }
+
+  #startBuild({ cityIndex, buildings }) {
+    const player = this.#current;
+    if (!Number.isInteger(cityIndex) || !this.#board.isOwnable(cityIndex)) {
+      throw DomainError.invalidArgument(`건설할 칸이 올바르지 않습니다: ${cityIndex}`);
+    }
+    this.#performBuild(player, this.#board.cityAt(cityIndex), buildings);
+    this.#endTurn();
+  }
+
+  #skipStartBuild() {
+    this.#emit(EVENT_TYPES.BUILD_DECLINED, { playerId: this.#current.id, index: null });
+    this.#endTurn();
+  }
+
+  /** 통행료를 모두 낸 뒤의 인수 제안. 보유 현금으로만 인수할 수 있다. */
+  #offerAcquire(player, cityIndex) {
+    const city = this.#board.cityAt(cityIndex);
+    if (!city.canBeAcquired() || city.isOwnedBy(player.id) || !player.canPay(city.acquisitionPrice())) {
+      this.#endTurn();
+      return;
+    }
+    this.#turn.acquireIndex = cityIndex;
+    this.#phase = PHASES.AWAIT_ACQUIRE;
+    this.#emit(EVENT_TYPES.ACQUIRE_OFFERED, {
+      playerId: player.id,
+      index: city.index,
+      name: city.name,
+      ownerId: city.ownerId,
+      price: city.acquisitionPrice(),
+    });
+  }
+
+  #acquire() {
+    const player = this.#current;
+    const city = this.#board.cityAt(this.#turn.acquireIndex);
+    if (!city.canBeAcquired()) {
+      throw DomainError.invalidState(`인수할 수 없는 칸입니다: ${city.name}`);
+    }
+    const price = city.acquisitionPrice();
+    if (!player.canPay(price)) {
+      throw DomainError.insufficientCash('인수 대금은 보유 현금으로만 지불할 수 있습니다');
+    }
+    const owner = this.playerById(city.ownerId);
+    player.pay(price);
+    if (owner && !owner.eliminated) {
+      owner.receive(price);
+    } else {
+      this.#ledger.payToBank(price);
+    }
+    city.transferTo(player.id);
+    this.#emit(EVENT_TYPES.ACQUIRED, {
+      playerId: player.id,
+      index: city.index,
+      name: city.name,
+      fromId: owner?.id ?? null,
+      price,
+    });
+    this.#turn.acquireIndex = null;
+    this.#offerBuild(player, city.index);
+  }
+
+  #skipAcquire() {
+    this.#emit(EVENT_TYPES.ACQUIRE_DECLINED, {
+      playerId: this.#current.id,
+      index: this.#turn.acquireIndex,
+    });
+    this.#turn.acquireIndex = null;
     this.#endTurn();
   }
 
@@ -505,26 +682,8 @@ export class Game {
     if (!this.#board.isOwnable(cityIndex) || !this.#board.cityAt(cityIndex).isOwnedBy(player.id)) {
       throw DomainError.invalidArgument(`내 소유가 아닌 칸은 매각할 수 없습니다: ${cityIndex}`);
     }
-    const city = this.#board.cityAt(cityIndex);
-    const refund = city.liquidationValue();
-    city.reset();
-    player.receive(refund);
-    this.#ledger.receiveFromBank(refund);
-    this.#emit(EVENT_TYPES.ASSET_SOLD, {
-      playerId: player.id,
-      index: city.index,
-      name: city.name,
-      refund,
-    });
-
-    const total = this.#debtTotal();
-    if (player.canPay(total)) {
-      this.#settleDebt();
-      return;
-    }
-    if (this.#board.ownedBy(player.id).length === 0) {
-      this.#bankrupt(player, this.#primaryCreditorId());
-    }
+    this.#sellCity(player, this.#board.cityAt(cityIndex));
+    this.#afterLiquidationStep();
   }
 
   // ── 이동과 칸 해석 ──────────────────────────────────────────────────────
@@ -540,10 +699,23 @@ export class Game {
     this.#resolveLanding(player, index, depth);
   }
 
+  /** 월급 지급. 대출 채무가 남아 있으면 먼저 압류된다. */
   #paySalary(player) {
-    player.receive(SALARY);
-    this.#ledger.receiveFromBank(SALARY);
-    this.#emit(EVENT_TYPES.SALARY_PAID, { playerId: player.id, amount: SALARY });
+    const { seized, received } = player.seizeSalary(SALARY);
+    if (seized > 0) {
+      this.#emit(EVENT_TYPES.SALARY_SEIZED, {
+        playerId: player.id,
+        amount: seized,
+        remainingDebt: player.loanDebt,
+      });
+      if (player.loanDebt === 0) {
+        this.#emit(EVENT_TYPES.LOAN_REPAID, { playerId: player.id });
+      }
+    }
+    if (received > 0) {
+      this.#ledger.receiveFromBank(received);
+      this.#emit(EVENT_TYPES.SALARY_PAID, { playerId: player.id, amount: received });
+    }
   }
 
   #resolveLanding(player, index, depth) {
@@ -556,6 +728,8 @@ export class Game {
     });
 
     switch (space.kind) {
+      case SPACE_KINDS.START:
+        return this.#offerStartBuild(player);
       case SPACE_KINDS.CITY:
       case SPACE_KINDS.RESORT:
         return this.#resolveOwnable(player, index);
@@ -590,11 +764,7 @@ export class Game {
     }
 
     if (city.isOwnedBy(player.id)) {
-      if (city.canUpgrade() && player.canPay(city.upgradeCost())) {
-        this.#phase = PHASES.AWAIT_BUILD;
-        return;
-      }
-      this.#endTurn();
+      this.#offerBuild(player, index);
       return;
     }
 
@@ -615,6 +785,7 @@ export class Game {
         type: EVENT_TYPES.TOLL_PAID,
         payload: { payerId: player.id, ownerId: owner.id, index, amount: toll },
       },
+      next: { kind: CONTINUATIONS.ACQUIRE, cityIndex: index },
     });
   }
 
@@ -709,7 +880,7 @@ export class Game {
       case TICKET_EFFECTS.PAY_PER_BUILDING:
         return this.#payToBank(
           player,
-          this.#board.buildingLevelSumOf(player.id) * effect.amount,
+          this.#board.buildingCountOf(player.id) * effect.amount,
           ticket.id,
         );
       case TICKET_EFFECTS.GAIN_PER_CITY:
@@ -830,38 +1001,40 @@ export class Game {
   }
 
   /**
-   * 강제 지불. 현금이 부족하면 정리 페이즈로, 매각해도 부족하면 즉시 파산으로 이어진다.
+   * 강제 지불. 현금이 부족하면 정리(AWAIT_LIQUIDATION) 페이즈로 들어간다.
+   * 현금 부족 자체가 파산은 아니며, 파산은 플레이어가 직접 선언해야 한다.
    */
-  #charge({ items, reason, event }) {
+  #charge({ items, reason, event, next = { kind: CONTINUATIONS.TURN_END } }) {
     const player = this.#current;
     const total = items.reduce((sum, item) => sum + item.amount, 0);
     if (total <= 0) {
-      this.#endTurn();
+      this.#continueAfterPayment(next);
       return;
     }
 
-    this.#turn.debt = { reason, items, event };
+    this.#turn.debt = { reason, items, event, next };
 
     if (player.canPay(total)) {
       this.#settleDebt();
       return;
     }
 
-    const raisable = this.#board
-      .ownedBy(player.id)
-      .reduce((sum, city) => sum + city.liquidationValue(), 0);
-    if (player.cash + raisable < total) {
-      this.#bankrupt(player, this.#primaryCreditorId());
-      return;
-    }
-
     this.#phase = PHASES.AWAIT_LIQUIDATION;
     this.#emit(EVENT_TYPES.LIQUIDATION_REQUIRED, {
       playerId: player.id,
-      debt: total,
+      amountDue: total,
       creditorId: this.#primaryCreditorId(),
       reason,
     });
+  }
+
+  /** 지불이 끝난 뒤 흐름을 이어간다. */
+  #continueAfterPayment(next) {
+    if (next?.kind === CONTINUATIONS.ACQUIRE) {
+      this.#offerAcquire(this.#current, next.cityIndex);
+      return;
+    }
+    this.#endTurn();
   }
 
   #settleDebt() {
@@ -897,23 +1070,87 @@ export class Game {
         amount: items.reduce((sum, item) => sum + item.amount, 0),
       });
     }
+    const next = this.#turn.debt.next;
     this.#turn.debt = null;
-    this.#endTurn();
+    this.#continueAfterPayment(next);
   }
 
-  #bankrupt(player, creditorId) {
+  /** 정리 페이즈에서 한 걸음 진행한 뒤, 채무를 덮을 수 있으면 자동 정산한다. */
+  #afterLiquidationStep() {
+    if (this.#current.canPay(this.#debtTotal())) {
+      this.#settleDebt();
+    }
+  }
+
+  #sellCity(player, city) {
+    const refund = city.liquidationValue();
+    const index = city.index;
+    const name = city.name;
+    city.reset();
+    player.receive(refund);
+    this.#ledger.receiveFromBank(refund);
+    this.#emit(EVENT_TYPES.PROPERTY_SOLD, { playerId: player.id, index, name, refund });
+  }
+
+  #autoSell() {
+    const player = this.#current;
+    const owned = this.#board
+      .ownedBy(player.id)
+      .sort((a, b) => a.liquidationValue() - b.liquidationValue() || a.index - b.index);
+    if (owned.length === 0) {
+      throw DomainError.invalidState('매각할 자산이 없습니다');
+    }
+    const amountDue = this.#debtTotal();
+    for (const city of owned) {
+      if (player.canPay(amountDue)) {
+        break;
+      }
+      this.#sellCity(player, city);
+    }
+    this.#afterLiquidationStep();
+  }
+
+  #takeLoan() {
+    const player = this.#current;
+    if (!player.canTakeLoan()) {
+      throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
+    }
+    player.takeLoan(LOAN_PRINCIPAL, LOAN_DEBT);
+    this.#ledger.receiveFromBank(LOAN_PRINCIPAL);
+    this.#emit(EVENT_TYPES.LOAN_TAKEN, {
+      playerId: player.id,
+      principal: LOAN_PRINCIPAL,
+      debt: LOAN_DEBT,
+    });
+    this.#afterLiquidationStep();
+  }
+
+  #declareBankruptcy() {
+    this.#bankrupt(this.#current);
+  }
+
+  /** 파산: 남은 현금을 채권자에게 넘기고 모든 자산을 초기화한 뒤 탈락한다. */
+  #bankrupt(player) {
+    const debt = this.#turn.debt;
+    const creditorItem = debt?.items.find((item) => item.sink === SINKS.PLAYER) ?? null;
+    const toJackpot = Boolean(debt?.items.some((item) => item.sink === SINKS.JACKPOT));
+    const creditor = creditorItem ? this.playerById(creditorItem.toPlayerId) : null;
+    const creditorId = creditor && !creditor.eliminated ? creditor.id : null;
     const remaining = player.cash;
+
     if (remaining > 0) {
       player.pay(remaining);
-      const creditor = creditorId ? this.playerById(creditorId) : null;
-      if (creditor && !creditor.eliminated) {
+      if (creditorId) {
         creditor.receive(remaining);
         this.#emit(EVENT_TYPES.MONEY_TRANSFERRED, {
           fromId: player.id,
-          toId: creditor.id,
+          toId: creditorId,
           amount: remaining,
           reason: MONEY_REASONS.BANKRUPTCY,
         });
+      } else if (toJackpot) {
+        this.#casino.accumulate(remaining);
+        this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
       } else {
         this.#ledger.payToBank(remaining);
       }
@@ -924,7 +1161,7 @@ export class Game {
     this.#phase = PHASES.AWAIT_ROLL;
     this.#emit(EVENT_TYPES.BANKRUPT, {
       playerId: player.id,
-      creditorId: creditorId ?? null,
+      creditorId,
       paidAmount: remaining,
       releasedIndexes,
     });
@@ -1041,6 +1278,8 @@ export class Game {
         rollWasDouble: this.#turn.rollWasDouble,
         casinoRoundsLeft: this.#turn.casinoRoundsLeft,
         debt: this.#turn.debt ? structuredClone(this.#turn.debt) : null,
+        buildIndex: this.#turn.buildIndex,
+        acquireIndex: this.#turn.acquireIndex,
       },
     };
   }

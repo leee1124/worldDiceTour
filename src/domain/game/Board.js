@@ -22,19 +22,23 @@ export class Board {
     );
   }
 
-  /** 스냅샷(소유자/건물 단계)으로 보드를 복원한다. */
+  /** 스냅샷(소유자/건물)으로 보드를 복원한다. */
   static restore(citySnapshots = []) {
-    const board = Board.createDefault();
-    for (const snapshot of citySnapshots) {
-      const city = board.cityAt(snapshot.index);
-      if (snapshot.ownerId) {
-        city.buy(snapshot.ownerId);
-        for (let level = 0; level < snapshot.level; level += 1) {
-          city.upgrade();
+    const byIndex = new Map(citySnapshots.map((snapshot) => [snapshot.index, snapshot]));
+    return new Board(
+      BOARD_SPACES.map((space) => {
+        if (!OWNABLE_KINDS.includes(space.kind)) {
+          return { ...space };
         }
-      }
-    }
-    return board;
+        const snapshot = byIndex.get(space.index);
+        return new City({
+          ...space,
+          ownerId: snapshot?.ownerId ?? null,
+          buildings: snapshot?.buildings ?? [],
+          landmark: snapshot?.landmark ?? false,
+        });
+      }),
+    );
   }
 
   get size() {
@@ -86,8 +90,9 @@ export class Board {
     return this.ownedBy(playerId).filter((city) => !city.isResort).length;
   }
 
-  buildingLevelSumOf(playerId) {
-    return this.ownedBy(playerId).reduce((sum, city) => sum + city.level, 0);
+  /** 보유 자산에 지어진 건물 수 합계(랜드마크 포함). */
+  buildingCountOf(playerId) {
+    return this.ownedBy(playerId).reduce((sum, city) => sum + city.buildingCount(), 0);
   }
 
   totalAssetValueOf(playerId) {

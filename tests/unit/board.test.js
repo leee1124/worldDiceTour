@@ -128,21 +128,20 @@ describe('Board(보드 40칸)', () => {
   });
 
   describe('소유 현황 집계', () => {
-    it('플레이어가 가진 칸/휴양지 수/건물 단계 합/총자산을 집계한다', () => {
+    it('플레이어가 가진 칸/휴양지 수/건물 수/총자산을 집계한다', () => {
       // Given
       const board = Board.createDefault();
       board.cityAt(1).buy('p1');
       board.cityAt(5).buy('p1');
       board.cityAt(15).buy('p1');
       board.cityAt(39).buy('p2');
-      board.cityAt(1).upgrade();
-      board.cityAt(1).upgrade();
+      board.cityAt(1).build(['VILLA', 'BUILDING']);
 
       // When / Then
       assert.equal(board.ownedBy('p1').length, 3);
       assert.equal(board.resortCountOf('p1'), 2);
-      assert.equal(board.buildingLevelSumOf('p1'), 2);
-      assert.equal(board.totalAssetValueOf('p1'), 60_000 + 60_000 + 200_000 + 200_000);
+      assert.equal(board.buildingCountOf('p1'), 2);
+      assert.equal(board.totalAssetValueOf('p1'), 60_000 + 18_000 + 36_000 + 200_000 + 200_000);
       assert.equal(board.cityCountOf('p1'), 1);
     });
 
@@ -151,7 +150,6 @@ describe('Board(보드 40칸)', () => {
       const board = Board.createDefault();
       board.cityAt(1).buy('p1');
       board.cityAt(5).buy('p1');
-      board.cityAt(5).upgrade === undefined;
 
       // When
       board.releaseAllOf('p1');

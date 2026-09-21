@@ -10,6 +10,10 @@ export const ISLAND_TURNS = 3;
 export const ISLAND_RESCUE_FEE = 200_000;
 /** 3연속 더블이면 조난. */
 export const MAX_CONSECUTIVE_DOUBLES = 3;
+/** 대출 원금(게임당 1회). */
+export const LOAN_PRINCIPAL = 1_000_000;
+/** 대출 채무(원금 + 이자). 월급으로 상환한다. */
+export const LOAN_DEBT = 1_200_000;
 
 /**
  * 플레이어. 현금 입출과 자신의 상태(위치/조난/공항 이동권/연속 더블)를 스스로 관리한다.
@@ -23,6 +27,8 @@ export class Player {
   #islandRemainingTurns;
   #airportPending;
   #consecutiveDoubles;
+  #loanUsed;
+  #loanDebt;
 
   constructor({
     id,
@@ -33,6 +39,8 @@ export class Player {
     islandRemainingTurns = 0,
     airportPending = false,
     consecutiveDoubles = 0,
+    loanUsed = false,
+    loanDebt = 0,
   }) {
     this.#id = id;
     this.#name = name;
@@ -42,6 +50,8 @@ export class Player {
     this.#islandRemainingTurns = islandRemainingTurns;
     this.#airportPending = airportPending;
     this.#consecutiveDoubles = consecutiveDoubles;
+    this.#loanUsed = loanUsed;
+    this.#loanDebt = loanDebt;
   }
 
   get id() {
@@ -74,6 +84,44 @@ export class Player {
 
   get consecutiveDoubles() {
     return this.#consecutiveDoubles;
+  }
+
+  get loanUsed() {
+    return this.#loanUsed;
+  }
+
+  get loanDebt() {
+    return this.#loanDebt;
+  }
+
+  canTakeLoan() {
+    return !this.#loanUsed;
+  }
+
+  /** 은행에서 원금을 받고 채무를 진다(게임당 1회). */
+  takeLoan(principal, debt) {
+    if (!this.canTakeLoan()) {
+      throw DomainError.invalidState('대출은 게임당 한 번만 받을 수 있습니다');
+    }
+    this.#loanUsed = true;
+    this.#loanDebt = debt;
+    this.receive(principal);
+    return { principal, debt };
+  }
+
+  /**
+   * 월급을 받는다. 대출 채무가 남아 있으면 채무 상환에 먼저 압류된다.
+   * @returns {{seized:number, received:number}}
+   */
+  seizeSalary(amount) {
+    this.#assertAmount(amount);
+    const seized = Math.min(this.#loanDebt, amount);
+    this.#loanDebt -= seized;
+    const received = amount - seized;
+    if (received > 0) {
+      this.receive(received);
+    }
+    return { seized, received };
   }
 
   #assertAmount(amount) {
@@ -157,6 +205,8 @@ export class Player {
       islandRemainingTurns: this.#islandRemainingTurns,
       airportPending: this.#airportPending,
       consecutiveDoubles: this.#consecutiveDoubles,
+      loanUsed: this.#loanUsed,
+      loanDebt: this.#loanDebt,
     };
   }
 }

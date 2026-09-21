@@ -4,8 +4,12 @@ export const PHASES = Object.freeze({
   AWAIT_ROLL: 'AWAIT_ROLL',
   /** 빈 도시 매입 여부 선택 */
   AWAIT_BUY: 'AWAIT_BUY',
-  /** 내 도시 건설 여부 선택 */
+  /** 건설 기회: 지을 건물 조합 선택 */
   AWAIT_BUILD: 'AWAIT_BUILD',
+  /** 출발 칸 보너스: 건설할 내 도시 + 건물 조합 선택 */
+  AWAIT_START_BUILD: 'AWAIT_START_BUILD',
+  /** 남의 도시 인수 여부 선택 */
+  AWAIT_ACQUIRE: 'AWAIT_ACQUIRE',
   /** 카지노 베팅/그만두기 선택 */
   AWAIT_CASINO: 'AWAIT_CASINO',
   /** 지불 불능 → 자산 매각 선택 */

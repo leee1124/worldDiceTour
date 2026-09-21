@@ -26,6 +26,7 @@ export function buildGame({
   islandTurns = {},
   airportPending = [],
   consecutiveDoubles = {},
+  loans = {},
   cities = [],
   jackpot = 0,
   drawPile = TICKETS.map((ticket) => ticket.id),
@@ -43,6 +44,8 @@ export function buildGame({
     islandRemainingTurns: islandTurns[seat.id] ?? 0,
     airportPending: airportPending.includes(seat.id),
     consecutiveDoubles: consecutiveDoubles[seat.id] ?? 0,
+    loanUsed: loans[seat.id]?.used ?? false,
+    loanDebt: loans[seat.id]?.debt ?? 0,
   }));
 
   const initialTotal = players.reduce((sum, player) => sum + player.cash, 0) + jackpot;
@@ -55,7 +58,12 @@ export function buildGame({
     options: { roundLimit },
     initialTotal,
     players,
-    board: cities,
+    board: cities.map((city) => ({
+      index: city.index,
+      ownerId: city.ownerId ?? null,
+      buildings: city.buildings ?? [],
+      landmark: city.landmark ?? false,
+    })),
     deck: { drawPile },
     casino: { jackpot },
     ledger: { fromBank: 0, toBank: 0 },
