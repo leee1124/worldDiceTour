@@ -182,7 +182,8 @@ export function createGameController({ appRoot, overlayRoot }) {
     }
 
     const pending = view.pending;
-    const keep = [CELL_SHEET_ID, TRAVEL_MODAL_ID];
+    // 목적지 확인 시트는 공항 선택 페이즈에서만 남겨 둔다.
+    const keep = view.phase === 'AWAIT_TRAVEL' ? [CELL_SHEET_ID, TRAVEL_MODAL_ID] : [CELL_SHEET_ID];
 
     // 카지노는 관전자도 함께 본다(조작은 자기 차례에만).
     if (view.phase === 'AWAIT_CASINO' && pending) {
@@ -418,7 +419,8 @@ export function createGameController({ appRoot, overlayRoot }) {
   async function enterRoom(code) {
     stopRoomListPolling();
     roomCode = code;
-    queue.clearEvents();
+    // 방마다 view.version이 1부터 다시 시작하므로 버전 기억까지 비운다.
+    queue.forget();
     logView.clear();
 
     try {
@@ -522,6 +524,7 @@ export function createGameController({ appRoot, overlayRoot }) {
   function goHome() {
     disconnectStream();
     roomCode = null;
+    queue.forget();
     modalHost.closeAll();
     store.resetRoom();
     store.patch({ screen: SCREENS.HOME, savedRooms: storage.savedRooms(), connection: CONNECTION.IDLE });

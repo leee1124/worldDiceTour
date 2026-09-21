@@ -91,9 +91,15 @@ export class EventPlaybackQueue {
     }
   }
 
-  /** 연출만 버리고 목표 뷰는 유지한다(탭 비활성 등). */
-  clearEvents() {
+  /**
+   * 다른 방으로 옮길 때 버전 기억까지 비운다.
+   * 방마다 version은 1부터 다시 시작하므로, 이것을 지우지 않으면
+   * 새 방의 낮은 버전을 "오래된 메시지"로 오해해 화면이 멈춘다.
+   */
+  forget() {
     this.#events.length = 0;
+    this.#targetView = null;
+    this.#latestVersion = -1;
   }
 
   #trim() {

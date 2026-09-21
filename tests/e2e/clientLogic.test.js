@@ -589,3 +589,19 @@ test('게임 로그: 지은 건물은 별장 · 빌딩 · 호텔 순서로 정�
   // Then 항상 같은 순서로 읽힌다
   assert.ok(line.text.includes('별장 · 빌딩 · 호텔'), line.text);
 });
+
+test('이벤트 큐: 다른 방으로 옮기면 이전 방의 버전 기억을 버린다', () => {
+  // Given 버전이 한참 올라간 방에서 플레이하던 큐
+  const queue = new EventPlaybackQueue();
+  queue.accept(message(120, 2));
+  assert.equal(queue.latestVersion, 120);
+
+  // When 다른 방(또는 새 게임)으로 들어가며 큐를 초기화하면
+  queue.forget();
+
+  // Then 버전 기억과 목표 뷰가 비워져, 버전 1부터 다시 시작하는 방도 정상 반영된다
+  assert.equal(queue.size, 0);
+  assert.equal(queue.targetView, null);
+  assert.equal(queue.accept(message(1, 1)), true);
+  assert.equal(queue.targetView.version, 1);
+});
