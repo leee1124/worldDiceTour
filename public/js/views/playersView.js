@@ -15,7 +15,7 @@ function badge(text, tone) {
   return el('span', { class: ['badge', `badge--${tone}`], text });
 }
 
-export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) {
+export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} }) {
   const listNode = el('div', { class: 'player-list' });
   const element = el('section', { class: 'panel panel--players' }, [
     el('h2', { class: 'panel-title' }, ['👥 플레이어']),
@@ -38,14 +38,15 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
 
     const location = el('span', { class: 'player-location' });
 
-    // 카드 윗부분 전체가 "이 사람 어디 있지?" 버튼이다(키보드로도 누를 수 있다).
+    // 카드 윗부분 전체가 "이 사람 도시 어디 있지?" 버튼이다(키보드로도 누를 수 있다).
+    // 오너 요청: 돋보기는 말의 위치가 아니라 **그 사람이 가진 도시**를 찾는 도구다.
     const head = button(
       {
         class: 'player-head player-head--locate',
         // 버튼 이름은 "무엇을 하는지"까지 담는다(내용만으로는 이름·금액만 읽힌다).
-        'aria-label': `${player.name} · ${slot.shapeLabel} 모양 말 — 보드에서 위치 보기`,
-        title: `${player.name}의 말 위치 보기`,
-        on: { click: () => onFocusPlayer(player.seatId) },
+        'aria-label': `${player.name} · ${slot.shapeLabel} 모양 말 — 가진 도시 보드에서 찾기`,
+        title: `${player.name}의 도시 찾기`,
+        on: { click: () => onShowHoldings(player.seatId) },
       },
       [
         el('span', {
