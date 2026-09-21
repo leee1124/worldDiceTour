@@ -91,13 +91,13 @@ describe('AutoPlayerPolicy: 거래 창구(설계서 §4.6)', () => {
     });
   });
 
-  it('부채가 없고 기준금리가 250bp 이상이면 여유현금을 100,000원 단위로 예치한다', () => {
+  it('부채가 없고 기준금리가 기준선(125bp) 이상이면 여유현금을 100,000원 단위로 예치한다', () => {
     // Given (현금 3,000,000 − 버퍼 1,000,000 = 2,000,000)
-    assert.equal(AUTO_DEPOSIT_RATE_BP, 250);
+    assert.equal(AUTO_DEPOSIT_RATE_BP, 125);
     assert.equal(AUTO_DEPOSIT_UNIT, 100_000);
 
     // When
-    const decision = policy.decide(tradeView({ cash: 3_050_000, baseRateBp: 250 }));
+    const decision = policy.decide(tradeView({ cash: 3_050_000, baseRateBp: 125 }));
 
     // Then
     assert.deepEqual(decision, {
@@ -108,7 +108,7 @@ describe('AutoPlayerPolicy: 거래 창구(설계서 §4.6)', () => {
 
   it('금리가 낮으면 예금을 전액 인출한다', () => {
     // Given / When
-    const decision = policy.decide(tradeView({ cash: 2_000_000, baseRateBp: 100, deposit: 500_000 }));
+    const decision = policy.decide(tradeView({ cash: 2_000_000, baseRateBp: 50, deposit: 500_000 }));
 
     // Then
     assert.deepEqual(decision, {
