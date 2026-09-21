@@ -759,6 +759,12 @@ export class Market {
       const result = this.withdraw({ playerId, amount: order.amount });
       return { ok: true, ...result, cashDelta: order.amount };
     } catch (error) {
+      // **규칙 위반만** 사유 코드로 바꿔 그 주문을 버린다. 프로그래밍 오류(TypeError 등)를
+      // "주문 거절"로 바꿔 버리면 결함이 조용히 묻히므로 그대로 올려보낸다
+      // (application 레이어가 ERR010 + 서버 로그로 처리한다).
+      if (!(error instanceof DomainError)) {
+        throw error;
+      }
       return { ok: false, reasonCode: reasonCodeOf(error, order) };
     }
   }

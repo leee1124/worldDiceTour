@@ -286,6 +286,21 @@ describe('Market — 예약 주문', () => {
     assert.equal(market.holdingsOf('s1').length, 0);
   });
 
+  it('예약 체결 중 도메인 오류가 아닌 예외는 삼키지 않는다(버그를 숨기지 않는다)', () => {
+    // Given (규칙 위반은 사유 코드로 버리지만, 프로그래밍 오류를 "주문 거절"로 바꿔 버리면
+    //        결함이 조용히 묻힌다. 예상 못 한 예외는 위로 올라가 ERR010 + 서버 로그가 돼야 한다)
+    const market = freshMarket();
+    market.queueOrder({ seatId: 's1', kind: ORDER_KINDS.BUY_STOCK, instrumentId: 'AIR', quantity: 1 });
+    market.openWindow('s1');
+    const instrument = market.instrumentOf('AIR');
+    instrument.isListed = () => {
+      throw new TypeError('시장 내부 결함');
+    };
+
+    // When / Then
+    assert.throws(() => market.runQueuedOrders({ playerId: 's1', cash: 1_000_000 }), TypeError);
+  });
+
   it('상장폐지된 종목의 예약은 버려진다', () => {
     // Given
     const market = Market.restore({
