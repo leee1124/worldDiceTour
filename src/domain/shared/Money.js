@@ -3,9 +3,9 @@ import { DomainError } from './DomainError.js';
 /**
  * 금액 단위 규칙(순수 함수).
  *
- * 이 게임의 모든 금액은 **원 단위 정수**다. 소수·`NaN`·지수 표기·`-0`·안전 정수 범위를 넘는 값이
+ * 이 게임의 모든 금액은 **원 단위 정수**다. 소수·`NaN`·지수 표기·안전 정수 범위를 넘는 값이
  * 도메인 안으로 들어오면 반올림 오차로 돈이 생기거나 사라진다. 금액을 만드는 모든 지점이 이 함수를
- * 거치도록 해 그런 값이 애초에 존재하지 못하게 한다.
+ * 거치도록 해 그런 값이 애초에 존재하지 못하게 한다. `-0`은 거부하지 않고 **0으로 정규화**한다.
  */
 
 /**
@@ -28,7 +28,9 @@ export function assertAmount(amount, label = '금액') {
   if (amount > MAX_MONEY) {
     throw DomainError.invalidArgument(`${label}이 상한(${MAX_MONEY})을 넘습니다: ${amount}`);
   }
-  return amount;
+  // `-0`은 `<0`도 아니고 `>MAX_MONEY`도 아니라 위 검사를 모두 통과한다. 스냅샷·비교에서
+  // `0`과 다르게 보일 수 있으므로 **여기서 0으로 정규화해** 도메인 안에 들어오지 못하게 한다.
+  return amount === 0 ? 0 : amount;
 }
 
 /**
@@ -42,7 +44,7 @@ export function assertSignedAmount(amount, label = '금액') {
   if (Math.abs(amount) > MAX_MONEY) {
     throw DomainError.invalidArgument(`${label}이 상한(${MAX_MONEY})을 넘습니다: ${amount}`);
   }
-  return amount;
+  return amount === 0 ? 0 : amount;
 }
 
 /** 오류 메시지에 값을 안전하게 싣는다(도메인은 외부 문자열화 유틸에 의존하지 않는다). */

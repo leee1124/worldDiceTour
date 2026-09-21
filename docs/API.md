@@ -26,7 +26,7 @@
 | 18 | **추가 필드** | `RoomDto.options.finance = { investmentMode, financeSystem, tradeTimerSec, scenario }`. 기본값 `"OFF"` / `"BASIC"` / `0` / `"STANDARD"` | 로비 호스트 도구에 표시만 하면 된다. **지금은 기본값 외의 값을 보내면 `400 ERR001`이다**(해당 기능이 아직 없다). `RoomSummaryDto.options`에는 들어가지 않는다(목록은 `roundLimit`만) |
 | 19 | 동작 | `SET_OPTIONS`에 `finance`를 **넣을 수 있고, 생략하면 기존 값이 유지된다** | 기존 클라이언트(roundLimit만 보내는)는 그대로 동작한다 |
 | 20 | 동작 | 저장 파일에 `schemaVersion: 2`가 생겼다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방(버전 필드 없음)은 서버가 자동으로 승급해 그대로 이어진다 |
-| 21 | **추가 필드** | `pending.sellable` 항목은 부동산일 때 지금과 똑같이 `{ index, name, refund }`다(변경 없음). 앞으로 자산군이 늘면 **항목 모양이 자산군마다 달라진다** | 정리 모달은 `index`가 있는 항목만 보드 칸으로 다루고, 모르는 모양의 항목은 `name`/`refund`만 표시하도록 방어적으로 그릴 것 |
+| 21 | **추가 필드** | `pending.sellable` 항목에 `assetKind`("PROPERTY")와 `assetId`가 가산됐다. `index`·`name`·`refund`는 그대로다 | 기존 정리 모달은 고칠 것이 없다. 앞으로 주식·예금이 같은 목록에 섞이면 **`assetKind`로 분기**하면 되고, `index`는 부동산 항목에만 있다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -186,7 +186,8 @@
 | `tradeTimerSec` | `0` | `30` · `45` |
 | `scenario` | `"STANDARD"` | `"BUBBLE"` · `"DEPRESSION"` |
 
-- `finance`를 **생략하면 기존 값이 유지된다**(기존 클라이언트는 바꿀 것이 없다).
+- `finance`를 **생략하면 기존 값이 유지된다**(기존 클라이언트는 바꿀 것이 없다). 일부 키만 보내도
+  마찬가지로 **보낸 키만** 바뀐다(나머지는 그대로).
 - 모르는 키, 구현되지 않은 값, 객체가 아닌 값은 모두 `400 ERR001`이다. 켜도 아무 일이 일어나지 않는
   옵션을 만들지 않기 위한 의도적인 거부이며, 각 기능이 들어올 때 값이 열린다.
 - 옵션은 **대기실에서만** 바꿀 수 있다(`START` 시점의 옵션이 판 내내 고정된다).
@@ -397,7 +398,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `CASINO` | `roundsLeft`, `limits: { min, max, unit }`, `jackpot` |
 | `ISLAND` | `remainingTurns`, `fee`(200000), `canPayFee` |
 | `TRAVEL` | `forbiddenIndexes: number[]` — 공항 칸(30)과 현재 칸. 공항 칸에 서 있으면 한 칸으로 합쳐져 `[30]` |
-| `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ index, name, refund }]` |
+| `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ assetKind, assetId, index, name, refund }]` — `assetKind`는 지금 항상 `"PROPERTY"`이고 `index`는 부동산 항목에만 있다 |
 
 `AWAIT_ROLL`과 `GAME_OVER`에서는 `pending`이 `null`이다.
 

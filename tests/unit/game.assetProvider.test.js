@@ -16,6 +16,8 @@ import { assertMoneyConserved, buildGame, eventTypes } from '../support/gameBuil
  */
 class FakeDepositAssets {
   #balances;
+  /** 어떤 메서드가 실제로 불렸는지 — "정말 참여했는가"를 증명할 근거. */
+  calls = [];
 
   constructor(balances) {
     this.#balances = new Map(Object.entries(balances));
@@ -51,25 +53,37 @@ class FakeDepositAssets {
   }
 
   liquidate({ playerId }) {
-    const refund = this.#balances.get(playerId) ?? 0;
-    this.#balances.set(playerId, 0);
-    return {
-      refund,
-      intents:
-        refund > 0
-          ? [MoneyIntent.fromBank({ playerId, amount: refund, reason: MONEY_REASONS.LIQUIDATION })]
-          : [],
-      events:
-        refund > 0
-          ? [{ type: EVENT_TYPES.MONEY_GAINED, payload: { playerId, amount: refund, reason: MONEY_REASONS.LIQUIDATION } }]
-          : [],
-    };
+    this.calls.push(`liquidate:${playerId}`);
+    return this.#cashOut(playerId);
   }
 
-  /** 파산: 예금은 은행 것이 되고 현금은 움직이지 않는다(자산을 잃는다). */
+  /**
+   * 파산 청산: **예금은 해지되어 현금으로 돌아온다**(앞으로의 주식·예금·증거금과 같은 성격).
+   * 부동산처럼 그냥 사라지는 자산군이 아니므로, 이 돈이 채권자에게 흘러가야 한다.
+   */
   releaseAllOf(playerId) {
+    this.calls.push(`releaseAllOf:${playerId}`);
+    return this.#cashOut(playerId);
+  }
+
+  #cashOut(playerId) {
+    const refund = this.#balances.get(playerId) ?? 0;
     this.#balances.set(playerId, 0);
-    return { refund: 0, intents: [], events: [] };
+    if (refund <= 0) {
+      return { refund: 0, intents: [], events: [] };
+    }
+    return {
+      refund,
+      intents: [
+        MoneyIntent.fromBank({ playerId, amount: refund, reason: MONEY_REASONS.LIQUIDATION }),
+      ],
+      events: [
+        {
+          type: EVENT_TYPES.MONEY_GAINED,
+          payload: { playerId, amount: refund, reason: MONEY_REASONS.LIQUIDATION },
+        },
+      ],
+    };
   }
 }
 
@@ -127,8 +141,13 @@ describe('Game 자산군 확장(AssetProvider 등록만으로)', () => {
     assert.equal(pending.canSell, true);
     assert.deepEqual(pending.sellable, [
       { assetKind: 'DEPOSIT', assetId: 'main', name: '정기예금', refund: 300_000 },
-      { index: 1, name: '하노이', refund: 30_000 },
+      { index: 1, name: '하노이', refund: 30_000, assetKind: 'PROPERTY', assetId: '1' },
     ]);
+    // 모든 항목은 자산군을 스스로 밝힌다 → 클라이언트가 `assetKind`로 분기할 수 있다.
+    assert.deepEqual(
+      pending.sellable.map((asset) => asset.assetKind),
+      ['DEPOSIT', 'PROPERTY'],
+    );
   });
 
   it('AUTO_SELL은 자산군 우선순위대로 팔아 부동산을 지킨다', () => {
@@ -149,24 +168,38 @@ describe('Game 자산군 확장(AssetProvider 등록만으로)', () => {
     assertMoneyConserved(game, '새 자산군 자동매각 후');
   });
 
-  it('파산하면 등록된 자산군도 함께 청산되고 총자산이 0이 된다', () => {
-    // Given (팔아도 모자라는 예금 1,000 + 대출 이미 사용)
+  it('파산하면 등록된 자산군도 청산되고, 청산 대금이 채권자에게 흘러간다', () => {
+    // Given (하나는 통행료 140,000을 못 내고 대출도 이미 썼다. 예금 1,000,000원이 있다)
     const game = buildGame({
       cash: { s1: 5_000 },
       loans: { s1: { used: true, debt: 0 } },
       cities: [{ index: 3, ownerId: 's2', buildings: ['VILLA', 'BUILDING', 'HOTEL'] }],
       random: new FakeRandomSource([1, 2]),
     });
-    game.registerAssetProvider(new FakeDepositAssets({ s1: 1_000_000 }));
+    const deposits = new FakeDepositAssets({ s1: 1_000_000 });
+    game.registerAssetProvider(deposits);
     game.execute('s1', COMMAND_TYPES.ROLL);
+    assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
+    const creditorBefore = game.playerById('s2').cash;
 
     // When
     const events = game.execute('s1', COMMAND_TYPES.DECLARE_BANKRUPTCY);
 
-    // Then
-    assert.ok(eventTypes(events).includes(EVENT_TYPES.BANKRUPT));
+    // Then (자산군이 실제로 청산에 참여했다)
+    assert.deepEqual(deposits.calls, ['releaseAllOf:s1'], '파산 청산이 자산군을 호출해야 한다');
+    assert.equal(deposits.valueOf('s1'), 0, '예금이 비워져야 한다');
+    assert.ok(
+      eventTypes(events).includes(EVENT_TYPES.MONEY_GAINED),
+      '자산군이 낸 이벤트가 버려지지 않아야 한다',
+    );
+
+    // 청산 대금이 사라지지 않고 채권자에게 갔다: 현금 5,000 + 예금 1,000,000
+    const bankruptEvent = events.find((event) => event.type === EVENT_TYPES.BANKRUPT);
+    assert.equal(bankruptEvent.paidAmount, 1_005_000, '청산 대금이 분배 대상에 포함돼야 한다');
+    assert.equal(game.playerById('s2').cash, creditorBefore + 1_005_000);
+    assert.equal(game.playerById('s1').cash, 0);
     assert.equal(game.playerById('s1').eliminated, true);
-    assert.equal(game.netWorthOf('s1'), 0, '탈락자의 총자산은 자산군과 무관하게 0');
+    assert.equal(game.netWorthOf('s1'), 0);
     assertMoneyConserved(game, '새 자산군 파산 청산 후');
   });
 });

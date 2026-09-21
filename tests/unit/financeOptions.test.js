@@ -7,7 +7,7 @@ import {
   FINANCE_OPTION_KEYS,
   normalizeFinanceOptions,
 } from '../../src/domain/room/FinanceOptions.js';
-import { ROOM_STATUS, Room } from '../../src/domain/room/Room.js';
+import { ROOM_SCHEMA_VERSION, ROOM_STATUS, Room } from '../../src/domain/room/Room.js';
 import { toRoomDto } from '../../src/application/dto.js';
 import { parseHostActionBody } from '../../src/server/validation.js';
 import { DOMAIN_ERROR_CODES } from '../../src/domain/shared/DomainError.js';
@@ -204,6 +204,28 @@ describe('금융 옵션 입력 검증(컨트롤러)', () => {
     });
   });
 
+  it('보낸 키만 도메인으로 넘긴다(생략한 옵션을 기본값으로 되돌리지 않는다)', () => {
+    // Given (한 항목만 바꾸려는 요청 — 컨트롤러가 빈 자리를 채워 넘기면
+    //        도메인의 "생략하면 유지" 규칙이 죽어 나머지가 조용히 초기화된다)
+    const action = parseHostActionBody({
+      type: 'SET_OPTIONS',
+      roundLimit: 20,
+      finance: { tradeTimerSec: 0 },
+    });
+
+    // Then
+    assert.deepEqual(action.finance, { tradeTimerSec: 0 });
+    assert.deepEqual(Object.keys(action.finance), ['tradeTimerSec']);
+  });
+
+  it('빈 finance 객체는 아무 항목도 바꾸지 않는 요청이 된다', () => {
+    // Given / When
+    const action = parseHostActionBody({ type: 'SET_OPTIONS', roundLimit: null, finance: {} });
+
+    // Then
+    assert.deepEqual(action.finance, {});
+  });
+
   it('아직 없는 값·모르는 키·객체가 아닌 finance는 ERR001이다', () => {
     // Given
     const bad = [
@@ -224,6 +246,26 @@ describe('금융 옵션 입력 검증(컨트롤러)', () => {
         `거부되지 않았다: ${JSON.stringify(finance)}`,
       );
     }
+  });
+});
+
+describe('금융 옵션과 스키마 버전의 결합(다음 Phase를 위한 계약)', () => {
+  it('허용 값 목록을 넓히면 스키마 버전도 함께 올려야 한다', () => {
+    // Given (구버전 서버는 모르는 값을 담은 방 파일을 손상으로 보고 **격리**한다. 그래서 값을
+    //        넓히는 변경은 schemaVersion 승급과 함께 가야 한다. 값을 늘리면 이 테스트가
+    //        깨지며 그 약속을 상기시킨다.)
+    const allowedCount = FINANCE_OPTION_KEYS.reduce(
+      (sum, key) => sum + ALLOWED_FINANCE_OPTIONS[key].length,
+      0,
+    );
+
+    // When / Then
+    assert.equal(
+      allowedCount,
+      FINANCE_OPTION_KEYS.length,
+      '허용 값을 추가했다면 ROOM_SCHEMA_VERSION을 올리고 MIGRATIONS에 한 줄 추가한 뒤 이 숫자를 갱신할 것',
+    );
+    assert.equal(ROOM_SCHEMA_VERSION, 2);
   });
 });
 

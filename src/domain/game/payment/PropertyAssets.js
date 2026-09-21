@@ -33,7 +33,13 @@ export class PropertyAssets {
     return PROPERTY_LIQUIDATION_PRIORITY;
   }
 
-  /** 소유한 칸 목록(칸 번호 순). `view`가 그대로 DTO의 `pending.sellable` 항목이 된다. */
+  /**
+   * 소유한 칸 목록(칸 번호 순). `view`가 그대로 DTO의 `pending.sellable` 항목이 된다.
+   *
+   * `index`/`name`/`refund`는 **기존 계약 그대로** 두고, 자산군을 구별할 `assetKind`/`assetId`를
+   * 가산한다. 앞으로 주식·예금이 같은 목록에 섞여도 클라이언트는 `assetKind`로 분기하면 되고,
+   * 이미 있는 화면은 한 줄도 고치지 않아도 된다(Phase 1에서 DTO를 깨지 않기 위한 자리).
+   */
   listOf(playerId) {
     return this.#board.ownedBy(playerId).map((city) => ({
       kind: PROPERTY_ASSET_KIND,
@@ -41,7 +47,13 @@ export class PropertyAssets {
       label: city.name,
       refund: city.liquidationValue(),
       quantity: 1,
-      view: { index: city.index, name: city.name, refund: city.liquidationValue() },
+      view: {
+        index: city.index,
+        name: city.name,
+        refund: city.liquidationValue(),
+        assetKind: PROPERTY_ASSET_KIND,
+        assetId: String(city.index),
+      },
     }));
   }
 

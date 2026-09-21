@@ -195,11 +195,24 @@ export class Game {
       round: snapshot.round ?? 1,
       version: snapshot.version ?? 0,
       options: snapshot.options ?? { roundLimit: null },
-      initialTotal:
-        snapshot.initialTotal ??
-        players.reduce((sum, player) => sum + player.cash, 0) + (snapshot.casino?.jackpot ?? 0),
+      // 초기 총액이 없는 아주 오래된 스냅샷: 보존 불변식을 거꾸로 풀어 되살린다.
+      // `총현금 + 잭팟 = 초기총액 + 은행순유입`이므로 초기총액 = 총현금 + 잭팟 − 은행순유입이다.
+      // (단순히 현재 총액으로 두면 그 방은 복원 직후부터 불변식이 거짓이 되어 첫 커맨드에서 멈춘다.)
+      initialTotal: snapshot.initialTotal ?? Game.#inferInitialTotal(snapshot, players),
       turn: { ...EMPTY_TURN, ...(snapshot.turn ?? {}) },
     });
+  }
+
+  /**
+   * `initialTotal`이 없는 스냅샷의 초기 총액을 보존 불변식에서 역산한다.
+   * @param {object} snapshot
+   * @param {Player[]} players
+   */
+  static #inferInitialTotal(snapshot, players) {
+    const totalCash = players.reduce((sum, player) => sum + player.cash, 0);
+    const jackpot = snapshot.casino?.jackpot ?? 0;
+    const netFromBank = (snapshot.ledger?.fromBank ?? 0) - (snapshot.ledger?.toBank ?? 0);
+    return Math.max(0, totalCash + jackpot - netFromBank);
   }
 
   // ── 조회 ────────────────────────────────────────────────────────────────
@@ -963,8 +976,18 @@ export class Game {
     this.#bankrupt(this.#current);
   }
 
-  /** 파산: 남은 현금을 채권자에게 넘기고 모든 자산을 초기화한 뒤 탈락한다. */
+  /**
+   * 파산: 모든 자산을 청산하고 남은 현금을 채권자에게 넘긴 뒤 탈락한다.
+   *
+   * **청산이 분배보다 먼저다**(설계 §4.7). 자산군이 청산 대금을 돌려주는 종류(주식·예금·증거금)면
+   * 그 돈도 채권자에게 가야 하므로, `plan()`이 남은 현금을 읽기 **전에** 청산을 끝낸다.
+   * 부동산은 환급 없이 주인만 사라지므로 오늘은 두 순서의 결과가 같다.
+   */
   #bankrupt(player) {
+    const liquidation = this.#bankruptcy.liquidateAll(player.id);
+    this.#treasury.apply(liquidation.intents);
+    this.#emitAll(liquidation.events);
+
     const plan = this.#bankruptcy.plan({
       player,
       note: this.#payment.note,
@@ -986,7 +1009,7 @@ export class Game {
       }
     }
 
-    const { releasedIndexes } = this.#bankruptcy.liquidateAll(player.id);
+    const releasedIndexes = liquidation.releasedIndexes;
     player.eliminate();
     this.#payment.clear();
     this.#phase = PHASES.AWAIT_ROLL;
@@ -1028,11 +1051,12 @@ export class Game {
     const result = this.#clock.advance({ players: this.#players });
 
     if (result.intents.length > 0) {
-      this.#treasury.apply(result.intents);
+      const { jackpotChanged } = this.#treasury.apply(result.intents);
+      if (jackpotChanged) {
+        this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
+      }
     }
-    for (const event of result.events) {
-      this.#emit(event.type, event.payload);
-    }
+    this.#emitAll(result.events);
 
     if (result.outcome === TURN_OUTCOMES.GAME_OVER) {
       this.#gameOver(result.reason);

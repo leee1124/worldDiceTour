@@ -3,11 +3,7 @@ import { BUILDING_TYPES } from '../domain/game/City.js';
 import { CASINO_GAMES, HIGH_LOW_SEVEN_CHOICES, ODD_EVEN_CHOICES } from '../domain/game/Casino.js';
 import { BOARD_SIZE } from '../domain/game/data/board.js';
 import { ALLOWED_ROUND_LIMITS } from '../domain/room/Room.js';
-import {
-  ALLOWED_FINANCE_OPTIONS,
-  DEFAULT_FINANCE_OPTIONS,
-  FINANCE_OPTION_KEYS,
-} from '../domain/room/FinanceOptions.js';
+import { ALLOWED_FINANCE_OPTIONS, FINANCE_OPTION_KEYS } from '../domain/room/FinanceOptions.js';
 import { HOST_ACTIONS } from '../application/hostActions.js';
 import { AppError } from '../application/errors.js';
 
@@ -186,15 +182,19 @@ function requireFinanceOptions(value) {
       throw invalid(`알 수 없는 finance 옵션: ${safeText(key)}`);
     }
   }
-  const normalized = {};
+  // **보낸 키만** 통과시킨다. 빈 자리를 기본값으로 채워 넘기면 도메인의 "생략한 옵션은 유지"
+  // 규칙이 죽어, 한 항목만 바꾸려던 호스트가 나머지를 조용히 기본값으로 되돌리게 된다.
+  const checked = {};
   for (const key of FINANCE_OPTION_KEYS) {
-    const chosen = value[key] === undefined ? DEFAULT_FINANCE_OPTIONS[key] : value[key];
-    if (!ALLOWED_FINANCE_OPTIONS[key].includes(chosen)) {
-      throw invalid(`finance.${key} 값 오류: ${safeText(chosen)}`);
+    if (value[key] === undefined) {
+      continue;
     }
-    normalized[key] = chosen;
+    if (!ALLOWED_FINANCE_OPTIONS[key].includes(value[key])) {
+      throw invalid(`finance.${key} 값 오류: ${safeText(value[key])}`);
+    }
+    checked[key] = value[key];
   }
-  return normalized;
+  return checked;
 }
 
 /** 게임 커맨드 본문. 커맨드별 payload 화이트리스트. */

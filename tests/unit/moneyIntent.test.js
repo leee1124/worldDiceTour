@@ -144,6 +144,81 @@ describe('MoneyIntent(돈 이동 의사 VO)', () => {
     );
   });
 
+  it('알 수 없는 상대방은 거부한다', () => {
+    // Given / When / Then
+    assert.throws(
+      () =>
+        new MoneyIntent({
+          playerId: 's1',
+          amount: -10,
+          counterparty: 'MARS',
+          reason: MONEY_REASONS.TICKET,
+        }),
+      { message: /알 수 없는 상대방/ },
+    );
+  });
+
+  it('상대 좌석이 없는 이동에 상대 좌석을 적으면 거부한다', () => {
+    // Given (BANK·JACKPOT 이동에 상대 좌석이 붙어 있으면 어느 쪽 규칙을 따를지 모호해진다)
+    // When / Then
+    assert.throws(
+      () =>
+        new MoneyIntent({
+          playerId: 's1',
+          amount: -10,
+          counterparty: COUNTERPARTIES.BANK,
+          otherPlayerId: 's2',
+          reason: MONEY_REASONS.TICKET,
+        }),
+      { message: /상대 좌석이 없어야/ },
+    );
+  });
+
+  it('좌석 간 이동에 상대 좌석이 없으면 거부한다', () => {
+    // Given / When / Then
+    assert.throws(
+      () =>
+        new MoneyIntent({
+          playerId: 's1',
+          amount: -10,
+          counterparty: COUNTERPARTIES.PLAYER,
+          reason: MONEY_REASONS.TOLL,
+        }),
+      { message: /상대 좌석 식별자/ },
+    );
+  });
+
+  it('meta가 객체가 아니면 거부한다', () => {
+    // Given / When / Then
+    assert.throws(
+      () =>
+        MoneyIntent.toBank({
+          playerId: 's1',
+          amount: 10,
+          reason: MONEY_REASONS.TICKET,
+          meta: 'ticket',
+        }),
+      { message: /meta는 객체/ },
+    );
+  });
+
+  it('금액 0은 -0이 아니라 0으로 정규화된다(스냅샷·비교가 흔들리지 않게)', () => {
+    // Given / When
+    const paid = MoneyIntent.toBank({ playerId: 's1', amount: 0, reason: MONEY_REASONS.TICKET });
+    const moved = MoneyIntent.transfer({
+      fromId: 's1',
+      toId: 's2',
+      amount: 0,
+      reason: MONEY_REASONS.TICKET,
+    });
+
+    // Then
+    assert.ok(Object.is(paid.amount, 0), `-0이 새어 나왔다: ${paid.amount}`);
+    assert.ok(Object.is(moved.amount, 0), `-0이 새어 나왔다: ${moved.amount}`);
+    assert.ok(Object.is(assertAmount(-0), 0), 'assertAmount가 -0을 정규화해야 한다');
+    assert.ok(Object.is(assertSignedAmount(-0), 0), 'assertSignedAmount가 -0을 정규화해야 한다');
+  });
+
   it('음수 금액이나 비정수 금액으로는 만들 수 없다', () => {
     // Given / When / Then
     assert.throws(

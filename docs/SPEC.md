@@ -402,7 +402,16 @@ AssetProvider = { kind, liquidationPriority, listOf(playerId), valueOf(playerId)
 - 옵션은 **대기실에서만** 바꿀 수 있다. `START` 시점의 옵션이 판 내내 고정된다 — 밸런스·불변식이 판
   중간에 바뀌면 안 된다.
 - `schemaVersion: 2`. 없으면 1로 보고 `migrateRoomSnapshot()`이 단계별로 올린다(v1 → v2는 금융 옵션
-  기본값 채우기). **미래 버전은 거부한다** — 모르는 필드를 무시하고 진행하면 그 방을 덮어써서 잃는다.
-  `deserializeRoom` = 승급 → 검증 → 복원.
+  기본값 채우기). `deserializeRoom` = 승급 → 검증 → 복원.
+- **미래 버전 파일은 거부하되 손대지 않는다.** 손상(`RoomSchemaError` → 격리)과 달리 "이 서버보다
+  새로운 파일"(`RoomVersionError`)은 멀쩡하므로 **건너뛰기만** 하고 이름을 바꾸지 않으며, 그 방 코드는
+  예약된 것으로 취급해 새 방이 차지하지 못하게 한다. 거부의 목적이 "롤백 한 번에 판을 잃지 않는 것"이라
+  격리해 버리면 그 목적이 무너지기 때문이다.
+- **허용 값 목록을 넓히는 변경은 `ROOM_SCHEMA_VERSION` 승급과 함께 가야 한다.** 구버전 서버는 모르는
+  값을 담은 파일을 손상으로 보고 격리한다(`tests/unit/financeOptions.test.js`가 이 약속을 지킨다).
+- 금액 필드는 검증기도 도메인과 **같은 범위**(`Number.isSafeInteger` + `MAX_MONEY`)만 통과시킨다.
+  `1e300`이나 `2^53+1`이 통과하면 복원된 방의 보존 불변식이 처음부터 거짓이 되거나 값이 조용히 달라진다.
+- 건설·인수 대상 칸은 범위뿐 아니라 **소유 가능한 칸인지**까지 검증한다. `buildIndex: 0`(출발 칸) 같은
+  스냅샷이 통과하면 그 방은 조회·SSE·자동 진행이 영구히 실패하면서도 격리되지 않는다.
 - 검증기는 서브시스템별로 쪼개져 있다(`GAME_SUBSYSTEM_VALIDATORS`). 다음 Phase는 이 목록에 한 줄만
   추가한다.

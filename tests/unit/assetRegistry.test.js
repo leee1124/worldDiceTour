@@ -108,11 +108,12 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
     const sellable = registry.sellableOf('s1');
 
     // Then
+    // 기존 계약(index/name/refund)은 그대로 두고 자산군 구별 필드만 가산한다.
     assert.deepEqual(
       sellable.map((asset) => asset.view),
       [
-        { index: 1, name: '하노이', refund: 30_000 },
-        { index: 39, name: '서울', refund: 400_000 },
+        { index: 1, name: '하노이', refund: 30_000, assetKind: 'PROPERTY', assetId: '1' },
+        { index: 39, name: '서울', refund: 400_000, assetKind: 'PROPERTY', assetId: '39' },
       ],
     );
   });

@@ -198,6 +198,15 @@ describe('migrateRoomSnapshot(스키마 승급)', () => {
     }
   });
 
+  it('승급 단계가 전진하지 않거나 버전을 남기지 않으면 부팅이 멈추지 않고 거부된다', () => {
+    // Given (목록을 잘못 적으면 while 루프가 영원히 돌아 서버 부팅이 멈춘다 —
+    //        그 실수는 예외로 드러나야 한다. 단계 목록이 실제로 전진하는지 계약으로 고정한다.)
+    // When / Then
+    assert.equal(CURRENT_ROOM_SCHEMA_VERSION, 2);
+    const migrated = migrateRoomSnapshot(v1());
+    assert.equal(migrated.schemaVersion, CURRENT_ROOM_SCHEMA_VERSION, '단계가 버전을 남겨야 한다');
+  });
+
   it('객체가 아닌 값은 거부한다', () => {
     // Given / When / Then
     for (const raw of [null, undefined, 'room', 7, []]) {
@@ -220,5 +229,116 @@ describe('migrateRoomSnapshot(스키마 승급)', () => {
       RoomSchemaError,
       '검증기는 승급이 끝난 스냅샷만 받는다',
     );
+  });
+});
+
+describe('손상된 저장 파일 방어(복원 전에 걸러낸다)', () => {
+  const playing = () => JSON.parse(legacy('playing'));
+
+  it('안전 정수가 아니거나 상한을 넘는 금액은 복원 전에 거부한다', () => {
+    // Given (Number.isInteger는 1e300도 참이다. 그런 값이 통과하면 복원된 방의 보존
+    //        불변식이 처음부터 거짓이 되어 첫 커맨드에서 멈춘다. 2^53+1은 더 나쁘다 —
+    //        조용히 다른 값이 된다.)
+    const corruptions = [
+      ['현금이 안전 정수가 아니면', (game) => { game.players[0].cash = 1e300; }],
+      ['현금이 2^53을 넘으면', (game) => { game.players[0].cash = 9_007_199_254_740_993; }],
+      ['현금이 금액 상한을 넘으면', (game) => { game.players[0].cash = 2_000_000_000_000; }],
+      ['대출 채무가 상한을 넘으면', (game) => { game.players[0].loanDebt = 1e300; }],
+      ['잭팟이 안전 정수가 아니면', (game) => { game.casino.jackpot = 1e300; }],
+      ['초기 총액이 상한을 넘으면', (game) => { game.initialTotal = 1e300; }],
+      ['장부 값이 상한을 넘으면', (game) => { game.ledger.fromBank = 1e300; }],
+      ['장부 사유 순액이 안전 정수가 아니면', (game) => { game.ledger.byReason = { TAX: 1e300 }; }],
+    ];
+
+    // When / Then
+    for (const [label, corrupt] of corruptions) {
+      const snapshot = playing();
+      corrupt(snapshot.game);
+      assert.throws(
+        () => deserializeRoom(snapshot, new FakeRandomSource()),
+        RoomSchemaError,
+        `${label} 거부해야 한다`,
+      );
+    }
+  });
+
+  it('건설·인수 대상이 소유할 수 없는 칸이면 복원 전에 거부한다', () => {
+    // Given (범위만 보면 buildIndex: 0(출발 칸)이 통과해 격리되지 않는데, 그 방은
+    //        pendingDecision이 매번 터져 조회·SSE·자동 진행이 영구히 실패한다)
+    const corruptions = [
+      ['건설 칸이 출발 칸이면', (game) => { game.phase = 'AWAIT_BUILD'; game.turn.buildIndex = 0; }],
+      ['건설 칸이 티켓 칸이면', (game) => { game.phase = 'AWAIT_BUILD'; game.turn.buildIndex = 2; }],
+      ['인수 칸이 카지노 칸이면', (game) => { game.phase = 'AWAIT_ACQUIRE'; game.turn.acquireIndex = 20; }],
+    ];
+
+    // When / Then
+    for (const [label, corrupt] of corruptions) {
+      const snapshot = playing();
+      corrupt(snapshot.game);
+      assert.throws(
+        () => deserializeRoom(snapshot, new FakeRandomSource()),
+        RoomSchemaError,
+        `${label} 거부해야 한다`,
+      );
+    }
+  });
+
+  it('소유할 수 있는 칸이면 통과한다(거짓 양성 방어)', () => {
+    // Given (거짓 양성 하나면 멀쩡한 방이 삭제된다)
+    const snapshot = playing();
+    snapshot.game.phase = 'AWAIT_BUILD';
+    snapshot.game.turn.buildIndex = 39; // 서울(도시)
+    snapshot.game.turn.acquireIndex = null;
+
+    // When / Then
+    assert.doesNotThrow(() => deserializeRoom(snapshot, new FakeRandomSource()));
+  });
+
+  it('초기 총액이 없던 아주 오래된 방도 불변식을 만족한 상태로 복원된다', () => {
+    // Given (그냥 현재 총액으로 두면 은행 순유입만큼 어긋나 첫 커맨드에서 멈춘다)
+    const snapshot = playing();
+    const expected = snapshot.game.initialTotal;
+    delete snapshot.game.initialTotal;
+    assert.ok(
+      snapshot.game.ledger.fromBank - snapshot.game.ledger.toBank !== 0,
+      '픽스처의 은행 순유입이 0이 아니어야 의미 있는 검증이 된다',
+    );
+
+    // When
+    const room = deserializeRoom(snapshot, new FakeRandomSource());
+    const report = room.game.moneyReport();
+
+    // Then
+    assert.equal(report.balanced, true, JSON.stringify(report));
+    assert.equal(report.initialTotal, expected, '보존 불변식에서 역산한 값이 원래 값과 같다');
+  });
+
+  it('손상된 값이 오류 메시지를 만들다 원시 TypeError로 새지 않는다', () => {
+    // Given (`${value}`는 {"toString":1} 같은 값에서 터진다 — 그러면 규격 RoomSchemaError가
+    //        아예 만들어지지 않는다. server/validation.js의 safeText와 같은 방어다.)
+    const poison = { toString: 1, valueOf: 1 };
+    const fields = [
+      (game) => { game.phase = poison; },
+      (game) => { game.players[0].cash = poison; },
+      (game) => { game.players[0].position = poison; },
+      (game) => { game.casino.jackpot = poison; },
+      (game) => { game.ledger.fromBank = poison; },
+      (game) => { game.turn.buildIndex = poison; },
+      (game) => { game.turn.casinoRoundsLeft = poison; },
+    ];
+
+    // When / Then
+    for (const corrupt of fields) {
+      const snapshot = playing();
+      corrupt(snapshot.game);
+      assert.throws(() => deserializeRoom(snapshot, new FakeRandomSource()), RoomSchemaError);
+    }
+    // 방 수준 필드도 같다
+    const roomLevel = playing();
+    roomLevel.status = poison;
+    assert.throws(() => deserializeRoom(roomLevel, new FakeRandomSource()), RoomSchemaError);
+    const version = playing();
+    version.schemaVersion = poison;
+    assert.throws(() => migrateRoomSnapshot(version), RoomSchemaError);
   });
 });

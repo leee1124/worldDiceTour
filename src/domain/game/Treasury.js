@@ -28,16 +28,8 @@ export class Treasury {
     this.#initialTotal = assertAmount(initialTotal, '초기 총액');
   }
 
-  get ledger() {
-    return this.#ledger;
-  }
-
   get jackpot() {
     return this.#casino.jackpot;
-  }
-
-  get initialTotal() {
-    return this.#initialTotal;
   }
 
   /**

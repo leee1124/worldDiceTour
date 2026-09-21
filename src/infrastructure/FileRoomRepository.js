@@ -2,7 +2,12 @@ import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:
 import path from 'node:path';
 
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
-import { RoomSchemaError, parseRoomJson, serializeRoom } from './RoomSerializer.js';
+import {
+  RoomSchemaError,
+  RoomVersionError,
+  parseRoomJson,
+  serializeRoom,
+} from './RoomSerializer.js';
 
 /** 해석할 수 없는 저장 파일에 붙이는 꼬리표. 이 확장자는 조회/목록 경로가 모두 무시한다. */
 const CORRUPT_SUFFIX = '.corrupt';
@@ -21,6 +26,12 @@ export class FileRoomRepository {
   #logger;
   /** @type {Map<string, object>} code → RoomSummary */
   #summaries = new Map();
+  /**
+   * 이 서버보다 새로운 저장 파일이 놓인 방 코드.
+   * 격리하지 않고 건너뛴 코드이므로, 새 방이 이 코드를 차지하면 그 판을 덮어써 잃는다.
+   * @type {Set<string>}
+   */
+  #versionLocked = new Set();
   /** 디렉터리 생성은 한 번만(저장마다 mkdir 시스템 호출을 하지 않는다). */
   #ready = null;
 
@@ -185,18 +196,40 @@ export class FileRoomRepository {
     }
   }
 
-  /** 스키마가 깨진 파일은 격리하고(게임을 이어갈 수 없으므로) 로그를 남긴다. */
+  /**
+   * 스키마가 깨진 파일은 격리하고(게임을 이어갈 수 없으므로) 로그를 남긴다.
+   *
+   * 단 **미래 스키마 버전**(`RoomVersionError`)은 손상이 아니다 — 파일은 멀쩡하고 더 새 서버로
+   * 되돌리면 그대로 이어진다. 그래서 건너뛰기만 하고 파일 이름을 바꾸지 않으며, 그 방 코드는
+   * `#versionLocked`에 남겨 **새 방이 같은 코드를 차지해 덮어쓰지 못하게** 한다.
+   */
   async #parse(code, text) {
     try {
       const room = parseRoomJson(text, this.#random);
+      this.#versionLocked.delete(code);
       this.#summaries.set(room.code, room.toSummary());
       return room;
     } catch (error) {
+      this.#summaries.delete(code);
+      if (error instanceof RoomVersionError) {
+        this.#versionLocked.add(code);
+        this.#logger.error(
+          `[FileRoomRepository] 이 서버보다 새로운 저장 파일을 건너뜁니다 ${code}: ${error.message}`,
+        );
+        return null;
+      }
       const label = error instanceof RoomSchemaError ? '저장 파일 스키마 오류' : '방 복원 실패';
       this.#logger.error(`[FileRoomRepository] ${label} ${code}: ${error.message}`);
-      this.#summaries.delete(code);
       await this.#quarantine(code, error.message);
       return null;
     }
+  }
+
+  /**
+   * 그 방 코드를 새 방이 쓸 수 있는지. 미래 버전 파일이 놓인 코드는 **이미 쓰이는 중**이다
+   * (덮어쓰면 그 판이 사라진다).
+   */
+  isCodeReserved(code) {
+    return this.#versionLocked.has(code);
   }
 }

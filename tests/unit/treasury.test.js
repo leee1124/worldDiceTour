@@ -343,8 +343,35 @@ describe('Treasury(돈 이동의 유일한 통로)', () => {
       const { treasury } = createTreasury();
 
       // When / Then
-      assert.throws(() => treasury.apply(null), DomainError);
-      assert.throws(() => treasury.apply([{ playerId: 's1', amount: -1 }]), DomainError);
+      assert.throws(() => treasury.apply(null), {
+        message: /배열이 아닙니다/,
+      });
+    });
+
+    it('MoneyIntent가 아닌 값은 적용하기 전에 거부한다(돈을 옮기지 않는다)', () => {
+      // Given (직렬화를 거친 평범한 객체가 섞여 들어오면, 상대방을 알 수 없으므로
+      //        은행 지불로 오해되어 장부를 우회할 수 있다)
+      const { treasury, byId, ledger } = createTreasury();
+
+      // When / Then
+      assert.throws(() => treasury.apply([{ playerId: 's1', amount: -1_000, counterparty: 'BANK' }]), {
+        message: /MoneyIntent가 아닌/,
+      });
+      assert.equal(byId('s1').cash, 1_000_000, '거부되면 현금이 그대로다');
+      assert.equal(ledger.netFromBank, 0);
+    });
+
+    it('빈 목록을 적용하면 아무 일도 일어나지 않는다', () => {
+      // Given
+      const { treasury, ledger } = createTreasury();
+
+      // When
+      const result = treasury.apply([]);
+
+      // Then
+      assert.equal(result.jackpotChanged, false);
+      assert.deepEqual(ledger.breakdown, {});
+      assert.equal(treasury.report().balanced, true);
     });
   });
 });

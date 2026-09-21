@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RoundClock, TURN_OUTCOMES } from '../../src/domain/game/RoundClock.js';
+import { DomainError } from '../../src/domain/shared/DomainError.js';
 import { EVENT_TYPES, GAME_OVER_REASONS } from '../../src/domain/game/events.js';
 import { MONEY_REASONS } from '../../src/domain/shared/MoneyIntent.js';
 import { MoneyIntent } from '../../src/domain/shared/MoneyIntent.js';
@@ -237,6 +238,30 @@ describe('RoundClock(라운드 전이와 틱 훅)', () => {
       assert.deepEqual(result.events, [
         { type: EVENT_TYPES.ROUND_ADVANCED, payload: { round: 2 } },
       ]);
+    });
+
+    it('생성 인자가 올바르지 않으면 거부한다', () => {
+      // Given (손상된 스냅샷이 라운드 0이나 소수 인덱스로 시계를 만들지 못하게)
+      const bad = [
+        { round: 0 },
+        { round: 1.5 },
+        { round: 'one' },
+        { turnIndex: -1 },
+        { turnIndex: 1.5 },
+        { roundLimit: 0 },
+        { roundLimit: 1.5 },
+        { roundLimit: 'none' },
+      ];
+
+      // When / Then
+      for (const options of bad) {
+        assert.throws(
+          () => new RoundClock(options),
+          DomainError,
+          `거부되지 않았다: ${JSON.stringify(options)}`,
+        );
+      }
+      assert.doesNotThrow(() => new RoundClock({ round: 1, turnIndex: 0, roundLimit: null }));
     });
 
     it('같은 이름의 훅이나 형태가 틀린 훅은 거부한다', () => {

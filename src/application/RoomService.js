@@ -361,9 +361,15 @@ export class RoomService {
   async #generateUniqueCode() {
     for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt += 1) {
       const code = generateRoomCode(this.#random);
-      if (!(await this.#repository.findByCode(code))) {
-        return code;
+      if (await this.#repository.findByCode(code)) {
+        continue;
       }
+      // 저장소가 "이 코드는 쓰는 중"이라고 하면(예: 이 서버보다 새로운 저장 파일이 놓인 코드)
+      // 불러오지 못했더라도 차지하지 않는다 — 차지하면 그 판을 덮어써 잃는다.
+      if (this.#repository.isCodeReserved?.(code)) {
+        continue;
+      }
+      return code;
     }
     throw new AppError('ERR010', '빈 방 코드를 찾지 못했습니다');
   }

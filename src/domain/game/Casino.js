@@ -51,6 +51,9 @@ export class Casino {
       throw DomainError.invalidArgument(`잭팟 적립액이 올바르지 않습니다: ${amount}`);
     }
     assertAmount(amount, '잭팟 적립액');
+    // 적립액만이 아니라 **누적 결과**도 상한 안이어야 한다. 손상된 스냅샷이 반복 적립으로
+    // 안전 정수 경계까지 자라는 것을 그 자리에서 멈춘다.
+    assertAmount(this.#jackpot + amount, '잭팟 적립금');
     this.#jackpot += amount;
     return amount;
   }
