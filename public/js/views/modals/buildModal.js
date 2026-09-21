@@ -87,7 +87,7 @@ export function createBuildingPicker({ options, price, buildings, landmark, cash
   return { element, selected, refresh };
 }
 
-export function buildModalSpec({ pending, space, cash, keepBody, onBuild, onSkip }) {
+export function buildModalSpec({ pending, space, cash, keepBody, locked = false, onBuild, onSkip }) {
   const landmarkOffer = isLandmarkOffer(pending.options);
   const price = space?.price ?? 0;
 
@@ -100,7 +100,7 @@ export function buildModalSpec({ pending, space, cash, keepBody, onBuild, onSkip
     dismissible: false,
     keepBody,
     render: () => {
-      const confirmButton = primaryButton('건설하기', { onClick: () => {}, disabled: true, focusKey: 'build' });
+      const confirmButton = primaryButton('건설하기', { onClick: () => {}, disabled: true, busy: locked, focusKey: 'build' });
       const picker = createBuildingPicker({
         options: pending.options,
         price,
@@ -108,7 +108,7 @@ export function buildModalSpec({ pending, space, cash, keepBody, onBuild, onSkip
         landmark: Boolean(pending.landmark),
         cash,
         onValidityChange: ({ ok, cost }) => {
-          confirmButton.disabled = !ok;
+          confirmButton.disabled = !ok || locked;
           setText(confirmButton, cost > 0 ? `${formatWon(cost)} 들여 건설` : '건설하기');
         },
       });
@@ -133,7 +133,7 @@ export function buildModalSpec({ pending, space, cash, keepBody, onBuild, onSkip
             }),
         picker.element,
         cash <= 0 ? noticeLine('현금이 없어 건설할 수 없습니다.') : null,
-        actionRow([confirmButton, quietButton('건설 포기', { onClick: onSkip, focusKey: 'skip-build' })]),
+        actionRow([confirmButton, quietButton('건설 포기', { onClick: onSkip, busy: locked, focusKey: 'skip-build' })]),
       ]);
       picker.refresh();
       return body;

@@ -8,7 +8,7 @@ import { actionRow, infoRow, moneyRow, noticeLine, primaryButton, quietButton } 
 
 export const ISLAND_MODAL_ID = 'island';
 
-export function islandModalSpec({ pending, cash, onPay, onRoll }) {
+export function islandModalSpec({ pending, cash, locked = false, onPay, onRoll }) {
   return {
     id: ISLAND_MODAL_ID,
     title: '🏝 조난 섬',
@@ -34,9 +34,10 @@ export function islandModalSpec({ pending, cash, onPay, onRoll }) {
           primaryButton(`구조비 ${formatWon(pending.fee)} 지불`, {
             onClick: onPay,
             disabled: !pending.canPayFee,
+            busy: locked,
             focusKey: 'island-pay',
           }),
-          quietButton('🎲 주사위로 탈출 시도', { onClick: onRoll, focusKey: 'island-roll' }),
+          quietButton('🎲 주사위로 탈출 시도', { onClick: onRoll, busy: locked, focusKey: 'island-roll' }),
         ]),
       ]),
   };

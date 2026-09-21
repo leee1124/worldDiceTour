@@ -10,7 +10,7 @@ import { actionRow, citySummary, moneyRow, noticeLine, primaryButton, quietButto
 
 export const ACQUIRE_MODAL_ID = 'acquire';
 
-export function acquireModalSpec({ pending, space, ownerName, cash, onAcquire, onSkip }) {
+export function acquireModalSpec({ pending, space, ownerName, cash, locked = false, onAcquire, onSkip }) {
   const affordable = cash >= pending.price;
 
   return {
@@ -46,9 +46,10 @@ export function acquireModalSpec({ pending, space, ownerName, cash, onAcquire, o
           primaryButton(`${formatWon(pending.price)}에 인수`, {
             onClick: onAcquire,
             disabled: !affordable,
+            busy: locked,
             focusKey: 'acquire',
           }),
-          quietButton('인수 포기', { onClick: onSkip, focusKey: 'skip-acquire' }),
+          quietButton('인수 포기', { onClick: onSkip, busy: locked, focusKey: 'skip-acquire' }),
         ]),
       ]),
   };

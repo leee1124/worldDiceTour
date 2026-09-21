@@ -20,6 +20,7 @@ export function liquidationModalSpec({
   cash,
   creditorName,
   keepBody,
+  locked = false,
   onSell,
   onAutoSell,
   onTakeLoan,
@@ -48,6 +49,8 @@ export function liquidationModalSpec({
               button(
                 {
                   class: 'btn btn--danger',
+                  disabled: locked,
+                  'aria-busy': locked ? 'true' : undefined,
                   dataset: { focusKey: 'bankrupt-confirm' },
                   on: { click: onDeclareBankruptcy },
                 },
@@ -79,6 +82,8 @@ export function liquidationModalSpec({
               button(
                 {
                   class: 'btn btn--ghost btn--small',
+                  disabled: locked,
+                  'aria-busy': locked ? 'true' : undefined,
                   dataset: { focusKey: `sell-${item.index}` },
                   on: { click: () => onSell(item.index) },
                 },
@@ -107,7 +112,8 @@ export function liquidationModalSpec({
             button(
               {
                 class: 'btn btn--ghost',
-                disabled: !pending.canSell,
+                disabled: !pending.canSell || locked,
+                'aria-busy': locked ? 'true' : undefined,
                 dataset: { focusKey: 'auto-sell' },
                 on: { click: onAutoSell },
               },
@@ -116,7 +122,8 @@ export function liquidationModalSpec({
             button(
               {
                 class: 'btn btn--ghost',
-                disabled: !pending.canLoan,
+                disabled: !pending.canLoan || locked,
+                'aria-busy': locked ? 'true' : undefined,
                 dataset: { focusKey: 'take-loan' },
                 on: { click: onTakeLoan },
               },

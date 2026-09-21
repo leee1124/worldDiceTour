@@ -151,11 +151,16 @@
 }
 
 .cell-name {
+  display: -webkit-box;
+  overflow: hidden;
+  width: 100%;
   font-size: 0.95em;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1.1;
   word-break: keep-all;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .cell-name--tight {
@@ -164,6 +169,21 @@
 
 .cell-name--tiny {
   font-size: 0.7em;
+}
+
+/* 좁은 보드(모바일)에서는 축약 이름도 한 단계 더 줄인다(아래에 두어 위 기본값을 덮는다). */
+@container (max-width: 26rem) {
+  .cell-name {
+    font-size: 0.86em;
+  }
+
+  .cell-name--tight {
+    font-size: 0.74em;
+  }
+
+  .cell-name--tiny {
+    font-size: 0.64em;
+  }
 }
 
 .cell-hint {
@@ -272,6 +292,11 @@
 .board-stage--picking .cell--forbidden {
   filter: grayscale(0.7) brightness(0.72);
   cursor: not-allowed;
+}
+
+/* 목적지 선택 중에도 커맨드가 오가는 동안에는 칸 탭을 막는다. */
+.board-stage--locked .cell {
+  cursor: wait;
 }
 
 .cell--selected {

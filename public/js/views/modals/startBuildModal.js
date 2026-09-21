@@ -11,7 +11,7 @@ import { createBuildingPicker } from './buildModal.js';
 
 export const START_BUILD_MODAL_ID = 'start-build';
 
-export function startBuildModalSpec({ pending, boardOf, cash, keepBody, onStartBuild, onSkip }) {
+export function startBuildModalSpec({ pending, boardOf, cash, keepBody, locked = false, onStartBuild, onSkip }) {
   const candidates = pending.candidates ?? [];
 
   return {
@@ -22,7 +22,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, onStartB
     keepBody,
     render: () => {
       const pickerSlot = el('div', { class: 'candidate-picker' });
-      const confirmButton = primaryButton('건설하기', { onClick: () => {}, disabled: true, focusKey: 'start-build' });
+      const confirmButton = primaryButton('건설하기', { onClick: () => {}, disabled: true, busy: locked, focusKey: 'start-build' });
       const cityButtons = new Map();
       let chosenIndex = candidates[0]?.index ?? null;
       let picker = null;
@@ -42,7 +42,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, onStartB
           landmark: Boolean(space?.landmark),
           cash,
           onValidityChange: ({ ok, cost }) => {
-            confirmButton.disabled = !ok;
+            confirmButton.disabled = !ok || locked;
             setText(confirmButton, cost > 0 ? `${formatWon(cost)} 들여 건설` : '건설하기');
           },
         });
@@ -69,6 +69,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, onStartB
             class: 'candidate-row',
             'aria-pressed': 'false',
             dataset: { focusKey: `candidate-${candidate.index}` },
+            disabled: locked,
             on: { click: () => selectCity(candidate.index) },
           },
           [
@@ -95,7 +96,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, onStartB
         el('p', { class: 'modal-help', text: '랜드마크가 완성된 도시는 후보에 나오지 않습니다.' }),
         list,
         pickerSlot,
-        actionRow([confirmButton, quietButton('보너스 포기', { onClick: onSkip, focusKey: 'skip-start-build' })]),
+        actionRow([confirmButton, quietButton('보너스 포기', { onClick: onSkip, busy: locked, focusKey: 'skip-start-build' })]),
       ]);
 
       if (chosenIndex !== null) {

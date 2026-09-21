@@ -21,6 +21,9 @@ import {
 } from './store.js';
 import { setHidden } from './dom.js';
 import { buildCostOf } from './domain/buildRules.js';
+import { createCommandLock } from './domain/commandLock.js';
+import { inferGameOverReason } from './domain/gameOverReason.js';
+import { isRoomGoneError } from './domain/roomErrors.js';
 import { EventPlaybackQueue } from './animation/EventQueue.js';
 import { createPlaybackEngine } from './animation/playback.js';
 import { createToastHost } from './views/toast.js';
@@ -59,7 +62,14 @@ export function createGameController({ appRoot, overlayRoot }) {
   let reconnectTimer = null;
   let reconnectAttempt = 0;
   let roomListTimer = null;
-  let commandInFlight = false;
+  const commandLock = createCommandLock();
+  /** 마지막 GAME_OVER 이벤트의 종료 사유. 재접속 스냅샷에는 이벤트가 없으므로 뷰에서 추정한다. */
+  let gameOverReason = null;
+
+  /** 잠금 상태가 바뀔 때마다 화면에 반영한다(모든 커맨드 버튼의 disabled/aria-busy 기준). */
+  function syncLock() {
+    store.patch({ locked: commandLock.locked });
+  }
 
   /* ── 뷰 구성 ──────────────────────────────────────────────── */
 
@@ -120,7 +130,16 @@ export function createGameController({ appRoot, overlayRoot }) {
     casino: casinoView,
     isCasinoOpen: () => modalHost.isOpen(CASINO_MODAL_ID),
     announce: (text) => gameView.announce(text),
-    applyView: (view) => store.patch({ view }),
+    applyView: (view) => {
+      store.patch({ view });
+      // 실제로 최신 뷰가 반영된 순간에만 잠금을 푼다(연출이 끝날 때까지는 이중 전송을 막는다).
+      commandLock.onView(view?.version);
+      syncLock();
+    },
+    isLocalSeat: (seatId) => isMySeat(store.state, seatId),
+    onGameOver: (reason) => {
+      gameOverReason = reason;
+    },
     nameOf: (seatId) => seatNameOf(store.state, seatId),
     spaceNameOf: (index) => spaceNameOf(store.state, index),
   });
@@ -165,6 +184,7 @@ export function createGameController({ appRoot, overlayRoot }) {
     boardView.setTravelMode({
       active: picking,
       forbidden: picking ? view.pending?.forbiddenIndexes ?? [] : [],
+      locked: Boolean(state.locked),
     });
   }
 
@@ -192,6 +212,7 @@ export function createGameController({ appRoot, overlayRoot }) {
         pending,
         cash: currentPlayer(state)?.cash ?? 0,
         myTurn: isMyTurn(state),
+        locked: Boolean(state.locked),
         playerName,
       });
       modalHost.present(casinoModalSpec({ casinoView, playerName }));
@@ -217,6 +238,7 @@ export function createGameController({ appRoot, overlayRoot }) {
     const view = state.view;
     const cash = currentPlayer(state)?.cash ?? 0;
     const spaceAt = (index) => view.board?.[index] ?? null;
+    const locked = Boolean(state.locked);
 
     switch (pending.kind) {
       case 'BUY':
@@ -224,6 +246,7 @@ export function createGameController({ appRoot, overlayRoot }) {
           pending,
           space: spaceAt(pending.index),
           cash,
+          locked,
           onBuy: () => void sendCommand('BUY'),
           onSkip: () => void sendCommand('SKIP_BUY'),
         });
@@ -237,6 +260,7 @@ export function createGameController({ appRoot, overlayRoot }) {
           space: spaceAt(pending.index),
           cash,
           keepBody,
+          locked,
           onBuild: (buildings) => void sendCommand('BUILD', { buildings }),
           onSkip: () => void sendCommand('SKIP_BUILD'),
         });
@@ -248,6 +272,7 @@ export function createGameController({ appRoot, overlayRoot }) {
           boardOf: spaceAt,
           cash,
           keepBody: modalHost.isOpen(START_BUILD_MODAL_ID),
+          locked,
           onStartBuild: (cityIndex, buildings) => void sendCommand('START_BUILD', { cityIndex, buildings }),
           onSkip: () => void sendCommand('SKIP_START_BUILD'),
         });
@@ -258,6 +283,7 @@ export function createGameController({ appRoot, overlayRoot }) {
           space: spaceAt(pending.index),
           ownerName: seatNameOf(state, pending.ownerId),
           cash,
+          locked,
           onAcquire: () => void sendCommand('ACQUIRE'),
           onSkip: () => void sendCommand('SKIP_ACQUIRE'),
         });
@@ -266,6 +292,7 @@ export function createGameController({ appRoot, overlayRoot }) {
         return islandModalSpec({
           pending,
           cash,
+          locked,
           onPay: () => void sendCommand('ISLAND_PAY'),
           onRoll: () => void sendCommand('ISLAND_ROLL'),
         });
@@ -276,6 +303,7 @@ export function createGameController({ appRoot, overlayRoot }) {
           cash,
           creditorName: seatNameOf(state, pending.creditorId),
           keepBody: false,
+          locked,
           onSell: (cityIndex) => void sendCommand('SELL', { cityIndex }),
           onAutoSell: () => void sendCommand('AUTO_SELL'),
           onTakeLoan: () => void sendCommand('TAKE_LOAN'),
@@ -297,6 +325,8 @@ export function createGameController({ appRoot, overlayRoot }) {
     modalHost.present(
       gameOverModalSpec({
         rankings: state.view.rankings ?? [],
+        // 이번 세션에서 GAME_OVER 이벤트를 받았으면 그 사유를, 재접속 스냅샷이라 못 받았으면 뷰에서 추정한다.
+        reason: gameOverReason ?? inferGameOverReason(state.view),
         slotOfSeat: (seatId) => slotOf(state, seatId),
         onBackToRoom: () => {
           modalHost.close(GAME_OVER_MODAL_ID);
@@ -331,6 +361,10 @@ export function createGameController({ appRoot, overlayRoot }) {
     const picking = state.view.phase === 'AWAIT_TRAVEL' && isMyTurn(state);
     const forbidden = state.view.pending?.forbiddenIndexes ?? [];
     if (picking) {
+      if (state.locked) {
+        // 커맨드가 오가는 중에는 목적지 탭도 잠긴다(이중 전송 방지).
+        return;
+      }
       if (forbidden.includes(index)) {
         toast.info('이 칸은 목적지로 고를 수 없습니다.');
         return;
@@ -340,6 +374,7 @@ export function createGameController({ appRoot, overlayRoot }) {
         travelConfirmSpec({
           space,
           ownerName: space.ownerId ? seatNameOf(state, space.ownerId) : null,
+          locked: Boolean(state.locked),
           onConfirm: () => {
             modalHost.close(TRAVEL_MODAL_ID);
             boardView.setSelected(null);
@@ -422,11 +457,16 @@ export function createGameController({ appRoot, overlayRoot }) {
     // 방마다 view.version이 1부터 다시 시작하므로 버전 기억까지 비운다.
     queue.forget();
     logView.clear();
+    gameOverReason = null;
 
     try {
       applyRoomState(await api.getRoom(code));
       connectStream();
     } catch (error) {
+      if (isRoomGoneError(error)) {
+        // 저장돼 있던 방이 이미 사라졌다 — 홈 화면의 저장된 방 목록에서도 지운다.
+        storage.forgetRoom(code);
+      }
       reportError(error);
       goHome();
     }
@@ -448,6 +488,9 @@ export function createGameController({ appRoot, overlayRoot }) {
     if (game) {
       playback.resetTo(game);
     }
+    // 스냅샷으로 화면을 통째로 맞춘 것이므로 커맨드 잠금도 버전 비교 없이 즉시 푼다.
+    commandLock.onResync();
+    syncLock();
   }
 
   /* ── 좌석 떠나기 ─────────────────────────────────────────── */
@@ -525,9 +568,11 @@ export function createGameController({ appRoot, overlayRoot }) {
     disconnectStream();
     roomCode = null;
     queue.forget();
+    gameOverReason = null;
+    commandLock.onResync();
     modalHost.closeAll();
     store.resetRoom();
-    store.patch({ screen: SCREENS.HOME, savedRooms: storage.savedRooms(), connection: CONNECTION.IDLE });
+    store.patch({ screen: SCREENS.HOME, savedRooms: storage.savedRooms(), connection: CONNECTION.IDLE, locked: false });
     startRoomListPolling();
   }
 
@@ -590,7 +635,7 @@ export function createGameController({ appRoot, overlayRoot }) {
     if (!roomCode || !state.view) {
       return;
     }
-    if (commandInFlight) {
+    if (commandLock.locked) {
       return;
     }
     const seatId = state.view.currentSeatId;
@@ -604,17 +649,21 @@ export function createGameController({ appRoot, overlayRoot }) {
       return;
     }
 
-    commandInFlight = true;
+    commandLock.onSend(state.view.version);
+    syncLock();
     try {
       const command = payload === undefined ? { type, seatId } : { type, seatId, payload };
       const result = await api.sendCommand(roomCode, command, token);
+      // 성공했어도 연출이 끝나 최신 뷰가 실제로 반영될 때까지는 잠금을 유지한다(commandLock.onView가 푼다).
+      commandLock.onSuccess();
+      syncLock();
       playback.accept(result);
     } catch (error) {
+      commandLock.onError();
+      syncLock();
       reportError(error);
       // 서버 뷰가 유일한 진실이므로 현재 상태를 다시 받아 화면을 되돌린다.
       await refreshRoomState();
-    } finally {
-      commandInFlight = false;
     }
   }
 
@@ -693,6 +742,10 @@ export function createGameController({ appRoot, overlayRoot }) {
       applyRoomState(snapshot);
       connectStream();
     } catch (error) {
+      if (isRoomGoneError(error)) {
+        // 재접속하려던 방이 그새 사라졌다 — 저장된 방 목록에서 지운다.
+        storage.forgetRoom(roomCode);
+      }
       reportError(error);
       store.patch({ connection: CONNECTION.CLOSED });
       scheduleReconnect();
@@ -781,7 +834,7 @@ export function createGameController({ appRoot, overlayRoot }) {
       return;
     }
     const state = store.state;
-    if (state.screen !== SCREENS.GAME || !isMyTurn(state) || state.view?.phase !== 'AWAIT_ROLL') {
+    if (state.screen !== SCREENS.GAME || !isMyTurn(state) || state.view?.phase !== 'AWAIT_ROLL' || state.locked) {
       return;
     }
     event.preventDefault();

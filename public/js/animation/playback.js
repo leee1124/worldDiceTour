@@ -10,6 +10,8 @@
 import { hopPath } from '../domain/boardLayout.js';
 import { formatSignedWon, formatWon } from '../format.js';
 import { formatEventLine } from '../domain/eventLog.js';
+import { gameOverReasonLabel } from '../domain/labels.js';
+import { createTurnAnnouncer } from '../domain/announceThrottle.js';
 import { playTicketCard } from '../views/modals/ticketOverlay.js';
 import { playTollNotice } from '../views/modals/tollOverlay.js';
 import { flashScreen, floatAmount, flyCoin } from './effects.js';
@@ -30,8 +32,11 @@ export function createPlaybackEngine({
   applyView,
   nameOf,
   spaceNameOf,
+  isLocalSeat = () => false,
+  onGameOver = () => {},
 }) {
   let running = false;
+  const turnAnnouncer = createTurnAnnouncer();
 
   const logContext = { nameOf, spaceNameOf };
 
@@ -65,9 +70,15 @@ export function createPlaybackEngine({
 
   async function playEvent(event) {
     switch (event.type) {
-      case 'TURN_STARTED':
-        announce(`${nameOf(event.playerId)}의 차례입니다.`);
+      case 'TURN_STARTED': {
+        // 컴퓨터/자동 진행끼리 주고받는 턴은 초당 한 번꼴로 온다 — 내 좌석 차례만 매번 알리고,
+        // 나머지는 burst당 한 번으로 줄인다(aria-live 스팸 방지).
+        const local = isLocalSeat(event.playerId);
+        if (turnAnnouncer.shouldAnnounceTurn({ isLocalSeat: local })) {
+          announce(local ? `${nameOf(event.playerId)}의 차례입니다.` : '컴퓨터 진행 중…');
+        }
         break;
+      }
 
       case 'DICE_ROLLED':
         await center.rollDice(event.die1, event.die2);
@@ -184,6 +195,10 @@ export function createPlaybackEngine({
         break;
 
       case 'GAME_OVER':
+        // 게임 종료는 burst 제한과 무관하게 항상 알리고, 다음 원격 차례 안내 제한도 새로 시작한다.
+        turnAnnouncer.reset();
+        onGameOver(event.reason);
+        announce(`게임 종료 — ${gameOverReasonLabel(event.reason)}`);
         await flashScreen('gold');
         break;
 

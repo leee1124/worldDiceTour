@@ -12,7 +12,7 @@ import { actionRow, infoRow, moneyRow, primaryButton, quietButton } from './part
 
 export const TRAVEL_MODAL_ID = 'travel-confirm';
 
-export function travelConfirmSpec({ space, ownerName, onConfirm, onCancel }) {
+export function travelConfirmSpec({ space, ownerName, locked = false, onConfirm, onCancel }) {
   const ownable = space.price !== undefined && space.price !== null;
 
   return {
@@ -33,7 +33,7 @@ export function travelConfirmSpec({ space, ownerName, onConfirm, onCancel }) {
         !space.ownerId && ownable ? el('p', { class: 'modal-help', text: '주인이 없는 칸입니다. 도착하면 매입할 수 있습니다.' }) : null,
         space.ownerId ? el('p', { class: 'modal-help', text: `도착하면 통행료 ${formatWon(space.toll)}을 냅니다.` }) : null,
         actionRow([
-          primaryButton('이 칸으로 이동', { onClick: onConfirm, focusKey: 'travel-confirm' }),
+          primaryButton('이 칸으로 이동', { onClick: onConfirm, busy: locked, focusKey: 'travel-confirm' }),
           quietButton('다시 고르기', { onClick: onCancel, focusKey: 'travel-cancel' }),
         ]),
       ]),

@@ -159,3 +159,27 @@ export const ISLAND_ESCAPE_LABELS = Object.freeze({
 
 /** 에러 코드가 없을 때 쓰는 기본 안내(서버 메시지가 있으면 항상 그것을 쓴다). */
 export const FALLBACK_ERROR_MESSAGE = '요청을 처리할 수 없습니다.';
+
+/**
+ * 보드 칸 표시용 축약 이름(5자를 넘거나 붙여 쓰면 좁은 칸에서 잘리는 이름만).
+ * **보드 칸 안에서만** 쓴다 — 시트·모달·로그·aria-label은 항상 서버가 준 원래 이름을 쓴다.
+ */
+export const CELL_SHORT_NAMES = Object.freeze({
+  '제주 올레길': '제주',
+  '알프스 설원열차': '설원열차',
+  '암스테르담': '암스텔',
+  '바르셀로나': '바르셀',
+  '라스베이거스 카지노': '카지노',
+  '멕시코시티': '멕시코',
+  '리우데자네이루': '리우',
+  '부에노스아이레스': '부에노스',
+  '카리브 크루즈': '크루즈',
+  '샌프란시스코': '샌프란',
+  '세계일주 공항': '세계공항',
+  '오로라 관측소': '오로라',
+});
+
+/** 보드 칸에 그릴 이름. 매핑에 없으면 원래 이름 그대로. */
+export function boardCellShortName(name) {
+  return CELL_SHORT_NAMES[name] ?? name;
+}

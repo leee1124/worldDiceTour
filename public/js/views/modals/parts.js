@@ -46,12 +46,16 @@ export function actionRow(children) {
   return el('div', { class: 'modal-actions' }, children);
 }
 
-/** 주 버튼. */
-export function primaryButton(label, { onClick, disabled = false, focusKey = 'primary', tone = 'primary' }) {
+/**
+ * 주 버튼.
+ * @param {{busy?: boolean}} [opts.busy] 커맨드 응답을 기다리는 중이면 true(버튼을 잠그고 `aria-busy`를 켠다)
+ */
+export function primaryButton(label, { onClick, disabled = false, busy = false, focusKey = 'primary', tone = 'primary' }) {
   return button(
     {
       class: ['btn', `btn--${tone}`, 'btn--wide'],
-      disabled,
+      disabled: disabled || busy,
+      'aria-busy': busy ? 'true' : undefined,
       dataset: { focusKey },
       on: { click: onClick },
     },
@@ -59,10 +63,16 @@ export function primaryButton(label, { onClick, disabled = false, focusKey = 'pr
   );
 }
 
-/** 보조(포기) 버튼. */
-export function quietButton(label, { onClick, disabled = false, focusKey = 'quiet' }) {
+/** 보조(포기) 버튼. `busy`는 primaryButton과 같은 뜻. */
+export function quietButton(label, { onClick, disabled = false, busy = false, focusKey = 'quiet' }) {
   return button(
-    { class: 'btn btn--quiet btn--wide', disabled, dataset: { focusKey }, on: { click: onClick } },
+    {
+      class: 'btn btn--quiet btn--wide',
+      disabled: disabled || busy,
+      'aria-busy': busy ? 'true' : undefined,
+      dataset: { focusKey },
+      on: { click: onClick },
+    },
     label,
   );
 }

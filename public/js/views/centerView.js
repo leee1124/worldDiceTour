@@ -133,8 +133,14 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
     }
 
     if (view.phase === 'AWAIT_ROLL') {
+      const locked = Boolean(state.locked);
       rollButton = button(
-        { class: 'btn btn--primary btn--block btn--roll', on: { click: () => onRoll() } },
+        {
+          class: 'btn btn--primary btn--block btn--roll',
+          disabled: locked,
+          'aria-busy': locked ? 'true' : undefined,
+          on: { click: () => onRoll() },
+        },
         ['🎲 주사위 굴리기', el('kbd', { class: 'btn-kbd', text: 'Space' })],
       );
       actionsNode.appendChild(rollButton);

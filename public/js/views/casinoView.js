@@ -49,6 +49,7 @@ export function createCasinoView({ onBet, onLeave }) {
   let bet = 10_000;
   let limits = { min: 10_000, max: 0, unit: 10_000 };
   let interactive = false;
+  let locked = false;
   let spinning = false;
 
   const jackpotNode = el('span', { class: 'neon-amount' });
@@ -220,10 +221,12 @@ export function createCasinoView({ onBet, onLeave }) {
       );
     }
 
-    const ready = interactive && available && !spinning;
+    const ready = interactive && available && !spinning && !locked;
     betButton.disabled = !ready;
+    betButton.setAttribute('aria-busy', locked ? 'true' : 'false');
     setText(betButton, available ? `${formatWon(bet)} 베팅` : '현금 부족 — 베팅 불가');
-    leaveButton.disabled = !interactive || spinning;
+    leaveButton.disabled = !interactive || spinning || locked;
+    leaveButton.setAttribute('aria-busy', locked ? 'true' : 'false');
   }
 
   function selectGame(id) {
@@ -331,9 +334,10 @@ export function createCasinoView({ onBet, onLeave }) {
   return {
     element,
 
-    /** 서버 pending으로 화면을 맞춘다. 내 차례가 아니면 모든 조작을 잠근다. */
-    update({ pending, cash, myTurn, playerName }) {
+    /** 서버 pending으로 화면을 맞춘다. 내 차례가 아니거나 커맨드가 오가는 중이면 조작을 잠근다. */
+    update({ pending, cash, myTurn, locked: nextLocked = false, playerName }) {
       limits = pending.limits ?? limits;
+      locked = Boolean(nextLocked);
       interactive = Boolean(myTurn) && pending.roundsLeft > 0;
       setText(jackpotNode, formatWon(pending.jackpot));
       setText(cashNode, formatWon(cash));

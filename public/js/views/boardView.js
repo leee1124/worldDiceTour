@@ -6,8 +6,8 @@
 
 import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatCompactWon, formatWon } from '../format.js';
-import { cellPosition, cornerOf, gridArea, groupOf, sideOf } from '../domain/boardLayout.js';
-import { BUILDING_ORDER, buildingIcon, buildingLabel, spaceKindIcon, spaceKindLabel } from '../domain/labels.js';
+import { cornerOf, gridArea, groupOf, sideOf } from '../domain/boardLayout.js';
+import { BUILDING_ORDER, boardCellShortName, buildingIcon, buildingLabel, spaceKindIcon, spaceKindLabel } from '../domain/labels.js';
 import { slotOf } from '../store.js';
 import { centerOf } from '../animation/effects.js';
 import { DURATIONS, nextFrame, prefersReducedMotion, scaled, wait } from '../animation/timing.js';
@@ -51,15 +51,17 @@ export function createBoardView({ onCellActivate }) {
   /** @type {Map<string, HTMLElement>} */
   const tokens = new Map();
   let boardBuilt = false;
-  let travelMode = { active: false, forbidden: [] };
+  let travelMode = { active: false, forbidden: [], locked: false };
   let selectedIndex = null;
 
   function buildCell(space) {
     const index = space.index;
     const corner = cornerOf(index);
     const group = groupOf(index);
+    // 칸 안에는 축약 이름만 쓴다(시트·모달·로그·aria-label은 원래 이름을 그대로 쓴다).
+    const shortName = boardCellShortName(space.name);
     const band = el('span', { class: 'cell-band', 'aria-hidden': 'true' });
-    const name = el('span', { class: ['cell-name', nameSizeClass(space.name)], text: space.name });
+    const name = el('span', { class: ['cell-name', nameSizeClass(shortName)], text: shortName });
     const hint = el('span', { class: 'cell-hint' });
     const builds = el('span', { class: 'cell-builds', 'aria-hidden': 'true' });
     const tokenLayer = el('span', { class: 'cell-tokens' });
@@ -67,7 +69,7 @@ export function createBoardView({ onCellActivate }) {
     const body = corner
       ? el('span', { class: 'cell-body cell-body--corner' }, [
           el('span', { class: 'corner-emoji', 'aria-hidden': 'true', text: CORNER_ART[corner].emoji }),
-          el('span', { class: ['cell-name', 'cell-name--corner'], text: space.name }),
+          el('span', { class: ['cell-name', 'cell-name--corner'], text: shortName }),
           el('span', { class: 'corner-note', text: CORNER_ART[corner].note }),
         ])
       : el('span', { class: 'cell-body' }, [
@@ -172,9 +174,9 @@ export function createBoardView({ onCellActivate }) {
     renderBuildings(cell.builds, space);
     cell.root.setAttribute('aria-label', cellLabel(state, space));
 
-    const selectable = travelMode.active && !travelMode.forbidden.includes(space.index);
+    const selectable = travelMode.active && !travelMode.locked && !travelMode.forbidden.includes(space.index);
     toggleClass(cell.root, 'cell--selectable', selectable);
-    toggleClass(cell.root, 'cell--forbidden', travelMode.active && !selectable);
+    toggleClass(cell.root, 'cell--forbidden', travelMode.active && !travelMode.locked && !selectable);
     toggleClass(cell.root, 'cell--selected', selectedIndex === space.index);
   }
 
@@ -216,10 +218,16 @@ export function createBoardView({ onCellActivate }) {
       placeTokens(state);
     },
 
-    /** 공항 목적지 선택 모드(선택 가능 칸 하이라이트). */
-    setTravelMode({ active, forbidden = [] }) {
-      travelMode = { active, forbidden };
+    /** 공항 목적지 선택 모드(선택 가능 칸 하이라이트). `locked`면 커맨드가 오가는 중이라 탭을 막는다. */
+    setTravelMode({ active, forbidden = [], locked = false }) {
+      travelMode = { active, forbidden, locked };
       toggleClass(stage, 'board-stage--picking', active);
+      toggleClass(stage, 'board-stage--locked', active && locked);
+      if (active) {
+        stage.setAttribute('aria-busy', String(locked));
+      } else {
+        stage.removeAttribute('aria-busy');
+      }
     },
 
     setSelected(index) {
@@ -285,11 +293,6 @@ export function createBoardView({ onCellActivate }) {
       cell.root.classList.remove('cell--landing');
     },
 
-    /** 칸/말의 화면 좌표(동전 연출 시작·도착점). */
-    cellCenter(index) {
-      return centerOf(cells.get(index)?.root ?? null);
-    },
-
     tokenCenter(seatId) {
       return centerOf(tokens.get(seatId) ?? null);
     },
@@ -297,11 +300,6 @@ export function createBoardView({ onCellActivate }) {
     /** 칸 버튼에 포커스를 준다(키보드로 목적지를 고를 때). */
     focusCell(index) {
       cells.get(index)?.root.focus();
-    },
-
-    /** 그리드 좌표(디버깅·툴팁용). */
-    positionOf(index) {
-      return cellPosition(index);
     },
   };
 }

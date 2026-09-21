@@ -39,6 +39,8 @@ const INITIAL_STATE = Object.freeze({
   mySeats: [],
   connection: CONNECTION.IDLE,
   busy: false,
+  /** 커맨드가 오가는 중(전송~성공 후 최신 뷰 반영까지) 조작 버튼을 잠글지. `domain/commandLock.js` 참고 */
+  locked: false,
   /** 공항 목적지 선택 모드에서 하이라이트할 금지 칸 */
   travel: null,
   /** 상세 시트를 열어 둔 칸 */

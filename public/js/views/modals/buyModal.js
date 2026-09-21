@@ -9,7 +9,7 @@ import { actionRow, citySummary, moneyRow, noticeLine, primaryButton, quietButto
 
 export const BUY_MODAL_ID = 'buy';
 
-export function buyModalSpec({ pending, space, cash, onBuy, onSkip }) {
+export function buyModalSpec({ pending, space, cash, locked = false, onBuy, onSkip }) {
   const affordable = cash >= pending.price;
   const isResort = space?.kind === 'RESORT';
 
@@ -40,9 +40,10 @@ export function buyModalSpec({ pending, space, cash, onBuy, onSkip }) {
           primaryButton(`${formatWon(pending.price)}에 매입`, {
             onClick: onBuy,
             disabled: !affordable,
+            busy: locked,
             focusKey: 'buy',
           }),
-          quietButton('매입 포기', { onClick: onSkip, focusKey: 'skip-buy' }),
+          quietButton('매입 포기', { onClick: onSkip, busy: locked, focusKey: 'skip-buy' }),
         ]),
       ]),
   };
