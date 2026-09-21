@@ -14,6 +14,7 @@ import {
   SALARY,
   STARTING_CASH,
 } from './Player.js';
+import { RoundClock, TURN_OUTCOMES } from './RoundClock.js';
 import { TicketDeck } from './TicketDeck.js';
 import { Treasury } from './Treasury.js';
 import { COMMAND_PHASES, COMMAND_TYPES } from './commands.js';
@@ -60,11 +61,9 @@ export class Game {
   /** @type {Treasury} */ #treasury;
   /** @type {import('../shared/interfaces.js').RandomSource} */ #random;
   /** @type {Dice} */ #dice;
+  /** @type {RoundClock} */ #clock;
   #phase;
-  #turnIndex;
-  #round;
   #version;
-  #options;
   #initialTotal;
   #turn;
   #events = [];
@@ -92,10 +91,8 @@ export class Game {
     this.#random = random;
     this.#dice = new Dice(random);
     this.#phase = phase;
-    this.#turnIndex = turnIndex;
-    this.#round = round;
+    this.#clock = new RoundClock({ round, turnIndex, roundLimit: options.roundLimit ?? null });
     this.#version = version;
-    this.#options = { roundLimit: options.roundLimit ?? null };
     this.#initialTotal = initialTotal;
     this.#treasury = new Treasury({ players, ledger, casino, initialTotal });
     this.#turn = { ...turn };
@@ -164,7 +161,7 @@ export class Game {
   }
 
   get round() {
-    return this.#round;
+    return this.#clock.round;
   }
 
   get version() {
@@ -172,7 +169,18 @@ export class Game {
   }
 
   get options() {
-    return { ...this.#options };
+    return { roundLimit: this.#clock.roundLimit };
+  }
+
+  /**
+   * 라운드 틱 훅을 등록한다(설계서 §2.3 순서).
+   * 시장/대출/파생/리포트 같은 서브시스템이 붙는 **유일한 구독 지점**이다. 훅은 돈을 직접
+   * 만지지 않고 `{ intents, events }`만 돌려주며, 적용은 Game이 `Treasury`로 한다.
+   * @param {import('./RoundClock.js').RoundTickHook} hook
+   */
+  registerRoundTickHook(hook) {
+    this.#clock.registerTick(hook);
+    return this;
   }
 
   get board() {
@@ -192,11 +200,11 @@ export class Game {
   }
 
   get currentPlayerId() {
-    return this.#players[this.#turnIndex]?.id ?? null;
+    return this.#players[this.#clock.turnIndex]?.id ?? null;
   }
 
   get #current() {
-    return this.#players[this.#turnIndex];
+    return this.#players[this.#clock.turnIndex];
   }
 
   playerById(id) {
@@ -1371,37 +1379,21 @@ export class Game {
     this.#advanceTurn();
   }
 
+  /** 라운드 시계에 차례 넘기기를 맡기고, 그 결과(이벤트·돈 이동·종료)를 반영한다. */
   #advanceTurn() {
-    const size = this.#players.length;
-    let wrapped = false;
-    let found = false;
+    const result = this.#clock.advance({ players: this.#players });
 
-    for (let step = 1; step <= size; step += 1) {
-      const raw = this.#turnIndex + step;
-      const candidate = raw % size;
-      if (!this.#players[candidate].eliminated) {
-        wrapped = raw >= size;
-        this.#turnIndex = candidate;
-        found = true;
-        break;
-      }
+    if (result.intents.length > 0) {
+      this.#treasury.apply(result.intents);
+    }
+    for (const event of result.events) {
+      this.#emit(event.type, event.payload);
     }
 
-    if (!found) {
-      this.#gameOver(GAME_OVER_REASONS.LAST_SURVIVOR);
+    if (result.outcome === TURN_OUTCOMES.GAME_OVER) {
+      this.#gameOver(result.reason);
       return;
     }
-
-    if (wrapped) {
-      this.#round += 1;
-      this.#emit(EVENT_TYPES.ROUND_ADVANCED, { round: this.#round });
-      const limit = this.#options.roundLimit;
-      if (limit && this.#round > limit) {
-        this.#gameOver(GAME_OVER_REASONS.ROUND_LIMIT);
-        return;
-      }
-    }
-
     this.#beginTurn();
   }
 
@@ -1410,7 +1402,7 @@ export class Game {
     // 이전 턴의 흔적(건설/인수 대상 칸까지)을 남기지 않는다.
     this.#turn = { ...EMPTY_TURN };
     player.resetDoubles();
-    this.#emit(EVENT_TYPES.TURN_STARTED, { playerId: player.id, round: this.#round });
+    this.#emit(EVENT_TYPES.TURN_STARTED, { playerId: player.id, round: this.#clock.round });
 
     if (player.isStranded()) {
       this.#phase = PHASES.AWAIT_ISLAND_CHOICE;
@@ -1447,9 +1439,9 @@ export class Game {
     return {
       version: this.#version,
       phase: this.#phase,
-      turnIndex: this.#turnIndex,
-      round: this.#round,
-      options: { roundLimit: this.#options.roundLimit },
+      turnIndex: this.#clock.turnIndex,
+      round: this.#clock.round,
+      options: { roundLimit: this.#clock.roundLimit },
       initialTotal: this.#initialTotal,
       players: this.#players.map((player) => player.toSnapshot()),
       board: this.#board.toSnapshot(),
