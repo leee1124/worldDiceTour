@@ -1,4 +1,3 @@
-import { AppError } from '../application/errors.js';
 import {
   extractToken,
   parseCommandBody,
@@ -18,17 +17,13 @@ export class RoomController {
   #roomService;
   #gameService;
   #sseHub;
-  #authenticator;
-  #repository;
   #networkInfo;
   #logger;
 
-  constructor({ roomService, gameService, sseHub, authenticator, repository, networkInfo, logger }) {
+  constructor({ roomService, gameService, sseHub, networkInfo, logger }) {
     this.#roomService = roomService;
     this.#gameService = gameService;
     this.#sseHub = sseHub;
-    this.#authenticator = authenticator;
-    this.#repository = repository;
     this.#networkInfo = networkInfo;
     this.#logger = logger ?? console;
   }
@@ -87,12 +82,11 @@ export class RoomController {
    * EventSource는 헤더를 보낼 수 없으므로 쿼리로 받되 서버에서 토큰을 검증한다.
    */
   async subscribe(code, query, request, response) {
-    const room = await this.#repository.findByCode(code);
-    if (!room) {
-      throw new AppError('ERR004', `방을 찾을 수 없습니다: ${code}`);
-    }
-
-    const seatIds = this.#verifyPresence(room, query.get('presence'));
+    // 방이 없으면 여기서 ERR004로 끝난다(스트림을 열지 않는다).
+    const seatIds = await this.#roomService.verifyPresence({
+      code,
+      pairs: parsePresenceParam(query.get('presence')),
+    });
 
     response.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
@@ -118,18 +112,6 @@ export class RoomController {
     request.on('close', () => {
       response.end();
     });
-  }
-
-  /** presence 쌍을 토큰까지 검증해 실제 좌석 id만 남긴다. */
-  #verifyPresence(room, raw) {
-    const verified = [];
-    for (const { seatId, token } of parsePresenceParam(raw)) {
-      const resolved = this.#authenticator.resolveSeatId(room, token);
-      if (resolved && resolved === seatId) {
-        verified.push(resolved);
-      }
-    }
-    return verified;
   }
 
   async #publishPresence(code) {

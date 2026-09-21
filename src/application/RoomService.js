@@ -82,6 +82,25 @@ export class RoomService {
     };
   }
 
+  /**
+   * SSE presence 쌍(`seatId` + 좌석 토큰)을 검증해 실제 좌석 id만 돌려준다.
+   * 토큰 대조는 인증기(infrastructure)가, 방 조회는 이 서비스가 맡아 컨트롤러가
+   * 저장소나 도메인 엔티티를 직접 만지지 않게 한다.
+   * @param {{code:string, pairs:Array<{seatId:string, token:string}>}} params
+   * @returns {Promise<string[]>} 검증을 통과한 좌석 id
+   */
+  async verifyPresence({ code, pairs = [] }) {
+    const room = await this.#loadRoom(code);
+    const verified = [];
+    for (const { seatId, token } of pairs) {
+      const resolved = this.#authenticator.resolveSeatId(room, token);
+      if (resolved && resolved === seatId) {
+        verified.push(resolved);
+      }
+    }
+    return verified;
+  }
+
   async createRoom({ hostName }) {
     return this.#mutex.runExclusive(CREATE_LOCK_KEY, () => this.#createRoomLocked({ hostName }));
   }
@@ -122,9 +141,9 @@ export class RoomService {
     this.#guard(() => room.removeSeat({ seatId, bySeatId, now: this.#clock.now() }));
 
     if (room.isEmpty()) {
-      this.#autoDriver?.cancel(room.code);
-      await this.#repository.delete(room.code);
-      return this.#roomDto(room);
+      const dto = this.#roomDto(room);
+      await this.#deleteRoom(room.code);
+      return dto;
     }
     await this.#repository.save(room);
     this.#publishRoom(room);
@@ -194,18 +213,29 @@ export class RoomService {
     this.#autoDriver?.cancelTimer(room.code);
   }
 
-  /** 시작 시 오래된 방 정리. */
+  /** 오래된 방 정리(시작 시 + 주기적으로). */
   async cleanupStaleRooms() {
     const now = this.#clock.now();
     const rooms = await this.#repository.findAll();
     const removed = [];
     for (const room of rooms) {
       if (room.isStale(now)) {
-        await this.#repository.delete(room.code);
+        await this.#deleteRoom(room.code);
         removed.push(room.code);
       }
     }
     return removed;
+  }
+
+  /**
+   * 방을 지우고 그 방에 매달린 자원을 함께 정리한다.
+   * 스트림을 닫지 않으면 구독자가 사라진 방의 이벤트를 영원히 기다리고, 예약을 취소하지 않으면
+   * 드라이버가 없는 방을 계속 깨운다.
+   */
+  async #deleteRoom(code) {
+    this.#autoDriver?.cancel(code);
+    await this.#repository.delete(code);
+    this.#publisher.closeRoom?.(code);
   }
 
   // ── 내부 ────────────────────────────────────────────────────────────────

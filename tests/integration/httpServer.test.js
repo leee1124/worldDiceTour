@@ -597,6 +597,39 @@ describe('HTTP 서버(REST + SSE)', () => {
       assert.equal(response.status, 404);
       assert.equal(response.body.code, 'ERR004');
     });
+
+    it('방이 삭제되면 열려 있던 스트림이 끝난다', async () => {
+      // Given (혼자 있는 대기실에 스트림을 연다)
+      const created = await request(baseUrl, {
+        method: 'POST',
+        path: '/api/rooms',
+        body: { hostName: '하나' },
+      });
+      const code = created.body.room.code;
+      const stream = openSse(baseUrl, `/api/rooms/${code}/events`);
+      const { response } = await stream.ready;
+      await stream.waitFor((event) => event.event === 'room');
+      const ended = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('스트림이 닫히지 않았습니다')), 2_000);
+        response.on('end', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      // When (마지막 좌석이 나가 방이 삭제된다)
+      const deleted = await request(baseUrl, {
+        method: 'DELETE',
+        path: `/api/rooms/${code}/seats/${created.body.seatId}`,
+        token: created.body.seatToken,
+      });
+
+      // Then
+      assert.equal(deleted.status, 200);
+      await ended;
+      assert.equal(response.complete, true);
+      stream.close();
+    });
   });
 
   describe('컴퓨터 좌석 자동 진행', () => {

@@ -11,6 +11,7 @@ import { FakeRandomSource } from './FakeRandomSource.js';
 export class RecordingPublisher {
   rooms = [];
   games = [];
+  closed = [];
 
   publishRoom(code, payload) {
     this.rooms.push({ code, payload });
@@ -18,6 +19,10 @@ export class RecordingPublisher {
 
   publishGame(code, payload) {
     this.games.push({ code, payload });
+  }
+
+  closeRoom(code) {
+    this.closed.push(code);
   }
 
   get lastGame() {
@@ -31,6 +36,7 @@ export class RecordingPublisher {
   reset() {
     this.rooms = [];
     this.games = [];
+    this.closed = [];
   }
 }
 
@@ -40,7 +46,8 @@ export class SequentialTokenFactory {
 
   create() {
     this.#sequence += 1;
-    return `t${String(this.#sequence).padStart(2, '0')}${'0'.repeat(58)}`;
+    // 실제 토큰과 같은 형식(64자 hex)이어야 presence 파라미터 검증을 통과한다.
+    return `${this.#sequence.toString(16).padStart(4, '0')}${'a'.repeat(60)}`;
   }
 }
 

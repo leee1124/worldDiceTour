@@ -65,8 +65,6 @@ export function createApp({
     roomService,
     gameService,
     sseHub,
-    authenticator,
-    repository,
     networkInfo: () => serverInfo(currentPort()),
     logger,
   });

@@ -189,6 +189,18 @@ describe('RoomService(방 유스케이스)', () => {
       // Then
       assert.equal(await repository.findByCode(host.room.code), null);
     });
+
+    it('방이 삭제되면 그 방의 SSE 스트림도 닫는다', async () => {
+      // Given
+      const { roomService, publisher } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      await roomService.leaveSeat({ code: host.room.code, seatId: host.seatId, token: host.seatToken });
+
+      // Then
+      assert.deepEqual(publisher.closed, [host.room.code]);
+    });
   });
 
   describe('오래된 방 정리', () => {
@@ -219,6 +231,44 @@ describe('RoomService(방 유스케이스)', () => {
       assert.deepEqual(removed, [oldRoom.room.code]);
       assert.equal(await fixture.repository.findByCode(oldRoom.room.code), null);
       assert.notEqual(await fixture.repository.findByCode(freshRoom.room.code), null);
+    });
+
+    it('정리된 방은 스트림을 닫고 자동 진행 예약도 취소한다', async () => {
+      // Given
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      const cancelled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: () => {},
+        cancelTimer: () => {},
+        cancel: (code) => cancelled.push(code),
+      });
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+      roomService.attachAutoPlayerDriver({
+        schedule: () => {},
+        cancelTimer: () => {},
+        cancel: (code) => cancelled.push(code),
+      });
+      const oldRoom = await roomService.createRoom({ hostName: '옛방' });
+      now += day + 1_000;
+      fixture.publisher.reset();
+
+      // When
+      await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(cancelled, [oldRoom.room.code]);
+      assert.deepEqual(fixture.publisher.closed, [oldRoom.room.code]);
     });
 
     it('정리할 방이 없으면 빈 목록을 돌려준다', async () => {
