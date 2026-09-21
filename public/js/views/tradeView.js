@@ -116,13 +116,19 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
     sideNode,
     stepperNode,
     previewNode,
-    reasonNode,
-    noteNode,
   ]);
 
   // 주문 버튼과 마감 버튼은 **항상 손에 닿아야 한다** — 폰에서 시트 본문이 길어도 아래에 붙여 둔다.
   // 색으로도 역할이 갈린다: 주문은 청록(되돌릴 수 있는 한 건), 마감은 금색(차례를 넘기는 결정).
-  const footerNode = el('div', { class: 'trade-footer' }, [submitButton, budgetNode, closeButton, holdNote]);
+  // 못 누르는 이유도 같이 붙여 둔다 — 버튼은 보이는데 이유만 스크롤 위에 있으면 아무 말도 안 한 셈이다.
+  const footerNode = el('div', { class: 'trade-footer' }, [
+    reasonNode,
+    noteNode,
+    submitButton,
+    budgetNode,
+    closeButton,
+    holdNote,
+  ]);
 
   const element = el('div', { class: 'trade' }, [tabList, panelNode, queueListNode, footerNode]);
 

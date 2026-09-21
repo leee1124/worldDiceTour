@@ -21,7 +21,7 @@ const INVESTMENT_MODE_OPTIONS = [
 const INVESTMENT_MODE_LABELS = Object.freeze({ OFF: '끔', STOCKS: '주식' });
 
 const INVESTMENT_MODE_NOTE =
-  '켜면 보드 아래에 증권거래소가 열립니다 — 자기 턴 시작에 주식을 사고팔거나 예금에 넣고, 라운드마다 뉴스로 시세가 움직입니다.';
+  '증권거래소가 열립니다 — 자기 턴 시작에 주식·예금을 사고팔고, 라운드마다 뉴스로 시세가 움직입니다.';
 
 function investmentModeLabel(mode) {
   return INVESTMENT_MODE_LABELS[mode] ?? String(mode ?? '끔');

@@ -1282,15 +1282,33 @@
 
 /* ── 로비 호스트 도구 ──────────────────────────────────────── */
 
+/*
+  설명이 길어 칩이 눌리기 쉽다 — 뷰포트 기준 미디어 쿼리 대신 **행 안에서** 접히게 둔다
+  (호스트 도구 카드 폭은 화면 폭과 다를 수 있다).
+*/
 .tool-row--finance {
+  flex-wrap: wrap;
   border-color: rgba(239, 193, 101, 0.35);
   background: rgba(239, 193, 101, 0.07);
+}
+
+.tool-row--finance .tool-label {
+  flex: 1 1 13rem;
+}
+
+.tool-row--finance .chip-row {
+  flex: 0 0 auto;
+}
+
+.tool-row--finance .btn--chip {
+  white-space: nowrap;
 }
 
 .tool-row--readonly {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
