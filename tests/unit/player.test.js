@@ -166,6 +166,57 @@ describe('Player(플레이어)', () => {
     });
   });
 
+  describe('바퀴(lap)', () => {
+    it('1바퀴에서 시작한다', () => {
+      // Given / When
+      const player = newPlayer();
+
+      // Then
+      assert.equal(player.lap, 1);
+    });
+
+    it('바퀴를 올리면 1씩 늘어나고 새 바퀴 수를 돌려준다', () => {
+      // Given
+      const player = newPlayer();
+
+      // When
+      const second = player.advanceLap();
+      const third = player.advanceLap();
+
+      // Then
+      assert.equal(second, 2);
+      assert.equal(third, 3);
+      assert.equal(player.lap, 3);
+    });
+
+    it('스냅샷에 바퀴 수가 담기고 그대로 복원된다', () => {
+      // Given
+      const player = newPlayer({ lap: 4 });
+
+      // When
+      const snapshot = player.toSnapshot();
+
+      // Then
+      assert.equal(snapshot.lap, 4);
+      assert.equal(new Player({ ...snapshot }).lap, 4);
+    });
+
+    it('바퀴 수가 없는 예전 스냅샷은 1바퀴로 복원된다', () => {
+      // Given / When
+      const player = new Player({ id: 'p1', name: '가나' });
+
+      // Then
+      assert.equal(player.lap, 1);
+    });
+
+    it('1 미만이거나 정수가 아닌 바퀴 수는 거부한다', () => {
+      // Given / When / Then
+      for (const lap of [0, -3, 1.5, '2']) {
+        assert.throws(() => newPlayer({ lap }), DomainError, `바퀴 값 ${String(lap)}을 통과시켰다`);
+      }
+    });
+  });
+
   it('파산하면 탈락 처리되고 현금이 0이 된다', () => {
     // Given
     const player = newPlayer();

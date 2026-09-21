@@ -3,7 +3,7 @@ import { BankLedger } from './BankLedger.js';
 import { Board } from './Board.js';
 import { Casino } from './Casino.js';
 import { Dice } from './Dice.js';
-import { BUILDING_TYPES } from './City.js';
+import { BUILDING_TYPES, BuildingUnlocks } from './buildings.js';
 import {
   ISLAND_RESCUE_FEE,
   LOAN_DEBT,
@@ -224,7 +224,7 @@ export class Game {
           kind: 'BUILD',
           index: city.index,
           name: city.name,
-          options: this.#buildOptionsOf(city),
+          ...this.#buildOfferOf(city, player),
           buildings: city.buildings,
           landmark: city.landmark,
         };
@@ -448,14 +448,27 @@ export class Game {
     this.#endTurn();
   }
 
-  /** 이번 건설 기회에 고를 수 있는 건물과 비용. */
-  #buildOptionsOf(city) {
-    return city.buildableTypes().map((type) => ({ type, cost: city.buildCost(type) }));
+  /**
+   * 이번 건설 기회의 선택지.
+   * `options`는 지금 고를 수 있는 건물, `lockedOptions`는 아직 바퀴가 모자라 고를 수 없는 건물이다
+   * (화면에 "2바퀴부터"를 보여 주기 위한 추가 정보이며 커맨드로는 고를 수 없다).
+   */
+  #buildOfferOf(city, player) {
+    const describe = (type, locked) => ({
+      type,
+      cost: city.buildCost(type),
+      locked,
+      unlockLap: BuildingUnlocks.unlockLapOf(type),
+    });
+    return {
+      options: city.buildableTypes({ lap: player.lap }).map((type) => describe(type, false)),
+      lockedOptions: city.lockedTypes({ lap: player.lap }).map((type) => describe(type, true)),
+    };
   }
 
-  /** 건설 기회를 열 수 있는지(지을 것이 있고 가장 싼 것을 낼 현금이 있는지). */
+  /** 건설 기회를 열 수 있는지(그 바퀴에 지을 것이 있고 가장 싼 것을 낼 현금이 있는지). */
   #canOfferBuild(player, city) {
-    const options = this.#buildOptionsOf(city);
+    const { options } = this.#buildOfferOf(city, player);
     return options.length > 0 && player.canPay(Math.min(...options.map((option) => option.cost)));
   }
 
@@ -472,7 +485,7 @@ export class Game {
       playerId: player.id,
       index: city.index,
       name: city.name,
-      options: this.#buildOptionsOf(city),
+      ...this.#buildOfferOf(city, player),
     });
   }
 
@@ -494,14 +507,14 @@ export class Game {
     if (!city.isOwnedBy(player.id)) {
       throw DomainError.invalidArgument(`내 도시가 아닙니다: ${city.index}`);
     }
-    city.assertCanBuild(buildings);
+    city.assertCanBuild(buildings, { lap: player.lap });
     const cost = city.costOf(buildings);
     if (!player.canPay(cost)) {
       throw DomainError.insufficientCash(`건설비 ${cost}원이 부족합니다`);
     }
     player.pay(cost);
     this.#ledger.payToBank(cost);
-    city.build(buildings);
+    city.build(buildings, { lap: player.lap });
     this.#emit(EVENT_TYPES.BUILT, {
       playerId: player.id,
       index: city.index,
@@ -528,7 +541,7 @@ export class Game {
         index: city.index,
         name: city.name,
         price: city.price,
-        options: this.#buildOptionsOf(city),
+        ...this.#buildOfferOf(city, player),
       }));
   }
 
@@ -738,9 +751,16 @@ export class Game {
     player.moveTo(index);
     this.#emit(EVENT_TYPES.MOVED, { playerId: player.id, from, to: index, steps, passedStart });
     if (passedStart) {
+      // 앞으로 이동하며 출발 칸을 지나거나 도착한 순간 한 바퀴가 끝난다(뒤로 밀려온 경우는 제외).
+      this.#advanceLap(player);
       this.#paySalary(player);
     }
     this.#resolveLanding(player, index, depth);
+  }
+
+  /** 한 바퀴 완주. 지을 수 있는 건물이 늘어나므로 이벤트로 알린다. */
+  #advanceLap(player) {
+    this.#emit(EVENT_TYPES.LAP_ADVANCED, { playerId: player.id, lap: player.advanceLap() });
   }
 
   /** 월급 지급. 대출 채무가 남아 있으면 먼저 압류된다. */

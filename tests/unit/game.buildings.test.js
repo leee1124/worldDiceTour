@@ -18,7 +18,7 @@ const rollToBangkok = () => new FakeRandomSource([1, 2]);
 describe('Game(건설 기회)', () => {
   it('빈 도시를 매입하면 같은 턴에 건설 기회를 얻는다', () => {
     // Given
-    const game = buildGame({ random: rollToBangkok() });
+    const game = buildGame({ laps: { s1: 3 }, random: rollToBangkok() });
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When
@@ -47,7 +47,11 @@ describe('Game(건설 기회)', () => {
 
   it('원하는 조합을 한 번에 지으면 합계 비용을 지불한다', () => {
     // Given
-    const game = buildGame({ cities: [{ index: 3, ownerId: 's1' }], random: rollToBangkok() });
+    const game = buildGame({
+      laps: { s1: 3 },
+      cities: [{ index: 3, ownerId: 's1' }],
+      random: rollToBangkok(),
+    });
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When
@@ -81,7 +85,11 @@ describe('Game(건설 기회)', () => {
 
   it('3종을 완성하는 기회에서 랜드마크를 함께 요청하면 거부한다', () => {
     // Given
-    const game = buildGame({ cities: [{ index: 3, ownerId: 's1' }], random: rollToBangkok() });
+    const game = buildGame({
+      laps: { s1: 3 },
+      cities: [{ index: 3, ownerId: 's1' }],
+      random: rollToBangkok(),
+    });
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When / Then
@@ -138,6 +146,7 @@ describe('Game(건설 기회)', () => {
   it('현금보다 비싼 조합은 거부한다', () => {
     // Given
     const game = buildGame({
+      laps: { s1: 2 },
       cash: { s1: 30_000 },
       cities: [{ index: 3, ownerId: 's1' }],
       random: rollToBangkok(),
@@ -149,6 +158,197 @@ describe('Game(건설 기회)', () => {
       code: DOMAIN_ERROR_CODES.INSUFFICIENT_CASH,
     });
     assert.equal(game.playerById('s1').cash, 30_000);
+  });
+});
+
+describe('Game(바퀴별 건설 제한)', () => {
+  const optionTypes = (options) => options.map((option) => option.type);
+
+  it('1바퀴 플레이어는 별장만 고를 수 있고 나머지는 잠긴 것으로 알려 준다', () => {
+    // Given
+    const game = buildGame({ laps: { s1: 1 }, random: rollToBangkok() });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.BUY);
+
+    // Then
+    const pending = game.pendingDecision;
+    assert.deepEqual(optionTypes(pending.options), [VILLA]);
+    assert.deepEqual(pending.lockedOptions, [
+      { type: BUILDING, cost: 42_000, locked: true, unlockLap: 2 },
+      { type: HOTEL, cost: 63_000, locked: true, unlockLap: 3 },
+    ]);
+    assert.deepEqual(optionTypes(findEvent(events, EVENT_TYPES.BUILD_OFFERED).options), [VILLA]);
+  });
+
+  it('2바퀴 플레이어는 별장과 빌딩까지 고를 수 있다', () => {
+    // Given
+    const game = buildGame({
+      laps: { s1: 2 },
+      cities: [{ index: 3, ownerId: 's1' }],
+      random: rollToBangkok(),
+    });
+
+    // When
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then
+    assert.deepEqual(optionTypes(game.pendingDecision.options), [VILLA, BUILDING]);
+    assert.deepEqual(optionTypes(game.pendingDecision.lockedOptions), [HOTEL]);
+  });
+
+  it('3바퀴 플레이어는 3종을 한 번에 지을 수 있다', () => {
+    // Given
+    const game = buildGame({
+      laps: { s1: 3 },
+      cities: [{ index: 3, ownerId: 's1' }],
+      random: rollToBangkok(),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    game.execute('s1', COMMAND_TYPES.BUILD, { buildings: [VILLA, BUILDING, HOTEL] });
+
+    // Then
+    assert.deepEqual(game.board.cityAt(3).buildings, [VILLA, BUILDING, HOTEL]);
+    assert.deepEqual(game.pendingDecision, null);
+    assertMoneyConserved(game, '3바퀴 일괄 건설 후');
+  });
+
+  it('1바퀴에 별장을 이미 지은 내 도시에 도착하면 건설 기회가 열리지 않는다', () => {
+    // Given
+    const game = buildGame({
+      laps: { s1: 1 },
+      cities: [{ index: 3, ownerId: 's1', buildings: [VILLA] }],
+      random: rollToBangkok(),
+    });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then
+    assert.equal(findEvent(events, EVENT_TYPES.BUILD_OFFERED), undefined);
+    assert.equal(game.currentPlayerId, 's2');
+  });
+
+  it('잠긴 건물을 BUILD로 요청하면 거부하고 상태가 그대로다', () => {
+    // Given (2바퀴 — 호텔은 3바퀴부터)
+    const game = buildGame({
+      laps: { s1: 2 },
+      cities: [{ index: 3, ownerId: 's1' }],
+      random: rollToBangkok(),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+    const versionBefore = game.version;
+
+    // When / Then
+    assert.throws(() => game.execute('s1', COMMAND_TYPES.BUILD, { buildings: [HOTEL] }), {
+      code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
+    });
+    assert.throws(() => game.execute('s1', COMMAND_TYPES.BUILD, { buildings: [VILLA, HOTEL] }), {
+      code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
+    });
+    assert.equal(game.phase, PHASES.AWAIT_BUILD);
+    assert.equal(game.version, versionBefore);
+    assert.deepEqual(game.board.cityAt(3).buildings, []);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH);
+  });
+
+  it('출발 보너스 후보는 그 바퀴에 지을 것이 있는 도시만 나온다', () => {
+    // Given (출발 칸 도착으로 2바퀴가 되는 플레이어: 빌딩까지만 열린다)
+    const game = buildGame({
+      positions: { s1: 37 },
+      cities: [
+        { index: 3, ownerId: 's1', buildings: [VILLA, BUILDING] },
+        { index: 39, ownerId: 's1' },
+      ],
+      random: new FakeRandomSource([1, 2]),
+    });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then
+    assert.equal(game.playerById('s1').lap, 2);
+    assert.deepEqual(
+      findEvent(events, EVENT_TYPES.START_BONUS_OFFERED).candidates.map((item) => item.index),
+      [39],
+    );
+    assert.deepEqual(optionTypes(game.pendingDecision.candidates[0].options), [VILLA, BUILDING]);
+    assert.deepEqual(optionTypes(game.pendingDecision.candidates[0].lockedOptions), [HOTEL]);
+  });
+
+  it('그 바퀴에 지을 수 있는 도시가 하나도 없으면 출발 보너스를 건너뛴다', () => {
+    // Given (2바퀴가 되지만 도시에는 별장·빌딩이 이미 있다)
+    const game = buildGame({
+      positions: { s1: 37 },
+      cities: [{ index: 3, ownerId: 's1', buildings: [VILLA, BUILDING] }],
+      random: new FakeRandomSource([1, 2]),
+    });
+
+    // When
+    const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // Then
+    assert.equal(findEvent(events, EVENT_TYPES.START_BONUS_OFFERED), undefined);
+    assert.notEqual(game.phase, PHASES.AWAIT_START_BUILD);
+    assert.equal(game.currentPlayerId, 's2');
+  });
+
+  it('출발 보너스로 잠긴 건물을 요청하면 거부하고 상태가 그대로다', () => {
+    // Given (출발 칸 도착으로 2바퀴)
+    const game = buildGame({
+      positions: { s1: 37 },
+      cities: [{ index: 3, ownerId: 's1' }],
+      random: new FakeRandomSource([1, 2]),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+    const versionBefore = game.version;
+
+    // When / Then
+    assert.throws(
+      () => game.execute('s1', COMMAND_TYPES.START_BUILD, { cityIndex: 3, buildings: [HOTEL] }),
+      { code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT },
+    );
+    assert.equal(game.phase, PHASES.AWAIT_START_BUILD);
+    assert.equal(game.version, versionBefore);
+    assert.deepEqual(game.board.cityAt(3).buildings, []);
+  });
+
+  it('인수 직후의 건설 기회도 인수자의 바퀴를 따른다', () => {
+    // Given (1바퀴 플레이어가 남의 빈 도시를 인수한다)
+    const game = buildGame({
+      laps: { s1: 1 },
+      cities: [{ index: 3, ownerId: 's2' }],
+      random: rollToBangkok(),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    game.execute('s1', COMMAND_TYPES.ACQUIRE);
+
+    // Then
+    assert.equal(game.phase, PHASES.AWAIT_BUILD);
+    assert.deepEqual(optionTypes(game.pendingDecision.options), [VILLA]);
+  });
+
+  it('인수한 도시의 건물은 인수자의 바퀴와 무관하게 남고 랜드마크만 제안된다', () => {
+    // Given (1바퀴 플레이어가 3종이 완성된 남의 도시를 인수한다)
+    const game = buildGame({
+      laps: { s1: 1 },
+      cities: [{ index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL] }],
+      random: rollToBangkok(),
+    });
+    game.execute('s1', COMMAND_TYPES.ROLL);
+
+    // When
+    game.execute('s1', COMMAND_TYPES.ACQUIRE);
+
+    // Then
+    assert.deepEqual(game.board.cityAt(3).buildings, [VILLA, BUILDING, HOTEL]);
+    assert.deepEqual(optionTypes(game.pendingDecision.options), [LANDMARK]);
+    assert.deepEqual(game.pendingDecision.lockedOptions, []);
   });
 });
 

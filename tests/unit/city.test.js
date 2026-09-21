@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { BUILDING_TYPES, City } from '../../src/domain/game/City.js';
 import { SPACE_KINDS } from '../../src/domain/game/data/board.js';
-import { DomainError } from '../../src/domain/shared/DomainError.js';
+import { DOMAIN_ERROR_CODES, DomainError } from '../../src/domain/shared/DomainError.js';
 
 const { VILLA, BUILDING, HOTEL, LANDMARK } = BUILDING_TYPES;
 
@@ -65,7 +65,7 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1', buildings: [VILLA] });
 
       // When
-      const options = city.buildableTypes();
+      const options = city.buildableTypes({ lap: 3 });
 
       // Then
       assert.deepEqual(options, [BUILDING, HOTEL]);
@@ -76,7 +76,7 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1' });
 
       // When
-      const cost = city.build([VILLA, HOTEL]);
+      const cost = city.build([VILLA, HOTEL], { lap: 3 });
 
       // Then
       assert.equal(cost, 240_000 + 720_000);
@@ -90,7 +90,7 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL] });
 
       // When / Then
-      assert.deepEqual(city.buildableTypes(), [LANDMARK]);
+      assert.deepEqual(city.buildableTypes({ lap: 3 }), [LANDMARK]);
     });
 
     it('3종을 완성하는 기회에서 랜드마크를 함께 지을 수 없다', () => {
@@ -98,7 +98,7 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1' });
 
       // When / Then
-      assert.throws(() => city.build([VILLA, BUILDING, HOTEL, LANDMARK]), DomainError);
+      assert.throws(() => city.build([VILLA, BUILDING, HOTEL, LANDMARK], { lap: 3 }), DomainError);
       assert.equal(city.landmark, false);
     });
 
@@ -107,12 +107,12 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL] });
 
       // When
-      city.build([LANDMARK]);
+      city.build([LANDMARK], { lap: 3 });
 
       // Then
       assert.equal(city.landmark, true);
-      assert.deepEqual(city.buildableTypes(), []);
-      assert.throws(() => city.build([LANDMARK]), DomainError);
+      assert.deepEqual(city.buildableTypes({ lap: 3 }), []);
+      assert.throws(() => city.build([LANDMARK], { lap: 3 }), DomainError);
     });
 
     it('이미 지은 건물은 다시 지을 수 없다', () => {
@@ -120,7 +120,7 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1', buildings: [VILLA] });
 
       // When / Then
-      assert.throws(() => city.build([VILLA]), DomainError);
+      assert.throws(() => city.build([VILLA], { lap: 3 }), DomainError);
     });
 
     it('같은 건물을 중복으로 요청할 수 없다', () => {
@@ -128,7 +128,7 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1' });
 
       // When / Then
-      assert.throws(() => city.build([VILLA, VILLA]), DomainError);
+      assert.throws(() => city.build([VILLA, VILLA], { lap: 3 }), DomainError);
     });
 
     it('빈 목록이나 알 수 없는 건물은 거부한다', () => {
@@ -136,8 +136,8 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul({ ownerId: 'p1' });
 
       // When / Then
-      assert.throws(() => city.build([]), DomainError);
-      assert.throws(() => city.build(['CASTLE']), DomainError);
+      assert.throws(() => city.build([], { lap: 3 }), DomainError);
+      assert.throws(() => city.build(['CASTLE'], { lap: 3 }), DomainError);
     });
 
     it('주인 없는 칸에는 건설할 수 없다', () => {
@@ -145,8 +145,8 @@ describe('City(도시/휴양지 칸)', () => {
       const city = seoul();
 
       // When / Then
-      assert.deepEqual(city.buildableTypes(), []);
-      assert.throws(() => city.build([VILLA]), DomainError);
+      assert.deepEqual(city.buildableTypes({ lap: 3 }), []);
+      assert.throws(() => city.build([VILLA], { lap: 3 }), DomainError);
     });
 
     it('휴양지는 건설할 수 없다', () => {
@@ -154,8 +154,84 @@ describe('City(도시/휴양지 칸)', () => {
       const resort = jeju({ ownerId: 'p1' });
 
       // When / Then
-      assert.deepEqual(resort.buildableTypes(), []);
-      assert.throws(() => resort.build([VILLA]), DomainError);
+      assert.deepEqual(resort.buildableTypes({ lap: 3 }), []);
+      assert.throws(() => resort.build([VILLA], { lap: 3 }), DomainError);
+    });
+  });
+
+  describe('바퀴별 건설 제한', () => {
+    it('1바퀴에는 별장만, 2바퀴에는 빌딩까지, 3바퀴부터 호텔까지 지을 수 있다', () => {
+      // Given
+      const city = seoul({ ownerId: 'p1' });
+
+      // When / Then
+      assert.deepEqual(city.buildableTypes({ lap: 1 }), [VILLA]);
+      assert.deepEqual(city.buildableTypes({ lap: 2 }), [VILLA, BUILDING]);
+      assert.deepEqual(city.buildableTypes({ lap: 3 }), [VILLA, BUILDING, HOTEL]);
+      assert.deepEqual(city.buildableTypes({ lap: 10 }), [VILLA, BUILDING, HOTEL]);
+    });
+
+    it('아직 열리지 않은 건물은 잠긴 목록으로 알려 준다', () => {
+      // Given
+      const city = seoul({ ownerId: 'p1' });
+
+      // When / Then
+      assert.deepEqual(city.lockedTypes({ lap: 1 }), [BUILDING, HOTEL]);
+      assert.deepEqual(city.lockedTypes({ lap: 2 }), [HOTEL]);
+      assert.deepEqual(city.lockedTypes({ lap: 3 }), []);
+    });
+
+    it('이미 지은 건물은 잠긴 목록에도 나오지 않는다', () => {
+      // Given
+      const city = seoul({ ownerId: 'p1', buildings: [BUILDING] });
+
+      // When / Then
+      assert.deepEqual(city.buildableTypes({ lap: 1 }), [VILLA]);
+      assert.deepEqual(city.lockedTypes({ lap: 1 }), [HOTEL]);
+    });
+
+    it('1바퀴에 별장을 이미 지었으면 지을 것이 없다', () => {
+      // Given
+      const city = seoul({ ownerId: 'p1', buildings: [VILLA] });
+
+      // When / Then
+      assert.deepEqual(city.buildableTypes({ lap: 1 }), []);
+      assert.deepEqual(city.lockedTypes({ lap: 1 }), [BUILDING, HOTEL]);
+    });
+
+    it('잠긴 건물을 지으려 하면 거부하고 상태를 바꾸지 않는다', () => {
+      // Given
+      const city = seoul({ ownerId: 'p1' });
+
+      // When / Then
+      assert.throws(() => city.build([HOTEL], { lap: 2 }), {
+        code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
+      });
+      assert.throws(() => city.build([VILLA, HOTEL], { lap: 2 }), {
+        code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
+      });
+      assert.deepEqual(city.buildings, []);
+    });
+
+    it('3종을 갖춘 도시는 바퀴와 무관하게 랜드마크만 제안한다(인수로 넘겨받은 도시)', () => {
+      // Given (2바퀴 플레이어가 3종이 지어진 도시를 인수한 상황)
+      const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL] });
+
+      // When / Then
+      assert.deepEqual(city.buildableTypes({ lap: 2 }), [LANDMARK]);
+      assert.deepEqual(city.lockedTypes({ lap: 2 }), []);
+    });
+
+    it('바퀴 수를 주지 않으면 건설 여부를 판단하지 않는다(우회 방지)', () => {
+      // Given
+      const city = seoul({ ownerId: 'p1' });
+
+      // When / Then
+      assert.throws(() => city.buildableTypes(), { code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT });
+      assert.throws(() => city.lockedTypes(), { code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT });
+      assert.throws(() => city.assertCanBuild([VILLA]), { code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT });
+      assert.throws(() => city.build([VILLA]), { code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT });
+      assert.deepEqual(city.buildings, []);
     });
   });
 

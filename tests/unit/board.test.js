@@ -135,7 +135,8 @@ describe('Board(보드 40칸)', () => {
       board.cityAt(5).buy('p1');
       board.cityAt(15).buy('p1');
       board.cityAt(39).buy('p2');
-      board.cityAt(1).build(['VILLA', 'BUILDING']);
+      // 빌딩은 2바퀴부터 열리므로 2바퀴 플레이어로 짓는다.
+      board.cityAt(1).build(['VILLA', 'BUILDING'], { lap: 2 });
 
       // When / Then
       assert.equal(board.ownedBy('p1').length, 3);
