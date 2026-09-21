@@ -91,6 +91,7 @@ export function toGameViewDto(game) {
       name: player.name,
       cash: player.cash,
       position: player.position,
+      lap: player.lap,
       eliminated: player.eliminated,
       islandRemainingTurns: player.islandRemainingTurns,
       airportPending: player.airportPending,

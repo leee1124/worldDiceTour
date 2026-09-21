@@ -104,6 +104,11 @@ function validateGameSnapshot(game, seats) {
     assert(isBoardIndex(player.position), `위치 오류: ${player.position}`);
     assert(typeof player.eliminated === 'boolean', 'eliminated 값 오류');
     assert(isFiniteInteger(player.loanDebt) && player.loanDebt >= 0, '대출 채무 오류');
+    // 바퀴 수는 규칙 변경 뒤에 생긴 필드다. 없으면 1바퀴로 복원하므로 있을 때만 검증한다.
+    assert(
+      player.lap === undefined || (isFiniteInteger(player.lap) && player.lap >= 1),
+      `바퀴 수 오류: ${player.lap}`,
+    );
   }
   assert(Array.isArray(game.board), '보드 스냅샷이 배열이 아닙니다');
   for (const city of game.board) {
