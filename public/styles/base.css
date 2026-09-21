@@ -82,6 +82,11 @@
   box-sizing: border-box;
 }
 
+/* `hidden` 속성은 display를 지정한 클래스보다 항상 우선한다(el.hidden 토글이 어디서나 동작하도록). */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
