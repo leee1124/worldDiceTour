@@ -1,0 +1,330 @@
+/* ==========================================================================
+   시작 화면 · 대기실
+   ========================================================================== */
+
+/* ── 히어로 ─────────────────────────────────────────────────── */
+
+.home-hero {
+  position: relative;
+  margin-bottom: clamp(1rem, 2.4vw, 1.9rem);
+  padding: clamp(1.4rem, 4vw, 3rem) clamp(1.1rem, 3vw, 2.4rem);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(90% 120% at 88% 10%, rgba(216, 161, 58, 0.22), transparent 60%),
+    linear-gradient(140deg, rgba(20, 80, 106, 0.55), rgba(8, 21, 31, 0.9));
+  box-shadow: var(--shadow-lift);
+}
+
+.hero-eyebrow {
+  color: var(--gold-400);
+  font-family: var(--font-num);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+
+.hero-title {
+  margin: 0.35rem 0 0.6rem;
+  font-size: clamp(2rem, 6.4vw, 3.4rem);
+  background: linear-gradient(100deg, var(--paper-100) 20%, var(--gold-300));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-lead {
+  max-width: 34rem;
+  color: var(--text-300);
+  font-size: clamp(0.92rem, 1.4vw, 1.05rem);
+}
+
+.hero-lead strong {
+  color: var(--gold-300);
+}
+
+.hero-dice {
+  position: absolute;
+  top: 12%;
+  right: clamp(0.5rem, 4vw, 3rem);
+  display: flex;
+  gap: 0.6rem;
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  opacity: 0.85;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.4));
+}
+
+.hero-die--a {
+  animation: hero-float 5.5s ease-in-out infinite;
+}
+
+.hero-die--b {
+  animation: hero-float 6.8s ease-in-out infinite reverse;
+}
+
+/* ── 카드 격자 ──────────────────────────────────────────────── */
+
+.home-grid {
+  display: grid;
+  gap: clamp(0.7rem, 1.6vw, 1.1rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  align-items: start;
+}
+
+.card--rooms,
+.card--saved {
+  grid-column: span 1;
+}
+
+@media (min-width: 60rem) {
+  .card--rooms {
+    grid-column: span 2;
+  }
+}
+
+.room-list,
+.saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(3, 12, 20, 0.4);
+}
+
+.room-code {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(239, 193, 101, 0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(239, 193, 101, 0.12);
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.room-meta {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.room-host {
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-seats {
+  color: var(--text-500);
+  font-size: 0.78rem;
+}
+
+/* ── 대기실 ─────────────────────────────────────────────────── */
+
+.lobby-head {
+  display: grid;
+  gap: clamp(0.7rem, 1.6vw, 1.1rem);
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  margin-bottom: clamp(0.8rem, 1.8vw, 1.3rem);
+  padding: clamp(1rem, 2.4vw, 1.6rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(140deg, rgba(20, 80, 106, 0.4), rgba(8, 21, 31, 0.86));
+  box-shadow: var(--shadow-soft);
+}
+
+@media (max-width: 52rem) {
+  .lobby-head {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lobby-code-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.lobby-code-label {
+  color: var(--text-500);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.lobby-code {
+  font-family: var(--font-num);
+  font-size: clamp(2.6rem, 9vw, 4.4rem);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--gold-300), var(--paper-100));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lan-url-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.45rem 0;
+}
+
+.lan-url code {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(47, 243, 224, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(47, 243, 224, 0.1);
+  color: var(--neon-cyan);
+  font-size: 0.98rem;
+  word-break: break-all;
+}
+
+.lan-url--empty {
+  color: var(--text-500);
+  font-size: 0.85rem;
+}
+
+.lobby-exit {
+  align-self: start;
+}
+
+.lobby-grid {
+  display: grid;
+  gap: clamp(0.7rem, 1.6vw, 1.1rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  align-items: start;
+}
+
+.seat-count {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-300);
+  font-family: var(--font-num);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.7rem 0;
+}
+
+.seat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(3, 12, 20, 0.4);
+}
+
+.seat-row--mine {
+  border-color: rgba(47, 243, 224, 0.4);
+  background: rgba(47, 243, 224, 0.07);
+}
+
+.seat-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.seat-name {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.online-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.online-dot--on {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(67, 196, 145, 0.22);
+}
+
+.online-dot--off {
+  background: var(--text-500);
+  box-shadow: 0 0 0 3px rgba(131, 153, 171, 0.14);
+}
+
+.seat-add {
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--line);
+}
+
+.seat-add-row {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.3rem 0;
+}
+
+.seat-add-row .text-input {
+  flex: 1;
+}
+
+/* ── 호스트 도구 ────────────────────────────────────────────── */
+
+.host-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.7rem 0 0.4rem;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(3, 12, 20, 0.4);
+}
+
+@media (max-width: 30rem) {
+  .tool-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.tool-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+}

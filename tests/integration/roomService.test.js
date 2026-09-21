@@ -1,0 +1,841 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { ROOM_STATUS } from '../../src/domain/room/Room.js';
+import { SEAT_KINDS } from '../../src/domain/room/Seat.js';
+import { AppError } from '../../src/application/errors.js';
+import { FakeRandomSource } from '../support/FakeRandomSource.js';
+import { createAppFixture, startedRoom } from '../support/appFixture.js';
+
+/** 방 코드 생성용 난수. 방마다 다른 코드가 나오도록 0~31을 순환한다. */
+const codeRandom = () => new FakeRandomSource(Array.from({ length: 200 }, (_unused, index) => index % 32));
+
+describe('RoomService(방 유스케이스)', () => {
+  describe('방 만들기', () => {
+    it('방을 만들면 방 DTO와 좌석 토큰을 돌려준다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+
+      // When
+      const result = await roomService.createRoom({ hostName: '하나' });
+
+      // Then
+      assert.match(result.room.code, /^[A-HJ-NP-Z2-9]{4}$/);
+      assert.equal(result.room.status, ROOM_STATUS.LOBBY);
+      assert.equal(result.room.seats.length, 1);
+      assert.equal(result.room.seats[0].isHost, true);
+      assert.equal(typeof result.seatToken, 'string');
+      assert.equal(result.seatId, result.room.seats[0].id);
+    });
+
+    it('방 DTO에는 좌석 토큰이 들어가지 않는다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+
+      // When
+      const result = await roomService.createRoom({ hostName: '하나' });
+
+      // Then
+      assert.equal(JSON.stringify(result.room).includes(result.seatToken), false);
+      assert.equal(Object.hasOwn(result.room.seats[0], 'token'), false);
+    });
+
+    it('만든 방은 저장소에 저장된다', async () => {
+      // Given
+      const { roomService, repository } = createAppFixture({ random: codeRandom() });
+
+      // When
+      const result = await roomService.createRoom({ hostName: '하나' });
+
+      // Then
+      const saved = await repository.findByCode(result.room.code);
+      assert.equal(saved.code, result.room.code);
+    });
+
+    it('이름 형식이 잘못되면 거부한다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+
+      // When / Then
+      await assert.rejects(() => roomService.createRoom({ hostName: '' }), (error) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.code, 'ERR001');
+        return true;
+      });
+    });
+  });
+
+  describe('방 목록', () => {
+    it('참가할 수 있는 대기실만 보여준다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const lobby = await fixture.roomService.createRoom({ hostName: '하나' });
+      const playing = await startedRoom(fixture, { guestCount: 1 });
+
+      // When
+      const rooms = await fixture.roomService.listRooms();
+
+      // Then
+      const codes = rooms.map((room) => room.code);
+      assert.ok(codes.includes(lobby.room.code));
+      assert.equal(codes.includes(playing.code), false);
+      assert.equal(Object.hasOwn(rooms[0], 'seats'), false);
+      assert.equal(rooms[0].seatCount, 1);
+    });
+  });
+
+  describe('좌석 참가와 퇴장', () => {
+    it('좌석에 참가하면 토큰을 발급하고 방 변경을 브로드캐스트한다', async () => {
+      // Given
+      const { roomService, publisher } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      publisher.reset();
+
+      // When
+      const guest = await roomService.joinSeat({ code: host.room.code, name: '두리' });
+
+      // Then
+      assert.equal(guest.room.seats.length, 2);
+      assert.notEqual(guest.seatToken, host.seatToken);
+      assert.equal(publisher.rooms.length, 1);
+      assert.equal(publisher.lastRoom.seats.length, 2);
+    });
+
+    it('없는 방에 참가하면 방을 찾을 수 없다는 에러다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+
+      // When / Then
+      await assert.rejects(() => roomService.joinSeat({ code: 'ZZZZ', name: '두리' }), { code: 'ERR004' });
+    });
+
+    it('본인 토큰으로 퇴장할 수 있다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      const guest = await roomService.joinSeat({ code: host.room.code, name: '두리' });
+
+      // When
+      const room = await roomService.leaveSeat({
+        code: host.room.code,
+        seatId: guest.seatId,
+        token: guest.seatToken,
+      });
+
+      // Then
+      assert.equal(room.seats.length, 1);
+    });
+
+    it('남의 좌석을 토큰 없이 강퇴할 수 없다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      const guest = await roomService.joinSeat({ code: host.room.code, name: '두리' });
+
+      // When / Then
+      await assert.rejects(
+        () => roomService.leaveSeat({ code: host.room.code, seatId: host.seatId, token: guest.seatToken }),
+        { code: 'ERR003' },
+      );
+    });
+
+    it('게임이 진행 중이면 퇴장 요청을 ERR005로 거부하고 방은 그대로 남는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.leaveSeat({
+            code: started.code,
+            seatId: started.guests[0].seatId,
+            token: started.guests[0].seatToken,
+          }),
+        { code: 'ERR005' },
+      );
+      const room = await fixture.roomService.getRoom({ code: started.code });
+      assert.equal(room.status, ROOM_STATUS.PLAYING);
+      assert.equal(room.seats.length, 2);
+    });
+
+    it('게임이 진행 중이면 호스트의 강퇴도 ERR005로 거부한다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.leaveSeat({
+            code: started.code,
+            seatId: started.guests[0].seatId,
+            token: started.host.seatToken,
+          }),
+        { code: 'ERR005' },
+      );
+      const room = await fixture.roomService.getRoom({ code: started.code });
+      assert.equal(room.seats.length, 2);
+    });
+
+    it('마지막 좌석이 나가면 방이 삭제된다', async () => {
+      // Given
+      const { roomService, repository } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      await roomService.leaveSeat({ code: host.room.code, seatId: host.seatId, token: host.seatToken });
+
+      // Then
+      assert.equal(await repository.findByCode(host.room.code), null);
+    });
+
+    it('방이 삭제되면 그 방의 SSE 스트림도 닫는다', async () => {
+      // Given
+      const { roomService, publisher } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      await roomService.leaveSeat({ code: host.room.code, seatId: host.seatId, token: host.seatToken });
+
+      // Then
+      assert.deepEqual(publisher.closed, [host.room.code]);
+    });
+  });
+
+  describe('방 개수 상한(플러딩 방어)', () => {
+    /** 상한을 낮춰 조립한 서비스와 움직이는 시계. */
+    const cappedFixture = async ({ maxRooms = 2, start = 1_700_000_000_000 } = {}) => {
+      const fixture = createAppFixture({ random: codeRandom() });
+      let now = start;
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+        maxRooms,
+      });
+      return { fixture, roomService, advance: (ms) => { now += ms; }, at: () => now };
+    };
+
+    it('상한에 닿고 정리할 방도 없으면 ERR017로 거절한다', async () => {
+      // Given
+      const { roomService } = await cappedFixture({ maxRooms: 2 });
+      await roomService.createRoom({ hostName: '하나' });
+      await roomService.createRoom({ hostName: '두리' });
+
+      // When / Then
+      await assert.rejects(() => roomService.createRoom({ hostName: '세찌' }), { code: 'ERR017' });
+    });
+
+    it('상한에 닿으면 30분 넘게 방치된 대기실을 먼저 쓸어낸다', async () => {
+      // Given
+      const { fixture, roomService, advance } = await cappedFixture({ maxRooms: 2 });
+      const stale = await roomService.createRoom({ hostName: '옛방' });
+      advance(31 * 60 * 1000);
+      const fresh = await roomService.createRoom({ hostName: '새방' });
+
+      // When
+      const created = await roomService.createRoom({ hostName: '신규' });
+
+      // Then (방치된 방만 사라지고 새 방이 생겼다)
+      assert.equal(await fixture.repository.findByCode(stale.room.code), null);
+      assert.notEqual(await fixture.repository.findByCode(fresh.room.code), null);
+      assert.notEqual(await fixture.repository.findByCode(created.room.code), null);
+    });
+
+    it('진행 중인 방은 방치돼 보여도 쓸어내지 않는다', async () => {
+      // Given
+      const { fixture, roomService, advance } = await cappedFixture({ maxRooms: 1 });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      await roomService.joinSeat({ code: host.room.code, name: '두리' });
+      await roomService.hostAction({
+        code: host.room.code,
+        token: host.seatToken,
+        action: { type: 'START' },
+      });
+      advance(31 * 60 * 1000);
+
+      // When / Then
+      await assert.rejects(() => roomService.createRoom({ hostName: '신규' }), { code: 'ERR017' });
+      assert.notEqual(await fixture.repository.findByCode(host.room.code), null);
+    });
+
+    it('기본 상한은 200개다', async () => {
+      // Given / When
+      const { MAX_ROOMS } = await import('../../src/application/RoomService.js');
+
+      // Then
+      assert.equal(MAX_ROOMS, 200);
+    });
+  });
+
+  describe('로비 목록', () => {
+    it('전체 방을 복원하지 않고 요약 색인만 읽는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      await fixture.roomService.createRoom({ hostName: '하나' });
+      let findAllCalls = 0;
+      const spied = {
+        ...fixture.repository,
+        findAll: async () => {
+          findAllCalls += 1;
+          return [];
+        },
+        findAllSummaries: () => fixture.repository.findAllSummaries(),
+        findByCode: (code) => fixture.repository.findByCode(code),
+      };
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: spied,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: fixture.clock,
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+
+      // When
+      const rooms = await roomService.listRooms();
+
+      // Then
+      assert.equal(rooms.length, 1);
+      assert.equal(findAllCalls, 0, 'findAll(전체 복원)을 쓰지 않는다');
+      assert.deepEqual(Object.keys(rooms[0]).sort(), [
+        'code',
+        'hostName',
+        'maxSeats',
+        'options',
+        'seatCount',
+        'status',
+        'updatedAt',
+      ]);
+    });
+
+    it('자리가 찬 방과 진행 중인 방은 목록에서 빠진다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const open = await fixture.roomService.createRoom({ hostName: '열린방' });
+      const playing = await fixture.roomService.createRoom({ hostName: '진행방' });
+      await fixture.roomService.joinSeat({ code: playing.room.code, name: '두리' });
+      await fixture.roomService.hostAction({
+        code: playing.room.code,
+        token: playing.seatToken,
+        action: { type: 'START' },
+      });
+      const full = await fixture.roomService.createRoom({ hostName: '만석방' });
+      for (const name of ['둘', '셋', '넷']) {
+        await fixture.roomService.joinSeat({ code: full.room.code, name });
+      }
+
+      // When
+      const rooms = await fixture.roomService.listRooms();
+
+      // Then
+      assert.deepEqual(rooms.map((room) => room.code), [open.room.code]);
+    });
+  });
+
+  describe('오래된 방 정리', () => {
+    it('주기적으로 정리를 돌리고 멈출 수 있다(unref된 타이머)', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const intervals = [];
+      let unrefCalled = false;
+      let tick;
+      const timers = {
+        setInterval: (fn, ms) => {
+          intervals.push(ms);
+          tick = fn;
+          return {
+            unref: () => {
+              unrefCalled = true;
+            },
+          };
+        },
+        clearInterval: () => {
+          tick = null;
+        },
+      };
+
+      // When
+      const stop = fixture.roomService.startStaleCleanup({ intervalMs: 1_000, timers });
+      await tick();
+
+      // Then
+      assert.deepEqual(intervals, [1_000]);
+      assert.equal(unrefCalled, true);
+      stop();
+      assert.equal(tick, null);
+    });
+
+    it('주기 정리가 실패해도 예외를 밖으로 던지지 않는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const errors = [];
+      let tick;
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: {
+          ...fixture.repository,
+          findAll: async () => {
+            throw new Error('디스크 장애');
+          },
+        },
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: fixture.clock,
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: (message) => errors.push(message) },
+      });
+
+      // When
+      roomService.startStaleCleanup({
+        intervalMs: 1_000,
+        timers: {
+          setInterval: (fn) => {
+            tick = fn;
+            return { unref: () => {} };
+          },
+          clearInterval: () => {},
+        },
+      });
+
+      // Then (타이머 콜백은 예외를 밖으로 내지 않고 로그만 남긴다)
+      assert.doesNotThrow(() => tick());
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.match(errors.at(-1), /정리/);
+    });
+
+    it('24시간 넘게 방치된 방을 서버 시작 시 지운다', async () => {
+      // Given
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      // clock을 앞으로 돌릴 수 있도록 서비스가 쓰는 시계를 교체한다.
+      const movableClock = { now: () => now };
+      const roomService = new (await import('../../src/application/RoomService.js')).RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: movableClock,
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+      const oldRoom = await roomService.createRoom({ hostName: '옛방' });
+      now += day + 1_000;
+      const freshRoom = await roomService.createRoom({ hostName: '새방' });
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(removed, [oldRoom.room.code]);
+      assert.equal(await fixture.repository.findByCode(oldRoom.room.code), null);
+      assert.notEqual(await fixture.repository.findByCode(freshRoom.room.code), null);
+    });
+
+    it('정리된 방은 스트림을 닫고 자동 진행 예약도 취소한다', async () => {
+      // Given
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      const cancelled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: () => {},
+        cancelTimer: () => {},
+        cancel: (code) => cancelled.push(code),
+      });
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+      roomService.attachAutoPlayerDriver({
+        schedule: () => {},
+        cancelTimer: () => {},
+        cancel: (code) => cancelled.push(code),
+      });
+      const oldRoom = await roomService.createRoom({ hostName: '옛방' });
+      now += day + 1_000;
+      fixture.publisher.reset();
+
+      // When
+      await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(cancelled, [oldRoom.room.code]);
+      assert.deepEqual(fixture.publisher.closed, [oldRoom.room.code]);
+    });
+
+    it('정리 도중 방이 활동하면 지우지 않는다(방 잠금 안에서 다시 확인)', async () => {
+      // Given (정리 판단 시점에는 방치 상태였지만, 삭제 직전에 커맨드가 들어온 상황)
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+        mutex: fixture.repository.mutexForTest ?? undefined,
+      });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      now += day + 1_000;
+
+      // 정리가 방 목록을 읽은 뒤, 삭제 직전에 방이 갱신되도록 저장소에 끼어든다.
+      const realFindAll = fixture.repository.findAll.bind(fixture.repository);
+      fixture.repository.findAll = async () => {
+        const rooms = await realFindAll();
+        // 목록을 넘겨준 직후 방이 활동한다(= updatedAt이 새로워진다).
+        const active = await fixture.repository.findByCode(host.room.code);
+        active.touch(now + 1);
+        await fixture.repository.save(active);
+        return rooms;
+      };
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then (막 활동한 방은 살아남는다)
+      assert.deepEqual(removed, []);
+      assert.notEqual(await fixture.repository.findByCode(host.room.code), null);
+    });
+
+    it('정말 방치된 방은 잠금 안에서 다시 확인해도 지운다', async () => {
+      // Given
+      const day = 24 * 60 * 60 * 1000;
+      let now = 1_700_000_000_000;
+      const fixture = createAppFixture({ random: codeRandom() });
+      const { RoomService } = await import('../../src/application/RoomService.js');
+      const roomService = new RoomService({
+        repository: fixture.repository,
+        random: codeRandom(),
+        authenticator: fixture.authenticator,
+        publisher: fixture.publisher,
+        clock: { now: () => now },
+        tokenFactory: fixture.tokenFactory,
+        logger: { error: () => {} },
+      });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      now += day + 1_000;
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(removed, [host.room.code]);
+      assert.equal(await fixture.repository.findByCode(host.room.code), null);
+    });
+
+    it('정리할 방이 없으면 빈 목록을 돌려준다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      const removed = await roomService.cleanupStaleRooms();
+
+      // Then
+      assert.deepEqual(removed, []);
+    });
+  });
+
+  describe('호스트 동작', () => {
+    it('호스트는 컴퓨터 좌석을 추가할 수 있다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      const room = await roomService.hostAction({
+        code: host.room.code,
+        token: host.seatToken,
+        action: { type: 'ADD_COMPUTER', name: '컴퓨터1' },
+      });
+
+      // Then
+      assert.equal(room.seats.length, 2);
+      assert.equal(room.seats[1].kind, SEAT_KINDS.COMPUTER);
+    });
+
+    it('호스트는 라운드 제한을 설정할 수 있다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When
+      const room = await roomService.hostAction({
+        code: host.room.code,
+        token: host.seatToken,
+        action: { type: 'SET_OPTIONS', roundLimit: 20 },
+      });
+
+      // Then
+      assert.equal(room.options.roundLimit, 20);
+    });
+
+    it('호스트가 아니면 호스트 동작이 거부되고 상태가 그대로다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+      const guest = await roomService.joinSeat({ code: host.room.code, name: '두리' });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          roomService.hostAction({
+            code: host.room.code,
+            token: guest.seatToken,
+            action: { type: 'ADD_COMPUTER', name: '컴퓨터1' },
+          }),
+        { code: 'ERR003' },
+      );
+      const room = await roomService.getRoom({ code: host.room.code });
+      assert.equal(room.seats.length, 2);
+    });
+
+    it('토큰이 없으면 인증 에러다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When / Then
+      await assert.rejects(
+        () => roomService.hostAction({ code: host.room.code, token: undefined, action: { type: 'START' } }),
+        { code: 'ERR002' },
+      );
+    });
+
+    it('엉뚱한 토큰이면 인증 에러다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          roomService.hostAction({
+            code: host.room.code,
+            token: 'f'.repeat(64),
+            action: { type: 'START' },
+          }),
+        { code: 'ERR002' },
+      );
+    });
+
+    it('알 수 없는 호스트 동작은 거부한다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          roomService.hostAction({
+            code: host.room.code,
+            token: host.seatToken,
+            action: { type: 'DROP_DATABASE' },
+          }),
+        { code: 'ERR001' },
+      );
+    });
+
+    it('좌석이 2명 미만이면 시작할 수 없다', async () => {
+      // Given
+      const { roomService } = createAppFixture({ random: codeRandom() });
+      const host = await roomService.createRoom({ hostName: '하나' });
+
+      // When / Then
+      await assert.rejects(
+        () => roomService.hostAction({ code: host.room.code, token: host.seatToken, action: { type: 'START' } }),
+        { code: 'ERR013' },
+      );
+    });
+
+    it('시작하면 게임 스냅샷을 브로드캐스트한다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const { roomService, publisher } = fixture;
+      const host = await roomService.createRoom({ hostName: '하나' });
+      await roomService.joinSeat({ code: host.room.code, name: '두리' });
+      publisher.reset();
+
+      // When
+      const room = await roomService.hostAction({
+        code: host.room.code,
+        token: host.seatToken,
+        action: { type: 'START' },
+      });
+
+      // Then
+      assert.equal(room.status, ROOM_STATUS.PLAYING);
+      assert.equal(publisher.games.length, 1);
+      assert.equal(publisher.lastGame.view.phase, 'AWAIT_ROLL');
+      assert.equal(publisher.lastGame.view.currentSeatId, host.seatId);
+    });
+
+    it('접속 중인 좌석을 자동 진행으로 바꾸려 하면 ERR005다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      fixture.presence.setOnline(started.code, [started.guests[0].seatId]);
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.hostAction({
+            code: started.code,
+            token: started.host.seatToken,
+            action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: true },
+          }),
+        { code: 'ERR005' },
+      );
+      const room = await fixture.roomService.getRoom({ code: started.code });
+      assert.equal(room.seats[1].autopilot, false);
+    });
+
+    it('자동 진행 해제는 그 좌석 본인 토큰으로도 할 수 있다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: true },
+      });
+
+      // When
+      const room = await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.guests[0].seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: false },
+      });
+
+      // Then
+      assert.equal(room.seats[1].autopilot, false);
+    });
+
+    it('남의 좌석 자동 진행을 비호스트가 켜려 하면 ERR003이다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 2 });
+
+      // When / Then
+      await assert.rejects(
+        () =>
+          fixture.roomService.hostAction({
+            code: started.code,
+            token: started.guests[0].seatToken,
+            action: { type: 'SET_AUTOPILOT', seatId: started.guests[1].seatId, enabled: true },
+          }),
+        { code: 'ERR003' },
+      );
+    });
+
+    it('현재 턴 좌석을 자동 진행으로 켜면 드라이버가 예약되고, 끄면 예약이 취소된다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      const scheduled = [];
+      const cancelled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: (code) => scheduled.push(code),
+        cancelTimer: (code) => cancelled.push(code),
+        cancel: (code) => cancelled.push(code),
+      });
+
+      // When (첫 턴은 호스트 좌석)
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: true },
+      });
+
+      // Then
+      assert.deepEqual(scheduled, [started.code]);
+
+      // When (되돌리면 예약을 취소한다)
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: false },
+      });
+
+      // Then
+      assert.deepEqual(cancelled, [started.code]);
+      assert.equal(scheduled.length, 1);
+    });
+
+    it('사람 차례인 방을 시작할 때는 드라이버를 예약하지 않는다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const scheduled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: (code) => scheduled.push(code),
+        cancelTimer: () => {},
+        cancel: () => {},
+      });
+
+      // When
+      await startedRoom(fixture, { guestCount: 1 });
+
+      // Then
+      assert.deepEqual(scheduled, []);
+    });
+
+    it('컴퓨터 차례로 시작하는 방은 드라이버를 예약한다', async () => {
+      // Given (호스트를 컴퓨터로 만들 수는 없으므로 호스트 좌석을 자동 진행으로 돌린다)
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+      const scheduled = [];
+      fixture.roomService.attachAutoPlayerDriver({
+        schedule: (code) => scheduled.push(code),
+        cancelTimer: () => {},
+        cancel: () => {},
+      });
+
+      // When
+      await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.host.seatId, enabled: true },
+      });
+
+      // Then
+      assert.deepEqual(scheduled, [started.code]);
+    });
+
+    it('호스트는 좌석을 자동 진행으로 바꿀 수 있다', async () => {
+      // Given
+      const fixture = createAppFixture({ random: codeRandom() });
+      const started = await startedRoom(fixture, { guestCount: 1 });
+
+      // When
+      const room = await fixture.roomService.hostAction({
+        code: started.code,
+        token: started.host.seatToken,
+        action: { type: 'SET_AUTOPILOT', seatId: started.guests[0].seatId, enabled: true },
+      });
+
+      // Then
+      assert.equal(room.seats[1].autopilot, true);
+    });
+  });
+});

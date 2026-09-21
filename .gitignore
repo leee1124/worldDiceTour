@@ -1,3 +1,7 @@
 node_modules/
 .omc/
 *.log
+/data/
+coverage/
+.claude/
+public/__verify.*

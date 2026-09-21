@@ -1,0 +1,877 @@
+/**
+ * 화면 · 서버 · 연출을 잇는 컨트롤러.
+ *
+ * 흐름: 사용자 입력 → 커맨드 POST → (응답 또는 SSE로 온) `{view, events}` → 재생 큐 → 최신 뷰 렌더.
+ * 실패하면 서버가 준 `{code, message}`만 토스트로 보여 주고, 화면은 서버 뷰로 되돌린다.
+ */
+
+import * as api from './api.js';
+import * as storage from './storage.js';
+import {
+  CONNECTION,
+  SCREENS,
+  createStore,
+  isHostSeatMine,
+  isMySeat,
+  isMyTurn,
+  isPlayingRoom,
+  seatNameOf,
+  slotOf,
+  spaceNameOf,
+} from './store.js';
+import { setHidden } from './dom.js';
+import { buildCostOf } from './domain/buildRules.js';
+import { createCommandLock } from './domain/commandLock.js';
+import { inferGameOverReason } from './domain/gameOverReason.js';
+import { isRoomGoneError } from './domain/roomErrors.js';
+import { EventPlaybackQueue } from './animation/EventQueue.js';
+import { createPlaybackEngine } from './animation/playback.js';
+import { createToastHost } from './views/toast.js';
+import { createHomeView } from './views/homeView.js';
+import { createLobbyView } from './views/lobbyView.js';
+import { createBoardView } from './views/boardView.js';
+import { createCenterView } from './views/centerView.js';
+import { createPlayersView } from './views/playersView.js';
+import { createLogView } from './views/logView.js';
+import { createGameView } from './views/gameView.js';
+import { createCasinoView, CASINO_MODAL_ID, casinoModalSpec } from './views/casinoView.js';
+import { createModalHost } from './views/modals/modalHost.js';
+import { BUY_MODAL_ID, buyModalSpec } from './views/modals/buyModal.js';
+import { BUILD_MODAL_ID, buildModalSpec } from './views/modals/buildModal.js';
+import { START_BUILD_MODAL_ID, startBuildModalSpec } from './views/modals/startBuildModal.js';
+import { ACQUIRE_MODAL_ID, acquireModalSpec } from './views/modals/acquireModal.js';
+import { ISLAND_MODAL_ID, islandModalSpec } from './views/modals/islandModal.js';
+import { LIQUIDATION_MODAL_ID, liquidationModalSpec } from './views/modals/liquidationModal.js';
+import { GAME_OVER_MODAL_ID, gameOverModalSpec } from './views/modals/gameOverModal.js';
+import { TRAVEL_MODAL_ID, travelConfirmSpec } from './views/modals/travelModal.js';
+import { CELL_SHEET_ID, cellSheetSpec } from './views/modals/cellSheet.js';
+
+/** 방 목록 자동 새로고침 주기. */
+const ROOM_LIST_INTERVAL_MS = 3000;
+/** SSE가 거절당했을 때의 재연결 대기 시간(점점 늘린다). */
+const RECONNECT_BACKOFF_MS = [1000, 2000, 4000, 8000, 15_000];
+
+export function createGameController({ appRoot, overlayRoot }) {
+  const store = createStore();
+  const toast = createToastHost(overlayRoot);
+  const modalHost = createModalHost(overlayRoot);
+  const queue = new EventPlaybackQueue();
+
+  let roomCode = null;
+  let stream = null;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
+  let roomListTimer = null;
+  const commandLock = createCommandLock();
+  /** 마지막 GAME_OVER 이벤트의 종료 사유. 재접속 스냅샷에는 이벤트가 없으므로 뷰에서 추정한다. */
+  let gameOverReason = null;
+
+  /** 잠금 상태가 바뀔 때마다 화면에 반영한다(모든 커맨드 버튼의 disabled/aria-busy 기준). */
+  function syncLock() {
+    store.patch({ locked: commandLock.locked });
+  }
+
+  /* ── 뷰 구성 ──────────────────────────────────────────────── */
+
+  const homeView = createHomeView({
+    onCreateRoom: (name) => void createRoom(name),
+    onJoinRoom: (code, name) => void joinRoom(code, name),
+    onReconnect: (code) => void enterRoom(code),
+    onForget: (code) => {
+      storage.forgetRoom(code);
+      store.patch({ savedRooms: storage.savedRooms() });
+    },
+  });
+
+  const lobbyView = createLobbyView({
+    onAddLocalPlayer: (name) => void joinSeat(name),
+    onLeaveSeat: (seatId) => void leaveSeat(seatId),
+    onKickSeat: (seatId) => void kickSeat(seatId),
+    onAddComputer: (name) => void sendHostAction({ type: 'ADD_COMPUTER', name }),
+    onSetRoundLimit: (roundLimit) => void sendHostAction({ type: 'SET_OPTIONS', roundLimit }),
+    onStart: () => void sendHostAction({ type: 'START' }),
+    onExit: () => void leaveRoomFromLobby(),
+  });
+
+  const boardView = createBoardView({ onCellActivate: (index) => onCellActivate(index) });
+  const centerView = createCenterView({
+    onRoll: () => void sendCommand('ROLL'),
+    onOpenDecision: () => syncModals(),
+    onShowRankings: () => showRankings(),
+    onLeaveGame: () => leaveGameScreen(),
+    onResumeControl: (seatId) => void setAutopilot(seatId, false),
+  });
+  const playersView = createPlayersView({
+    onSetAutopilot: (seatId, enabled) => void setAutopilot(seatId, enabled),
+  });
+  const logView = createLogView();
+  const casinoView = createCasinoView({
+    onBet: (bet) => void sendCommand('CASINO_BET', bet),
+    onLeave: () => void sendCommand('CASINO_LEAVE'),
+  });
+  const gameView = createGameView({
+    boardView,
+    centerView,
+    playersView,
+    logView,
+    onReconnectNow: () => void resyncAndReconnect(),
+  });
+
+  appRoot.append(homeView.element, lobbyView.element, gameView.element);
+
+  /* ── 재생 엔진 ────────────────────────────────────────────── */
+
+  const playback = createPlaybackEngine({
+    queue,
+    board: boardView,
+    center: centerView,
+    players: playersView,
+    log: logView,
+    casino: casinoView,
+    isCasinoOpen: () => modalHost.isOpen(CASINO_MODAL_ID),
+    announce: (text) => gameView.announce(text),
+    applyView: (view) => {
+      // 실제로 최신 뷰가 반영된 순간에만 잠금을 푼다(연출이 끝날 때까지는 이중 전송을 막는다).
+      // 뷰와 잠금을 한 번에 반영해야 한다: 뷰를 먼저 그리면 새 결정 모달이 잠긴 채로 만들어진다.
+      commandLock.onView(view?.version);
+      store.patch({ view, locked: commandLock.locked });
+    },
+    isLocalSeat: (seatId) => isMySeat(store.state, seatId),
+    onGameOver: (reason) => {
+      gameOverReason = reason;
+    },
+    nameOf: (seatId) => seatNameOf(store.state, seatId),
+    spaceNameOf: (index) => spaceNameOf(store.state, index),
+  });
+
+  /* ── 렌더링 ───────────────────────────────────────────────── */
+
+  store.subscribe((state) => render(state));
+
+  function render(state) {
+    setHidden(homeView.element, state.screen !== SCREENS.HOME);
+    setHidden(lobbyView.element, state.screen !== SCREENS.LOBBY);
+    setHidden(gameView.element, state.screen !== SCREENS.GAME);
+
+    if (state.screen === SCREENS.HOME) {
+      homeView.update(state);
+      modalHost.closeOthers([]);
+      return;
+    }
+    if (state.screen === SCREENS.LOBBY) {
+      lobbyView.update(state);
+      modalHost.closeOthers([]);
+      return;
+    }
+
+    gameView.update(state);
+    if (state.view) {
+      // 목적지 선택 모드를 먼저 정해야 한다: 칸의 선택 가능/금지 표시는 boardView.update가 그 모드를 읽어 그린다.
+      syncTravelMode(state);
+      boardView.update(state);
+      centerView.update(state);
+      centerView.animateJackpot(state.view.jackpot);
+      playersView.update(state);
+      syncModals(state);
+    }
+  }
+
+  /* ── 모달 동기화 (phase + pending) ─────────────────────────── */
+
+  function syncTravelMode(state) {
+    const view = state.view;
+    const picking = view?.phase === 'AWAIT_TRAVEL' && isMyTurn(state);
+    // 선택 가능한 칸은 서버가 준 금지 목록으로만 판단한다.
+    boardView.setTravelMode({
+      active: picking,
+      forbidden: picking ? view.pending?.forbiddenIndexes ?? [] : [],
+      locked: Boolean(state.locked),
+    });
+  }
+
+  function syncModals(state = store.state) {
+    const view = state.view;
+    if (!view || state.screen !== SCREENS.GAME) {
+      modalHost.closeOthers([]);
+      return;
+    }
+
+    if (view.isOver) {
+      presentGameOver(state);
+      modalHost.closeOthers([GAME_OVER_MODAL_ID, CELL_SHEET_ID]);
+      return;
+    }
+
+    const pending = view.pending;
+    // 목적지 확인 시트는 공항 선택 페이즈에서만 남겨 둔다.
+    const keep = view.phase === 'AWAIT_TRAVEL' ? [CELL_SHEET_ID, TRAVEL_MODAL_ID] : [CELL_SHEET_ID];
+
+    // 카지노는 관전자도 함께 본다(조작은 자기 차례에만).
+    if (view.phase === 'AWAIT_CASINO' && pending) {
+      const playerName = seatNameOf(state, view.currentSeatId);
+      casinoView.update({
+        pending,
+        cash: currentPlayer(state)?.cash ?? 0,
+        myTurn: isMyTurn(state),
+        locked: Boolean(state.locked),
+        playerName,
+      });
+      modalHost.present(casinoModalSpec({ casinoView, playerName }));
+      modalHost.closeOthers([CASINO_MODAL_ID, ...keep]);
+      return;
+    }
+
+    if (!isMyTurn(state) || !pending) {
+      modalHost.closeOthers(keep);
+      return;
+    }
+
+    const spec = decisionSpec(state, pending);
+    if (!spec) {
+      modalHost.closeOthers(keep);
+      return;
+    }
+    modalHost.present(spec);
+    modalHost.closeOthers([spec.id, ...keep]);
+  }
+
+  function decisionSpec(state, pending) {
+    const view = state.view;
+    const cash = currentPlayer(state)?.cash ?? 0;
+    const spaceAt = (index) => view.board?.[index] ?? null;
+    const locked = Boolean(state.locked);
+
+    switch (pending.kind) {
+      case 'BUY':
+        return buyModalSpec({
+          pending,
+          space: spaceAt(pending.index),
+          cash,
+          locked,
+          onBuy: () => void sendCommand('BUY'),
+          onSkip: () => void sendCommand('SKIP_BUY'),
+        });
+
+      case 'BUILD': {
+        const signature = `${signatureOfBuild(pending, cash)}:${locked}`;
+        const keepBody = modalHost.isOpen(BUILD_MODAL_ID) && buildSignature === signature;
+        buildSignature = signature;
+        return buildModalSpec({
+          pending,
+          space: spaceAt(pending.index),
+          cash,
+          keepBody,
+          locked,
+          onBuild: (buildings) => void sendCommand('BUILD', { buildings }),
+          onSkip: () => void sendCommand('SKIP_BUILD'),
+        });
+      }
+
+      case 'START_BUILD': {
+        const spec = startBuildModalSpec({
+          pending,
+          boardOf: spaceAt,
+          cash,
+          // 잠금 상태가 바뀌면 버튼의 disabled를 다시 그려야 하므로 본문을 유지하지 않는다.
+          keepBody: modalHost.isOpen(START_BUILD_MODAL_ID) && startBuildLocked === locked,
+          locked,
+          onStartBuild: (cityIndex, buildings) => void sendCommand('START_BUILD', { cityIndex, buildings }),
+          onSkip: () => void sendCommand('SKIP_START_BUILD'),
+        });
+        startBuildLocked = locked;
+        return spec;
+      }
+
+      case 'ACQUIRE':
+        return acquireModalSpec({
+          pending,
+          space: spaceAt(pending.index),
+          ownerName: seatNameOf(state, pending.ownerId),
+          cash,
+          locked,
+          onAcquire: () => void sendCommand('ACQUIRE'),
+          onSkip: () => void sendCommand('SKIP_ACQUIRE'),
+        });
+
+      case 'ISLAND':
+        return islandModalSpec({
+          pending,
+          cash,
+          locked,
+          onPay: () => void sendCommand('ISLAND_PAY'),
+          onRoll: () => void sendCommand('ISLAND_ROLL'),
+        });
+
+      case 'LIQUIDATION':
+        return liquidationModalSpec({
+          pending,
+          cash,
+          creditorName: seatNameOf(state, pending.creditorId),
+          keepBody: false,
+          locked,
+          onSell: (cityIndex) => void sendCommand('SELL', { cityIndex }),
+          onAutoSell: () => void sendCommand('AUTO_SELL'),
+          onTakeLoan: () => void sendCommand('TAKE_LOAN'),
+          onDeclareBankruptcy: () => void sendCommand('DECLARE_BANKRUPTCY'),
+        });
+
+      default:
+        return null;
+    }
+  }
+
+  /** 건설 모달은 체크 상태를 지키기 위해 같은 기회일 때 본문을 다시 만들지 않는다. */
+  let buildSignature = null;
+  /** 출발 보너스 모달 본문을 마지막으로 그렸을 때의 잠금 상태. */
+  let startBuildLocked = null;
+  function signatureOfBuild(pending, cash) {
+    return `${pending.index}:${(pending.options ?? []).map((option) => `${option.type}${option.cost}`).join(',')}:${cash}`;
+  }
+
+  function presentGameOver(state) {
+    modalHost.present(
+      gameOverModalSpec({
+        rankings: state.view.rankings ?? [],
+        // 이번 세션에서 GAME_OVER 이벤트를 받았으면 그 사유를, 재접속 스냅샷이라 못 받았으면 뷰에서 추정한다.
+        reason: gameOverReason ?? inferGameOverReason(state.view),
+        slotOfSeat: (seatId) => slotOf(state, seatId),
+        onBackToRoom: () => {
+          modalHost.close(GAME_OVER_MODAL_ID);
+        },
+        onNewGame: () => {
+          modalHost.close(GAME_OVER_MODAL_ID);
+          leaveGameScreen();
+        },
+      }),
+    );
+  }
+
+  function showRankings() {
+    if (store.state.view?.isOver) {
+      presentGameOver(store.state);
+    }
+  }
+
+  function currentPlayer(state) {
+    return state.view?.players.find((player) => player.seatId === state.view.currentSeatId) ?? null;
+  }
+
+  /* ── 보드 칸 누름 ─────────────────────────────────────────── */
+
+  function onCellActivate(index) {
+    const state = store.state;
+    const space = state.view?.board?.[index];
+    if (!space) {
+      return;
+    }
+
+    const picking = state.view.phase === 'AWAIT_TRAVEL' && isMyTurn(state);
+    const forbidden = state.view.pending?.forbiddenIndexes ?? [];
+    if (picking) {
+      if (state.locked) {
+        // 커맨드가 오가는 중에는 목적지 탭도 잠긴다(이중 전송 방지).
+        return;
+      }
+      if (forbidden.includes(index)) {
+        toast.info('이 칸은 목적지로 고를 수 없습니다.');
+        return;
+      }
+      boardView.setSelected(index);
+      modalHost.present(
+        travelConfirmSpec({
+          space,
+          ownerName: space.ownerId ? seatNameOf(state, space.ownerId) : null,
+          locked: Boolean(state.locked),
+          onConfirm: () => {
+            modalHost.close(TRAVEL_MODAL_ID);
+            boardView.setSelected(null);
+            void sendCommand('TRAVEL', { destination: index });
+          },
+          onCancel: () => {
+            modalHost.close(TRAVEL_MODAL_ID);
+            boardView.setSelected(null);
+          },
+        }),
+      );
+      return;
+    }
+
+    const costs = space.price
+      ? { VILLA: buildCostOf(space.price, 'VILLA'), BUILDING: buildCostOf(space.price, 'BUILDING'), HOTEL: buildCostOf(space.price, 'HOTEL') }
+      : {};
+    boardView.setSelected(index);
+    modalHost.present(
+      cellSheetSpec({
+        space,
+        ownerName: space.ownerId ? seatNameOf(state, space.ownerId) : null,
+        buildingCosts: costs,
+        onClose: () => {
+          modalHost.close(CELL_SHEET_ID);
+          boardView.setSelected(null);
+        },
+      }),
+    );
+  }
+
+  /* ── 방 참가/생성 흐름 ───────────────────────────────────── */
+
+  async function createRoom(hostName) {
+    store.patch({ busy: true });
+    try {
+      const { room, seatId, seatToken } = await api.createRoom(hostName);
+      storage.saveSeat(room.code, { seatId, seatToken, name: hostName });
+      await enterRoom(room.code);
+      toast.success(`방 ${room.code}을(를) 만들었습니다.`, '방 생성');
+    } catch (error) {
+      reportError(error);
+    } finally {
+      store.patch({ busy: false });
+    }
+  }
+
+  async function joinRoom(code, name) {
+    store.patch({ busy: true });
+    try {
+      const { room, seatId, seatToken } = await api.joinSeat(code, name);
+      storage.saveSeat(room.code, { seatId, seatToken, name });
+      await enterRoom(room.code);
+    } catch (error) {
+      reportError(error);
+    } finally {
+      store.patch({ busy: false });
+    }
+  }
+
+  /** 핫시트: 이 기기에 좌석을 하나 더 만든다. presence가 바뀌므로 스트림을 다시 연다. */
+  async function joinSeat(name) {
+    if (!roomCode) {
+      return;
+    }
+    try {
+      const { room, seatId, seatToken } = await api.joinSeat(roomCode, name);
+      storage.saveSeat(roomCode, { seatId, seatToken, name });
+      store.patch({ room, mySeats: storage.publicSeatsOf(roomCode) });
+      connectStream();
+      toast.success(`${name} 좌석을 이 기기에 추가했습니다.`);
+    } catch (error) {
+      reportError(error);
+    }
+  }
+
+  async function enterRoom(code) {
+    stopRoomListPolling();
+    roomCode = code;
+    // 방마다 view.version이 1부터 다시 시작하므로 버전 기억까지 비운다.
+    queue.forget();
+    logView.clear();
+    gameOverReason = null;
+
+    try {
+      applyRoomState(await api.getRoom(code));
+      connectStream();
+    } catch (error) {
+      if (isRoomGoneError(error)) {
+        // 저장돼 있던 방이 이미 사라졌다 — 홈 화면의 저장된 방 목록에서도 지운다.
+        storage.forgetRoom(code);
+      }
+      reportError(error);
+      goHome();
+    }
+  }
+
+  function applyRoomState({ room, game }) {
+    const mySeats = storage.publicSeatsOf(room.code);
+    for (const seat of room.seats) {
+      if (mySeats.some((mine) => mine.seatId === seat.id)) {
+        storage.renameSeat(room.code, seat.id, seat.name);
+      }
+    }
+    store.patch({
+      room,
+      mySeats: storage.publicSeatsOf(room.code),
+      screen: isPlayingRoom(room) ? SCREENS.GAME : SCREENS.LOBBY,
+      view: game ?? store.state.view,
+    });
+    if (game) {
+      playback.resetTo(game);
+    }
+    // 스냅샷으로 화면을 통째로 맞춘 것이므로 커맨드 잠금도 버전 비교 없이 즉시 푼다.
+    commandLock.onResync();
+    syncLock();
+  }
+
+  /* ── 좌석 떠나기 ─────────────────────────────────────────── */
+
+  async function leaveSeat(seatId) {
+    if (!roomCode) {
+      return;
+    }
+    const token = storage.tokenOf(roomCode, seatId);
+    if (!token) {
+      return;
+    }
+    try {
+      const { room } = await api.leaveSeat(roomCode, seatId, token);
+      storage.removeSeat(roomCode, seatId);
+      const mySeats = storage.publicSeatsOf(roomCode);
+      store.patch({ room, mySeats });
+      if (mySeats.length === 0) {
+        goHome();
+      } else {
+        connectStream();
+      }
+    } catch (error) {
+      reportError(error);
+    }
+  }
+
+  async function kickSeat(seatId) {
+    const hostToken = hostTokenOrNull();
+    if (!hostToken) {
+      return;
+    }
+    try {
+      const { room } = await api.leaveSeat(roomCode, seatId, hostToken);
+      store.patch({ room });
+    } catch (error) {
+      reportError(error);
+    }
+  }
+
+  /** 대기실에서 방을 완전히 떠난다(가진 좌석 모두 비우기). */
+  async function leaveRoomFromLobby() {
+    const code = roomCode;
+    if (!code) {
+      goHome();
+      return;
+    }
+    for (const seat of storage.publicSeatsOf(code)) {
+      const token = storage.tokenOf(code, seat.seatId);
+      if (!token) {
+        continue;
+      }
+      try {
+        await api.leaveSeat(code, seat.seatId, token);
+      } catch (error) {
+        // 이미 사라진 좌석일 수 있다. 기록만 남기고 계속 정리한다.
+        console.error('[controller] 좌석 퇴장 실패', seat.seatId, error.code ?? error);
+      }
+      storage.removeSeat(code, seat.seatId);
+    }
+    storage.forgetRoom(code);
+    goHome();
+  }
+
+  /**
+   * 게임 중 나가기. 진행 중인 방에서는 좌석을 지우지 않는다(서버도 허용하지 않는다).
+   * 좌석 토큰을 그대로 남겨 두어 "재접속"으로 돌아올 수 있게 한다.
+   */
+  function leaveGameScreen() {
+    toast.info('좌석은 그대로 남습니다. 홈의 "이 기기에 저장된 방"에서 다시 들어올 수 있습니다.', '관전 종료');
+    goHome();
+  }
+
+  function goHome() {
+    disconnectStream();
+    roomCode = null;
+    queue.forget();
+    gameOverReason = null;
+    commandLock.onResync();
+    modalHost.closeAll();
+    store.resetRoom();
+    store.patch({ screen: SCREENS.HOME, savedRooms: storage.savedRooms(), connection: CONNECTION.IDLE, locked: false });
+    startRoomListPolling();
+  }
+
+  /* ── 호스트 동작 ─────────────────────────────────────────── */
+
+  function hostTokenOrNull() {
+    const state = store.state;
+    if (!roomCode || !state.room) {
+      return null;
+    }
+    if (!isHostSeatMine(state)) {
+      toast.info('호스트만 할 수 있는 동작입니다.');
+      return null;
+    }
+    return storage.tokenOf(roomCode, state.room.hostSeatId);
+  }
+
+  async function sendHostAction(action) {
+    const token = hostTokenOrNull();
+    if (!token) {
+      return;
+    }
+    store.patch({ busy: true });
+    try {
+      const { room } = await api.hostAction(roomCode, action, token);
+      store.patch({ room });
+    } catch (error) {
+      reportError(error);
+    } finally {
+      store.patch({ busy: false });
+    }
+  }
+
+  /**
+   * 자동 진행 전환. 켜는 것은 호스트만, 끄는 것은 그 좌석의 토큰으로도 할 수 있다.
+   * 서버가 아직 자기 좌석 해제를 허용하지 않으면 규격 에러를 그대로 안내한다.
+   */
+  async function setAutopilot(seatId, enabled) {
+    if (!roomCode) {
+      return;
+    }
+    const ownToken = !enabled ? storage.tokenOf(roomCode, seatId) : null;
+    const token = ownToken ?? hostTokenOrNull();
+    if (!token) {
+      return;
+    }
+    try {
+      const { room } = await api.hostAction(roomCode, { type: 'SET_AUTOPILOT', seatId, enabled }, token);
+      store.patch({ room });
+      toast.success(enabled ? '자동 진행으로 넘겼습니다.' : '직접 플레이로 돌아왔습니다.');
+    } catch (error) {
+      reportError(error);
+    }
+  }
+
+  /* ── 게임 커맨드 ─────────────────────────────────────────── */
+
+  async function sendCommand(type, payload) {
+    const state = store.state;
+    if (!roomCode || !state.view) {
+      return;
+    }
+    if (commandLock.locked) {
+      return;
+    }
+    const seatId = state.view.currentSeatId;
+    if (!isMySeat(state, seatId)) {
+      toast.info('지금은 내 차례가 아닙니다.');
+      return;
+    }
+    const token = storage.tokenOf(roomCode, seatId);
+    if (!token) {
+      toast.info('이 좌석의 권한이 이 기기에 없습니다.');
+      return;
+    }
+
+    commandLock.onSend(state.view.version);
+    syncLock();
+    try {
+      const command = payload === undefined ? { type, seatId } : { type, seatId, payload };
+      const result = await api.sendCommand(roomCode, command, token);
+      // 성공했어도 연출이 끝나 최신 뷰가 실제로 반영될 때까지는 잠금을 유지한다(commandLock.onView가 푼다).
+      commandLock.onSuccess();
+      syncLock();
+      playback.accept(result);
+    } catch (error) {
+      commandLock.onError();
+      syncLock();
+      reportError(error);
+      // 서버 뷰가 유일한 진실이므로 현재 상태를 다시 받아 화면을 되돌린다.
+      await refreshRoomState();
+    }
+  }
+
+  async function refreshRoomState() {
+    if (!roomCode) {
+      return;
+    }
+    try {
+      const snapshot = await api.getRoom(roomCode);
+      applyRoomState(snapshot);
+    } catch (error) {
+      console.error('[controller] 상태 재조회 실패', error.code ?? error);
+    }
+  }
+
+  /* ── SSE 연결 ────────────────────────────────────────────── */
+
+  function connectStream() {
+    if (!roomCode) {
+      return;
+    }
+    disconnectStream();
+    store.patch({ connection: CONNECTION.CONNECTING });
+    stream = api.openRoomStream({
+      code: roomCode,
+      presence: storage.presenceParam(roomCode),
+      onRoom: (room) => onRoomEvent(room),
+      onGame: (message) => playback.accept(message),
+      onOpen: () => {
+        reconnectAttempt = 0;
+        store.patch({ connection: CONNECTION.OPEN });
+      },
+      onDisconnected: (closed) => {
+        if (!closed) {
+          store.patch({ connection: CONNECTION.RECONNECTING });
+          return;
+        }
+        store.patch({ connection: CONNECTION.CLOSED });
+        scheduleReconnect();
+      },
+    });
+  }
+
+  function disconnectStream() {
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (stream) {
+      stream.close();
+      stream = null;
+    }
+  }
+
+  /** 서버가 스트림을 거절했을 때(구독 한도 등) 점점 늘어나는 간격으로 다시 시도한다. */
+  function scheduleReconnect() {
+    if (reconnectTimer !== null || !roomCode) {
+      return;
+    }
+    const delay = RECONNECT_BACKOFF_MS[Math.min(reconnectAttempt, RECONNECT_BACKOFF_MS.length - 1)];
+    reconnectAttempt += 1;
+    reconnectTimer = window.setTimeout(() => {
+      reconnectTimer = null;
+      void resyncAndReconnect();
+    }, delay);
+  }
+
+  /** 재접속: 스냅샷을 먼저 받아 화면을 맞추고(연출 재생 없음) 스트림을 다시 연다. */
+  async function resyncAndReconnect() {
+    if (!roomCode) {
+      return;
+    }
+    disconnectStream();
+    try {
+      const snapshot = await api.getRoom(roomCode);
+      applyRoomState(snapshot);
+      connectStream();
+    } catch (error) {
+      if (isRoomGoneError(error)) {
+        // 재접속하려던 방이 그새 사라졌다 — 저장된 방 목록에서 지운다.
+        storage.forgetRoom(roomCode);
+      }
+      reportError(error);
+      store.patch({ connection: CONNECTION.CLOSED });
+      scheduleReconnect();
+    }
+  }
+
+  function onRoomEvent(room) {
+    const state = store.state;
+    const wasPlaying = isPlayingRoom(state.room);
+    const mySeats = storage.publicSeatsOf(room.code);
+
+    // 내 좌석이 사라졌다면(강퇴/퇴장) 기록을 정리한다.
+    for (const mine of mySeats) {
+      if (!room.seats.some((seat) => seat.id === mine.seatId)) {
+        storage.removeSeat(room.code, mine.seatId);
+        toast.info(`${mine.name} 좌석이 방에서 사라졌습니다.`);
+      }
+    }
+    const remaining = storage.publicSeatsOf(room.code);
+    store.patch({
+      room,
+      mySeats: remaining,
+      screen: isPlayingRoom(room) ? SCREENS.GAME : SCREENS.LOBBY,
+    });
+    if (remaining.length === 0) {
+      goHome();
+      return;
+    }
+    if (!wasPlaying && isPlayingRoom(room)) {
+      toast.success('게임이 시작되었습니다!', '시작');
+    }
+  }
+
+  /* ── 방 목록 자동 새로고침 ───────────────────────────────── */
+
+  async function refreshRoomList() {
+    try {
+      const { rooms } = await api.listRooms();
+      store.patch({ roomList: rooms, roomListError: null });
+    } catch (error) {
+      console.error('[controller] 방 목록 조회 실패', error.code ?? error);
+      store.patch({ roomListError: error.message ?? '방 목록을 불러올 수 없습니다.' });
+    }
+  }
+
+  function startRoomListPolling() {
+    stopRoomListPolling();
+    void refreshRoomList();
+    roomListTimer = window.setInterval(() => {
+      if (store.state.screen === SCREENS.HOME) {
+        void refreshRoomList();
+      }
+    }, ROOM_LIST_INTERVAL_MS);
+  }
+
+  function stopRoomListPolling() {
+    if (roomListTimer !== null) {
+      window.clearInterval(roomListTimer);
+      roomListTimer = null;
+    }
+  }
+
+  /* ── 에러 안내 ───────────────────────────────────────────── */
+
+  /** 화면에는 서버가 준 message만. 자세한 내용은 콘솔로만 남긴다. */
+  function reportError(error) {
+    if (error instanceof api.ApiError) {
+      toast.error(error);
+      return;
+    }
+    console.error('[controller] 예기치 못한 오류', error);
+    toast.error({ code: 'ERR_CLIENT', message: '요청을 처리할 수 없습니다.' });
+  }
+
+  /* ── 키보드 ──────────────────────────────────────────────── */
+
+  function onKeyDown(event) {
+    if (event.defaultPrevented || modalHost.hasModal) {
+      return;
+    }
+    if (event.key !== ' ' && event.key !== 'Enter') {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT', 'SUMMARY', 'A'].includes(target.tagName)) {
+      return;
+    }
+    const state = store.state;
+    if (state.screen !== SCREENS.GAME || !isMyTurn(state) || state.view?.phase !== 'AWAIT_ROLL' || state.locked) {
+      return;
+    }
+    event.preventDefault();
+    void sendCommand('ROLL');
+  }
+
+  /* ── 시작 ────────────────────────────────────────────────── */
+
+  return {
+    async start() {
+      document.addEventListener('keydown', onKeyDown);
+      window.addEventListener('beforeunload', () => disconnectStream());
+
+      store.patch({ savedRooms: storage.savedRooms() });
+      startRoomListPolling();
+
+      try {
+        const serverInfo = await api.getServerInfo();
+        store.patch({ serverInfo });
+      } catch (error) {
+        console.error('[controller] 서버 정보 조회 실패', error.code ?? error);
+      }
+
+      // ?room=CODE 로 들어오면 바로 그 방으로(같은 기기 좌석이 있으면 재접속).
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('room');
+      if (code && storage.publicSeatsOf(code.toUpperCase()).length > 0) {
+        await enterRoom(code.toUpperCase());
+      }
+      render(store.state);
+    },
+  };
+}

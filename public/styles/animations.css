@@ -1,0 +1,318 @@
+/* ==========================================================================
+   연출용 키프레임과 화면 위를 날아가는 효과 레이어.
+   `prefers-reduced-motion: reduce`에서는 모든 장식 애니메이션을 끈다.
+   ========================================================================== */
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes die-tumble {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-120deg) scale(1.12) translateY(-16%);
+  }
+  50% {
+    transform: rotate(150deg) scale(1.05) translateY(6%);
+  }
+  75% {
+    transform: rotate(300deg) scale(1.1) translateY(-8%);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes die-settle {
+  0% {
+    transform: scale(1.16);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cell-landing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 193, 101, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 0.7em rgba(239, 193, 101, 0);
+  }
+}
+
+@keyframes token-hop {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.45);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+@keyframes amount-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(var(--fx-x, 0), var(--fx-y, 0), 0) scale(0.8);
+  }
+  22% {
+    opacity: 1;
+    transform: translate3d(var(--fx-x, 0), calc(var(--fx-y, 0px) - 14px), 0) scale(1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--fx-x, 0), calc(var(--fx-y, 0px) - 58px), 0) scale(1);
+  }
+}
+
+@keyframes fx-flash {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 243, 224, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(47, 243, 224, 0);
+  }
+}
+
+@keyframes cash-up {
+  50% {
+    color: var(--ok);
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes cash-down {
+  50% {
+    color: #ff9aa0;
+    transform: translateY(3px);
+  }
+}
+
+@keyframes jackpot-bump {
+  40% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes ticket-flip-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reel-spin {
+  0% {
+    transform: translateY(-14%) scale(1.02);
+  }
+  50% {
+    transform: translateY(14%) scale(0.98);
+  }
+  100% {
+    transform: translateY(-14%) scale(1.02);
+  }
+}
+
+@keyframes neon-buzz {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 0.85;
+  }
+  48% {
+    opacity: 0.45;
+  }
+  52% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes marquee-bulbs {
+  0%,
+  100% {
+    box-shadow: 0 0 8px var(--neon-pink);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--neon-cyan);
+  }
+}
+
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-8deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(6deg);
+  }
+}
+
+@keyframes compass-sweep {
+  0%,
+  100% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toll-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+/* ── 화면 위 효과 레이어 ───────────────────────────────────── */
+
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fx-coin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: -0.8rem 0 0 -0.8rem;
+  will-change: transform;
+}
+
+.fx-coin-face {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+.fx-coin-label {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(8, 21, 31, 0.9);
+  color: var(--gold-300);
+  font-family: var(--font-num);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fx-amount {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--font-num);
+  font-size: 1rem;
+  font-weight: 800;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+  white-space: nowrap;
+}
+
+.fx-amount--plus {
+  color: #7bf0b8;
+}
+
+.fx-amount--minus {
+  color: #ff9aa0;
+}
+
+.fx-amount--rise {
+  animation: amount-rise 760ms ease-out forwards;
+}
+
+.fx-flash {
+  position: absolute;
+  inset: 0;
+  animation: fx-flash 420ms ease-out forwards;
+}
+
+.fx-flash--gold {
+  background: radial-gradient(circle at 50% 50%, rgba(247, 216, 148, 0.75), transparent 65%);
+}
+
+.fx-flash--crimson {
+  background: radial-gradient(circle at 50% 50%, rgba(240, 85, 95, 0.6), transparent 68%);
+}
+
+.fx-flash--neon {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 61, 154, 0.6), rgba(47, 243, 224, 0.28) 45%, transparent 70%);
+}
+
+/* ── 모션 축소 ──────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .fx-layer,
+  .hero-dice,
+  .emblem-compass {
+    display: none;
+  }
+}
