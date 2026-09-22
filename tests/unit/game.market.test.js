@@ -557,6 +557,7 @@ describe('정리(LIQUIDATION)와 파산에서의 주식·예금', () => {
       refund: 120_000,
       quantity: 10,
       maxQuantity: 10,
+      heldQuantity: 10,
       unitValue: 12_000,
     });
     // 자산군이 섞여도 이름 필드 키가 같아야 한 렌더러로 그릴 수 있다.
@@ -564,6 +565,53 @@ describe('정리(LIQUIDATION)와 파산에서의 주식·예금', () => {
       assert.equal(typeof asset.name, 'string', `${asset.assetKind}에 name이 없다`);
       assert.ok(asset.name.length > 0);
     }
+  });
+
+  it('sellable의 maxQuantity는 **팔 수 있는 최대**이고 quantity는 보유량이다', () => {
+    // Given (서버가 부족액까지만 허용하므로, 화면이 보유 전량을 최대로 보여 주면
+    //        플레이어가 스테퍼를 끝까지 올려 ERR018을 맞는다. 규칙은 서버가 알려 준다)
+    const game = smallDebtGame();
+    const shortfall = game.pendingDecision.amountDue - game.playerById('s1').cash;
+    const needed = Math.ceil(shortfall / 12_000);
+    const stock = game.pendingDecision.sellable.find((asset) => asset.assetKind === 'STOCK');
+
+    // When / Then
+    assert.equal(stock.quantity, 10, 'quantity는 보유량');
+    assert.equal(stock.heldQuantity, 10, 'heldQuantity도 보유량');
+    assert.equal(stock.maxQuantity, needed, 'maxQuantity는 부족액을 덮는 수량');
+    assert.ok(stock.maxQuantity < stock.heldQuantity, '이 시나리오는 일부만 팔면 된다');
+    // 화면이 maxQuantity까지 올려도 서버가 받아 준다.
+    game.execute('s1', COMMAND_TYPES.SELL_ASSET, {
+      assetKind: 'STOCK',
+      assetId: 'AIR',
+      quantity: stock.maxQuantity,
+    });
+    assertMoneyConserved(game, 'maxQuantity 매각');
+  });
+
+  it('부족액이 보유보다 크면 maxQuantity가 보유량과 같다', () => {
+    // Given (서울 랜드마크 통행료 2,800,000원)
+    const game = liquidatingGame();
+
+    // When
+    const stock = game.pendingDecision.sellable.find((asset) => asset.assetKind === 'STOCK');
+    const deposit = game.pendingDecision.sellable.find((asset) => asset.assetKind === 'DEPOSIT');
+
+    // Then
+    assert.equal(stock.maxQuantity, stock.heldQuantity);
+    assert.equal(deposit.maxQuantity, deposit.heldQuantity);
+  });
+
+  it('부동산은 쪼갤 수 없으므로 maxQuantity가 항상 1이다', () => {
+    // Given
+    const game = liquidatingGame({ withCity: true });
+
+    // When
+    const property = game.pendingDecision.sellable.find((asset) => asset.assetKind === 'PROPERTY');
+
+    // Then
+    assert.equal(property.maxQuantity, 1);
+    assert.equal(property.heldQuantity, 1);
   });
 
   it('SELL_ASSET으로 주식을 수수료 없이 팔 수 있고 기존 SELL도 그대로 동작한다', () => {

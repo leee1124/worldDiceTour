@@ -1,11 +1,15 @@
 /**
  * 정리 페이즈 모달(`AWAIT_LIQUIDATION`).
  *
- * pending.sellable 항목은 자산군이 섞여 온다(API.md 6장):
- * `{ assetKind: 'PROPERTY'|'STOCK'|'DEPOSIT', assetId, label, refund, quantity, maxQuantity, unitValue, index?, name? }`
+ * pending.sellable 항목은 자산군이 섞여 온다(API.md 6장). 모든 자산군이 같은 키를 쓴다:
+ * `{ assetKind: 'PROPERTY'|'STOCK'|'DEPOSIT', assetId, name, label, refund,
+ *    quantity, heldQuantity, maxQuantity, unitValue, index? }`
  * - `PROPERTY`는 통째로 하나(수량 1). 옛 서버(assetKind 없음)에서는 `SELL { cityIndex }`로 떨어진다.
  * - `STOCK`은 수량을, `DEPOSIT`은 금액을 골라 일부만 팔 수 있다(`SELL_ASSET { quantity }`).
  * - 정리·파산 중 매각에는 **거래 수수료가 없다**(refund가 그대로 들어온다).
+ * - **`maxQuantity`는 "지금 팔 수 있는 최대"**다. 서버가 부족액을 덮는 양까지만 허용하므로
+ *   (그보다 많이 보내면 `ERR018`) 보유량(`heldQuantity`)보다 작을 수 있다. 스테퍼의 기본값과
+ *   상한을 `maxQuantity`로 두면 화면이 규칙을 저절로 지킨다 — 수량 규칙은 서버가 안다.
  *
  * 현금이 지불액에 닿는 순간 서버가 자동으로 지불을 마치고 흐름을 이어 준다.
  * 파산 선언은 되돌릴 수 없으므로 두 단계 확인을 받는다.
@@ -23,8 +27,17 @@ const LOAN_DEBT = 1_200_000;
 
 const SECTIONS = Object.freeze([
   { kind: 'PROPERTY', title: '부동산', help: '환급액은 투자액의 50%입니다. 건물도 함께 사라집니다.' },
-  { kind: 'STOCK', title: '주식', help: '현재가로 팝니다. 정리 중에는 거래 수수료가 없습니다.' },
-  { kind: 'DEPOSIT', title: '예금', help: '정해진 단위로만 뺄 수 있습니다.' },
+  {
+    kind: 'STOCK',
+    title: '주식',
+    // 서버는 부족액을 덮는 수량까지만 받는다(그래서 스테퍼 상한이 보유량보다 작을 수 있다).
+    help: '현재가로 팝니다. 수수료는 없고, 모자란 금액을 메울 만큼만 팔 수 있습니다.',
+  },
+  {
+    kind: 'DEPOSIT',
+    title: '예금',
+    help: '정해진 단위로만 뺄 수 있고, 모자란 금액을 메울 만큼만 뺍니다.',
+  },
 ]);
 
 /**
@@ -56,6 +69,9 @@ function sellRow(item, { locked, unit, onSellAsset, onSellProperty }) {
   const isProperty = (item.assetKind ?? 'PROPERTY') === 'PROPERTY';
   const label = item.label ?? item.name ?? '자산';
   const maxQuantity = Number.isInteger(item.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : 1;
+  const heldQuantity =
+    Number.isInteger(item.heldQuantity) && item.heldQuantity > 0 ? item.heldQuantity : maxQuantity;
+  const capped = heldQuantity > maxQuantity;
   const unitValue = Number.isInteger(item.unitValue) && item.unitValue > 0 ? item.unitValue : null;
   const pickable = !isProperty && maxQuantity > 1;
 
@@ -95,7 +111,13 @@ function sellRow(item, { locked, unit, onSellAsset, onSellProperty }) {
         el('span', { class: 'sell-name', text: label }),
         el('span', {
           class: 'sell-unit',
-          text: unit > 1 ? `잔액 ${formatWon(maxQuantity)}` : `${formatWon(unitValue ?? 0)} × 최대 ${maxQuantity}주`,
+          text: unit > 1
+            ? capped
+              ? `잔액 ${formatWon(heldQuantity)} · 필요한 ${formatWon(maxQuantity)}까지`
+              : `잔액 ${formatWon(heldQuantity)}`
+            : capped
+              ? `${formatWon(unitValue ?? 0)} · 보유 ${heldQuantity}주 중 ${maxQuantity}주까지`
+              : `${formatWon(unitValue ?? 0)} × 최대 ${maxQuantity}주`,
         }),
       ]),
       el('div', { class: 'sell-stepper' }, [

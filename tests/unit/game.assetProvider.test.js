@@ -140,7 +140,15 @@ describe('Game 자산군 확장(AssetProvider 등록만으로)', () => {
     // Then
     assert.equal(pending.canSell, true);
     assert.deepEqual(pending.sellable, [
-      { assetKind: 'DEPOSIT', assetId: 'main', name: '정기예금', refund: 300_000 },
+      {
+        assetKind: 'DEPOSIT',
+        assetId: 'main',
+        name: '정기예금',
+        refund: 300_000,
+        // 이 테스트의 가짜 예금 자산군은 수량을 1로 보고한다(금액이 아니라 건수).
+        heldQuantity: 1,
+        maxQuantity: 1,
+      },
       {
         index: 1,
         name: '하노이',
@@ -148,6 +156,7 @@ describe('Game 자산군 확장(AssetProvider 등록만으로)', () => {
         refund: 30_000,
         quantity: 1,
         maxQuantity: 1,
+        heldQuantity: 1,
         unitValue: 30_000,
         assetKind: 'PROPERTY',
         assetId: '1',

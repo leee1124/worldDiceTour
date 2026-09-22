@@ -97,7 +97,10 @@ export function buildPendingDecision({
       return { kind: 'TRAVEL', forbiddenIndexes: forbiddenTravelIndexes(board, player) };
     case PHASES.AWAIT_LIQUIDATION: {
       // 목록과 순서는 AssetRegistry/Liquidator가 정한다 — 자산군이 늘어도 여기는 안 바뀐다.
-      const sellable = liquidator.sellableOf(player.id);
+      // 부족액을 함께 넘겨 각 항목의 "팔 수 있는 최대"를 서버가 계산하게 한다.
+      const sellable = liquidator.sellableOf(player.id, {
+        owed: payment.amountDue - player.cash,
+      });
       return {
         kind: 'LIQUIDATION',
         amountDue: payment.amountDue,

@@ -18,9 +18,12 @@ export class Liquidator {
     this.#registry = registry;
   }
 
-  /** 정리 페이즈에 보여 줄 매각 가능 목록. */
-  sellableOf(playerId) {
-    return this.#registry.sellableOf(playerId);
+  /**
+   * 정리 페이즈에 보여 줄 매각 가능 목록.
+   * `owed`(부족액)를 주면 각 항목의 `view.maxQuantity`가 **팔 수 있는 최대**로 좁혀진다.
+   */
+  sellableOf(playerId, { owed = null } = {}) {
+    return this.#registry.sellableOf(playerId, { owed });
   }
 
   /**

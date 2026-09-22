@@ -267,7 +267,6 @@ export function createPlaybackEngine({
         break;
 
       case 'QUEUED_ORDER_REJECTED':
-      case 'ORDER_REJECTED':
         if (isLocalSeat(event.playerId)) {
           notify({
             tone: 'info',
