@@ -200,6 +200,12 @@ export function showNotice({ kind, mine = false, fastForward = false, variant = 
   window.addEventListener('click', onAnyPointer, true);
   window.addEventListener('keydown', onAnyKey, true);
 
+  // 한 줄 안내는 재생을 **막지 않는다**(컴퓨터 턴이 한 줄짜리 알림 때문에 느려지면 안 된다).
+  // 노드는 제 수명(readMs)만큼 살아 있다가 스스로 사라진다.
+  if (!asCard) {
+    settle();
+  }
+
   try {
     onShown?.(node);
   } catch (error) {

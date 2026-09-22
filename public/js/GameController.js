@@ -280,8 +280,10 @@ export function createGameController({ appRoot, overlayRoot }) {
    */
   let staleSweepTimer = null;
   function scheduleStaleModalSweep(view) {
+    // 이미 예약돼 있으면 **다시 미루지 않는다**. 컴퓨터 좌석이 0.3초마다 메시지를 보내는 동안
+    // 타이머를 계속 뒤로 밀면 안전망이 영영 동작하지 않는다(그때가 바로 필요한 순간이다).
     if (staleSweepTimer !== null) {
-      window.clearTimeout(staleSweepTimer);
+      return;
     }
     staleSweepTimer = window.setTimeout(() => {
       staleSweepTimer = null;

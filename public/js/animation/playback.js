@@ -16,7 +16,7 @@ import { playTicketCard } from '../views/modals/ticketOverlay.js';
 import { playTollNotice } from '../views/modals/tollOverlay.js';
 import { playInfoNotice } from '../views/modals/noticeCard.js';
 import { NOTICE_KINDS } from '../domain/noticeTiming.js';
-import { lapLabel, unlockNotice } from '../domain/buildRules.js';
+import { LAP_RULE_TEXT, lapLabel } from '../domain/buildRules.js';
 import { flashScreen, floatAmount, flyCoin } from './effects.js';
 import { DURATIONS, prefersReducedMotion, scaled, wait } from './timing.js';
 
@@ -115,7 +115,7 @@ export function createPlaybackEngine({
           tone: 'lap',
           eyebrow: '🔄 새 바퀴',
           headline: `${nameOf(event.playerId)} · ${lapLabel(event.lap)}`,
-          note: unlockNotice(event.lap),
+          note: LAP_RULE_TEXT,
         });
         break;
 
