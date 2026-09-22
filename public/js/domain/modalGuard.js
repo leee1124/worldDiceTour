@@ -32,6 +32,13 @@ export const DECISION_MODAL_PENDING_KINDS = Object.freeze({
 });
 
 /**
+ * **자기 본문에서 연출이 재생되는** 결정 모달. 카지노만 해당한다
+ * (릴·주사위·결과 배너가 모달 안에서 돈다). 이 모달만 유예를 준다 —
+ * 곧바로 닫으면 3판째 결과를 사용자가 보기도 전에 화면에서 사라진다.
+ */
+export const ANIMATED_BODY_MODAL_IDS = Object.freeze(['casino']);
+
+/**
  * 어긋난 모달을 닫기 전에 기다려 주는 시간.
  * 0이면 진행 중인 연출(예: 카지노 3판째 결과)을 사용자가 보기도 전에 닫아 버린다.
  * 검증 하네스는 "페이즈가 바뀐 뒤 3초 이상 열려 있는 결정 모달"을 STUCK으로 보므로 그보다 짧게 둔다.
@@ -64,4 +71,22 @@ export function staleDecisionModalIds(openIds = [], view = null) {
     // pending이 아직 없는 메시지(연출만 온 경우)는 페이즈만으로 판단한다.
     return Boolean(wantKind) && Boolean(pending?.kind) && pending.kind !== wantKind;
   });
+}
+
+/**
+ * 어긋난 결정 모달을 "즉시 닫을 것"과 "유예 뒤에 닫을 것"으로 나눈다.
+ *
+ * 조난 섬처럼 자기 연출이 없는 모달은 페이즈가 바뀌는 **즉시** 닫아야 한다.
+ * (구조비를 낸 뒤 결과 안내 카드가 재생되는 동안 모달이 남아 있던 실제 사례가 있다.)
+ *
+ * @param {string[]} [openIds]
+ * @param {object|null} [view]
+ * @returns {{immediate: string[], graced: string[]}}
+ */
+export function partitionStaleModals(openIds = [], view = null) {
+  const stale = staleDecisionModalIds(openIds, view);
+  return {
+    immediate: stale.filter((id) => !ANIMATED_BODY_MODAL_IDS.includes(id)),
+    graced: stale.filter((id) => ANIMATED_BODY_MODAL_IDS.includes(id)),
+  };
 }

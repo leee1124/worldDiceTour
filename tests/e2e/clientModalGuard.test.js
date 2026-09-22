@@ -9,8 +9,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ANIMATED_BODY_MODAL_IDS,
   DECISION_MODAL_PHASES,
   STALE_MODAL_GRACE_MS,
+  partitionStaleModals,
   staleDecisionModalIds,
 } from '../../public/js/domain/modalGuard.js';
 
@@ -111,4 +113,44 @@ test('모달 안전망: 잘못된 입력에도 예외 없이 빈 목록을 돌�
   assert.deepEqual(staleDecisionModalIds(null, null), []);
   assert.deepEqual(staleDecisionModalIds([], { phase: 'AWAIT_ROLL' }), []);
   assert.deepEqual(staleDecisionModalIds(['unknown-modal'], { phase: 'AWAIT_ROLL' }), []);
+});
+
+test('모달 안전망: 자기 연출이 없는 결정 모달은 페이즈가 바뀌는 즉시 닫는다', () => {
+  // Given 구조비를 내 페이즈가 주사위로 넘어갔는데 조난 모달이 열려 있다
+  //       (조난 결과 안내 카드가 재생되는 동안 모달이 남아 있던 실제 사례)
+  const view = { phase: 'AWAIT_ROLL', pending: null };
+
+  // When 닫을 대상을 즉시/유예로 나누면
+  const split = partitionStaleModals(['island'], view);
+
+  // Then 기다릴 이유가 없으므로 즉시 닫는다
+  assert.deepEqual(split.immediate, ['island']);
+  assert.deepEqual(split.graced, []);
+});
+
+test('모달 안전망: 카지노 모달만 유예를 받는다(결과 연출이 모달 안에서 재생된다)', () => {
+  // Given 3판이 끝나 페이즈가 넘어갔지만 결과 릴이 아직 돌고 있는 상황
+  const view = { phase: 'AWAIT_ROLL', pending: null };
+
+  // When
+  const split = partitionStaleModals(['casino', 'buy'], view);
+
+  // Then 카지노는 유예 뒤에, 나머지는 즉시 닫는다
+  assert.deepEqual(split.graced, ['casino']);
+  assert.deepEqual(split.immediate, ['buy']);
+  assert.deepEqual(ANIMATED_BODY_MODAL_IDS, ['casino']);
+});
+
+test('모달 안전망: 어긋나지 않은 모달은 어느 쪽에도 들어가지 않는다', () => {
+  // Given 카지노 페이즈가 그대로다
+  // When / Then
+  const split = partitionStaleModals(['casino', 'cell-sheet'], { phase: 'AWAIT_CASINO', pending: {} });
+  assert.deepEqual(split.immediate, []);
+  assert.deepEqual(split.graced, []);
+});
+
+test('모달 안전망: 잘못된 입력에도 두 목록 모두 비어 있다', () => {
+  // Given / When / Then
+  assert.deepEqual(partitionStaleModals(), { immediate: [], graced: [] });
+  assert.deepEqual(partitionStaleModals([], null), { immediate: [], graced: [] });
 });

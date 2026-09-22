@@ -24,7 +24,7 @@ import { buildCostOf } from './domain/buildRules.js';
 import { createCommandLock } from './domain/commandLock.js';
 import { inferGameOverReason } from './domain/gameOverReason.js';
 import { isRoomGoneError } from './domain/roomErrors.js';
-import { STALE_MODAL_GRACE_MS, staleDecisionModalIds } from './domain/modalGuard.js';
+import { STALE_MODAL_GRACE_MS, partitionStaleModals } from './domain/modalGuard.js';
 import { ownedCitiesOf } from './domain/ownedCities.js';
 import { LOCATION_PREFIX, playerCellLabel } from './domain/locationLabel.js';
 import { EventPlaybackQueue } from './animation/EventQueue.js';
@@ -280,8 +280,16 @@ export function createGameController({ appRoot, overlayRoot }) {
    */
   let staleSweepTimer = null;
   function scheduleStaleModalSweep(view) {
-    // 이미 예약돼 있으면 **다시 미루지 않는다**. 컴퓨터 좌석이 0.3초마다 메시지를 보내는 동안
-    // 타이머를 계속 뒤로 밀면 안전망이 영영 동작하지 않는다(그때가 바로 필요한 순간이다).
+    // ① 자기 연출이 없는 모달(조난·매입·건설·인수·정리…)은 **기다릴 이유가 없다**.
+    //    안내 카드가 재생되는 동안 결정 모달이 화면에 남는 일을 여기서 끊는다.
+    const { immediate } = partitionStaleModals(modalHost.openIds, view);
+    for (const id of immediate) {
+      modalHost.close(id);
+    }
+
+    // ② 카지노처럼 본문에서 연출이 도는 모달만 유예 뒤에 다시 본다.
+    //    이미 예약돼 있으면 **다시 미루지 않는다**. 컴퓨터 좌석이 0.3초마다 메시지를 보내는 동안
+    //    타이머를 계속 뒤로 밀면 안전망이 영영 동작하지 않는다(그때가 바로 필요한 순간이다).
     if (staleSweepTimer !== null) {
       return;
     }
@@ -290,7 +298,8 @@ export function createGameController({ appRoot, overlayRoot }) {
       // 그새 최신 뷰가 반영됐다면 그 뷰를 기준으로 다시 판단한다.
       const latest = store.state.view ?? view;
       const target = (latest?.version ?? -1) >= (view?.version ?? -1) ? latest : view;
-      for (const id of staleDecisionModalIds(modalHost.openIds, target)) {
+      const stale = partitionStaleModals(modalHost.openIds, target);
+      for (const id of [...stale.immediate, ...stale.graced]) {
         console.error('[controller] 페이즈가 어긋난 결정 모달을 안전망으로 닫았습니다', id, target?.phase ?? null);
         modalHost.close(id);
       }
