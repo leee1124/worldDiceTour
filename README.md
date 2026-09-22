@@ -10,6 +10,8 @@
 
 - 클라이언트도 **빌드 없는 Vanilla JS(ES Modules) + CSS**뿐이다. 외부 폰트·이미지·CDN 없이 CSS와 이모지, 인라인 SVG로만 그린다.
 
+앞으로의 계획은 [docs/ROADMAP.md](docs/ROADMAP.md)를 참고.
+
 ## 실행
 
 ```bash
