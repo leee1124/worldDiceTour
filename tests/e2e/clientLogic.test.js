@@ -276,6 +276,10 @@ test('게임 로그: 잭팟 수령은 금액과 남은 적립금을 알리고, �
     { type: 'JACKPOT_CLAIMED', playerId: 'seat-1', amount: 326_500, share: 100, remaining: 0 },
     LOG_CONTEXT,
   );
+  const half = formatEventLine(
+    { type: 'JACKPOT_CLAIMED', playerId: 'seat-1', amount: 62_500, share: 50, remaining: 62_501 },
+    LOG_CONTEXT,
+  );
   const empty = formatEventLine(
     { type: 'JACKPOT_CLAIMED', playerId: 'seat-2', amount: 0, share: 50, remaining: 0 },
     LOG_CONTEXT,
@@ -285,6 +289,11 @@ test('게임 로그: 잭팟 수령은 금액과 남은 적립금을 알리고, �
   assert.ok(won.text.includes('하나'));
   assert.ok(won.text.includes('326,500원'));
   assert.equal(won.kind, 'special');
+
+  // And 절반만 받았으면 남은 적립금까지 알린다
+  assert.ok(half.text.includes('62,500원'), `수령액이 없다: ${half.text}`);
+  assert.ok(half.text.includes('62,501원'), `남은 적립금이 없다: ${half.text}`);
+  assert.equal(half.kind, 'special');
 
   assert.ok(empty.text.includes('두리'));
   assert.ok(empty.text.includes('비어'), `빈 적립금 안내가 없다: ${empty.text}`);

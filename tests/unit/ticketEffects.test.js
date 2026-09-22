@@ -8,6 +8,7 @@ import { TICKET_ACTIONS, TicketEffects } from '../../src/domain/game/TicketEffec
 import { SINKS } from '../../src/domain/game/payment/DebtNote.js';
 import { EVENT_TYPES } from '../../src/domain/game/events.js';
 import { COUNTERPARTIES, MONEY_REASONS } from '../../src/domain/shared/MoneyIntent.js';
+import { DomainError } from '../../src/domain/shared/DomainError.js';
 import { TICKET_EFFECTS } from '../../src/domain/game/data/tickets.js';
 
 const effects = new TicketEffects();
@@ -295,6 +296,23 @@ describe('TicketEffects(행운 티켓 효과 규칙)', () => {
       assert.equal(action.amount, 62_500);
       assert.equal(action.events[0].payload.remaining, 62_501);
       assert.equal(action.events[0].payload.share, 50);
+    });
+
+    it('카지노 없이 수령 티켓을 해석하려 하면 도메인 오류로 막는다', () => {
+      // Given (협력자를 빠뜨린 호출 — 500이 아니라 규격 오류로 드러나야 한다)
+      const { byId, board, players } = scene({ jackpot: 100_000 });
+
+      // When / Then
+      assert.throws(
+        () =>
+          effects.resolve({
+            ticket: { id: 'T21', text: '테스트 티켓', effect: { type: TICKET_EFFECTS.CLAIM_JACKPOT, share: 100 } },
+            player: byId('s1'),
+            board,
+            livingPlayers: players,
+          }),
+        DomainError,
+      );
     });
 
     it('적립금이 0원이면 돈은 움직이지 않고 금액 0원 이벤트만 남긴다', () => {

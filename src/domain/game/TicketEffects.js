@@ -1,3 +1,4 @@
+import { DomainError } from '../shared/DomainError.js';
 import { EVENT_TYPES } from './events.js';
 import { MONEY_REASONS, MoneyIntent } from '../shared/MoneyIntent.js';
 import { SINKS } from './payment/DebtNote.js';
@@ -129,6 +130,11 @@ export class TicketEffects {
    * 기록되지 않으므로 새 사유를 만들 이유가 없다(사유 목록을 넓히면 저장 스키마 승급이 따라온다).
    */
   #claimJackpot({ ticket, player, casino, share }) {
+    // 잭팟 수령 티켓에만 필요한 협력자라 선택 인자지만, 이 카드에는 **없으면 안 된다**.
+    // 빠졌을 때 TypeError로 터지면 규격 에러가 아니라 500이 나가므로 도메인 오류로 막는다.
+    if (!casino) {
+      throw DomainError.invalidState(`잭팟 수령 티켓에는 카지노가 필요합니다: ${ticket.id}`);
+    }
     const { amount, remaining, intents } = casino.claimShare({
       playerId: player.id,
       share,

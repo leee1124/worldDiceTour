@@ -321,6 +321,31 @@ describe('Game(행운 티켓 효과)', () => {
       assertMoneyConserved(game, '잭팟 수령 후 장부');
     });
 
+    it('잭팟이 움직이지 않는 거래(매입·건설)에서는 잭팟 이벤트가 생기지 않는다', () => {
+      // Given (돈 이동 결과를 모두 한 문으로 적용하므로, 그 문이 불필요한 이벤트를 만들지 않아야 한다)
+      const game = buildGame({
+        positions: { s1: 0 },
+        jackpot: 300_000,
+        random: new FakeRandomSource([1, 2]),
+      });
+
+      // When (3번 방콕 매입 → 별장 건설)
+      const rolled = game.execute('s1', COMMAND_TYPES.ROLL);
+      const bought = game.execute('s1', COMMAND_TYPES.BUY);
+      const built = game.execute('s1', COMMAND_TYPES.BUILD, { buildings: ['VILLA'] });
+
+      // Then
+      for (const [label, events] of [['굴림', rolled], ['매입', bought], ['건설', built]]) {
+        assert.equal(
+          events.some((event) => event.type === EVENT_TYPES.JACKPOT_CHANGED),
+          false,
+          `${label}에서 잭팟 이벤트가 생겼다`,
+        );
+      }
+      assert.equal(game.jackpot, 300_000);
+      assertMoneyConserved(game, '잭팟과 무관한 거래');
+    });
+
     it('이동 티켓으로 티켓 칸에 이어 도착해 잭팟을 수령해도 정상 종료된다', () => {
       // Given (36 → 주사위 6 → 2번 티켓 칸 → 앞으로 10칸 → 12번 티켓 칸 → 잭팟 당첨권)
       const game = buildGame({
