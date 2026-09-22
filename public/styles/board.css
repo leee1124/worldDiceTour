@@ -1426,3 +1426,25 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.75),
     0 0 0 2px var(--gold-400);
 }
+
+/* ── 이번 라운드 남은 차례 ─────────────────────────────────── */
+
+/*
+  "내 차례까지 몇 명 남았지?"에 대한 답. 좌석 순서가 곧 차례 순서라
+  지금 차례 뒤에 오는 이름을 그대로 읽어 준다(중앙 코어 · 폰 상황판 같은 문구).
+*/
+.core-queue {
+  color: var(--text-500);
+  font-size: clamp(0.62rem, 1.5cqi, 0.78rem);
+  line-height: 1.4;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.strip-queue {
+  width: 100%;
+  color: var(--text-500);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  word-break: keep-all;
+}
