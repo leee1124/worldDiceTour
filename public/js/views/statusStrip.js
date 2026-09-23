@@ -48,6 +48,7 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
       el('span', { class: 'strip-who' }, [chip, nameNode, tagNode]),
       locationNode,
     ]),
+    queueNode,
     el('div', { class: 'strip-line strip-line--tools' }, [dice.element, findButton, zoomButton]),
   ]);
 
