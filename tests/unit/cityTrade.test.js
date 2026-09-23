@@ -24,7 +24,7 @@ function build({ cities = [], cash = { s1: 1_000_000, s2: 1_000_000 }, eliminate
 describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
   describe('매입', () => {
     it('매입가를 은행에 내고 소유자가 된다', () => {
-      // Given (1번 하노이 60,000)
+      // Given (1번 하노이 90,000)
       const { trade, board, byId } = build();
 
       // When
@@ -32,10 +32,10 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
 
       // Then
       assert.equal(board.cityAt(1).isOwnedBy('s1'), true);
-      assert.equal(intents[0].amount, -60_000);
+      assert.equal(intents[0].amount, -90_000);
       assert.equal(intents[0].reason, MONEY_REASONS.PURCHASE);
       assert.deepEqual(types(events), [EVENT_TYPES.CITY_PURCHASED]);
-      assert.equal(events[0].payload.price, 60_000);
+      assert.equal(events[0].payload.price, 90_000);
     });
 
     it('이미 주인이 있으면 거부한다', () => {
@@ -64,7 +64,7 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
 
   describe('건설', () => {
     it('건설비를 은행에 내고 건물을 짓는다', () => {
-      // Given (1번 하노이 60,000 → 별장 18,000)
+      // Given (1번 하노이 90,000 → 별장 27,000)
       const { trade, board, byId } = build({
         cities: [{ index: 1, ownerId: 's1', buildings: [], landmark: false }],
       });
@@ -78,7 +78,7 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
 
       // Then
       assert.deepEqual(board.cityAt(1).buildings, ['VILLA']);
-      assert.equal(intents[0].amount, -18_000);
+      assert.equal(intents[0].amount, -27_000);
       assert.equal(intents[0].reason, MONEY_REASONS.BUILD);
       assert.deepEqual(types(events), [EVENT_TYPES.BUILT]);
     });
@@ -132,7 +132,7 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
 
   describe('인수', () => {
     it('인수 대금은 기존 소유자에게 간다', () => {
-      // Given (하노이 투자액 60,000 → 인수가 120,000)
+      // Given (하노이 투자액 90,000 → 인수가 180,000)
       const { trade, board, byId } = build({
         cities: [{ index: 1, ownerId: 's2', buildings: [], landmark: false }],
       });
@@ -144,7 +144,7 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
       assert.equal(board.cityAt(1).isOwnedBy('s1'), true);
       assert.equal(intents[0].playerId, 's1');
       assert.equal(intents[0].otherPlayerId, 's2');
-      assert.equal(intents[0].amount, -120_000);
+      assert.equal(intents[0].amount, -180_000);
       assert.deepEqual(types(events), [EVENT_TYPES.ACQUIRED]);
       assert.equal(events[0].payload.fromId, 's2');
     });

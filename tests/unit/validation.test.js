@@ -177,14 +177,14 @@ describe('입력 검증(화이트리스트)', () => {
         bet: 10_000,
         choice: 'ODD',
       });
-      assert.deepEqual(bet({ game: 'SLOT', bet: 500_000 }), {
+      assert.deepEqual(bet({ game: 'SLOT', bet: 750_000 }), {
         game: 'SLOT',
-        bet: 500_000,
+        bet: 750_000,
         choice: null,
       });
       assert.throws(() => bet({ game: 'ROULETTE', bet: 10_000 }), { code: 'ERR001' });
       assert.throws(() => bet({ game: 'ODD_EVEN', bet: 15_000, choice: 'ODD' }), { code: 'ERR001' });
-      assert.throws(() => bet({ game: 'ODD_EVEN', bet: 510_000, choice: 'ODD' }), { code: 'ERR001' });
+      assert.throws(() => bet({ game: 'ODD_EVEN', bet: 760_000, choice: 'ODD' }), { code: 'ERR001' });
       assert.throws(() => bet({ game: 'ODD_EVEN', bet: 10_000, choice: 'MAYBE' }), { code: 'ERR001' });
       assert.throws(() => bet({ game: 'HIGH_LOW_SEVEN', bet: 10_000, choice: 'ODD' }), { code: 'ERR001' });
     });

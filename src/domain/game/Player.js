@@ -6,17 +6,17 @@ import { BuildingUnlocks, FIRST_LAP } from './buildings.js';
 /** 시작 자금. 오너 결정(2026-09-23): 3,000,000 → 10,000,000원. */
 export const STARTING_CASH = 10_000_000;
 /** 출발 칸 통과/도착 시 월급. */
-export const SALARY = 200_000;
+export const SALARY = 300_000;
 /** 조난 섬에 갇히는 최대 턴 수. */
 export const ISLAND_TURNS = 3;
 /** 조난 섬 구조비. */
-export const ISLAND_RESCUE_FEE = 200_000;
+export const ISLAND_RESCUE_FEE = 300_000;
 /** 3연속 더블이면 조난. */
 export const MAX_CONSECUTIVE_DOUBLES = 3;
 /** 대출 원금(게임당 1회). */
-export const LOAN_PRINCIPAL = 1_000_000;
+export const LOAN_PRINCIPAL = 1_500_000;
 /** 대출 채무(원금 + 이자). 월급으로 상환한다. */
-export const LOAN_DEBT = 1_200_000;
+export const LOAN_DEBT = 1_800_000;
 
 /**
  * 플레이어. 현금 잔액과 자신의 상태(위치/조난/공항 이동권/연속 더블/바퀴 수)를 스스로 관리한다.

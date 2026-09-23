@@ -15,11 +15,11 @@ const BUY_CASH_RATIO = 2;
 /** 인수 기준: 현금이 인수 가격의 3배 이상. */
 const ACQUIRE_CASH_RATIO = 3;
 /** 건설 후 남겨둘 최소 현금. */
-const BUILD_CASH_RESERVE = 300_000;
+const BUILD_CASH_RESERVE = 450_000;
 /** 관광명소 기준: 현금이 건설비의 2배 이상. */
 const LANDMARK_CASH_RATIO = 2;
 /** 구조비를 낼지 판단하는 현금 기준. */
-const ISLAND_PAY_CASH = 1_000_000;
+const ISLAND_PAY_CASH = 1_500_000;
 
 // ── 증권거래소(설계서 §4.6). 전부 결정적이며 추가 난수를 쓰지 않는다 ──────────
 

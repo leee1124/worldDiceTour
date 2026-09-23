@@ -13,7 +13,7 @@ import { buildGame, eventTypes, findEvent, assertMoneyConserved } from '../suppo
 const { VILLA, BUILDING, HOTEL } = BUILDING_TYPES;
 
 /**
- * 3번 방콕(호텔·빌딩·별장 완비, 통행료 140,000원)에 도착하지만 현금이 5,000원뿐인 상황.
+ * 3번 방콕(호텔·빌딩·별장 완비, 통행료 210,000원)에 도착하지만 현금이 5,000원뿐인 상황.
  */
 const insolventGame = (overrides = {}) =>
   buildGame({
@@ -35,7 +35,7 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
     assert.equal(game.playerById('s1').eliminated, false);
     const required = findEvent(events, EVENT_TYPES.LIQUIDATION_REQUIRED);
-    assert.equal(required.amountDue, 140_000);
+    assert.equal(required.amountDue, 210_000);
     assert.equal(required.creditorId, 's2');
   });
 
@@ -52,11 +52,14 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
 
     // Then
     assert.equal(decision.kind, 'LIQUIDATION');
-    assert.equal(decision.amountDue, 140_000);
+    assert.equal(decision.amountDue, 210_000);
     assert.equal(decision.canSell, true);
     assert.equal(decision.canLoan, true);
+    // 화면이 대출 금액을 하드코딩하지 않도록 서버가 함께 알린다(D47 리뷰 반영).
+    assert.equal(decision.loanPrincipal, LOAN_PRINCIPAL);
+    assert.equal(decision.loanDebt, LOAN_DEBT);
     assert.equal(decision.sellable.length, 1);
-    assert.equal(decision.sellable[0].refund, 400_000);
+    assert.equal(decision.sellable[0].refund, 600_000);
   });
 
   it('선택 매각으로 채무를 메우면 지불이 자동 완료된다', () => {
@@ -76,7 +79,7 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     assert.ok(eventTypes(events).includes(EVENT_TYPES.PROPERTY_SOLD));
     assert.ok(eventTypes(events).includes(EVENT_TYPES.TOLL_PAID));
     assert.ok(eventTypes(events).includes(EVENT_TYPES.DEBT_SETTLED));
-    assert.equal(game.playerById('s1').cash, 5_000 + 400_000 - 140_000);
+    assert.equal(game.playerById('s1').cash, 5_000 + 600_000 - 210_000);
     assert.equal(game.board.cityAt(39).isOwned(), false);
     assertMoneyConserved(game, '선택 매각');
   });
@@ -116,12 +119,12 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     const sold = events.filter((event) => event.type === EVENT_TYPES.PROPERTY_SOLD);
     assert.deepEqual(sold.map((event) => event.index), [1, 39]);
     assert.equal(game.board.cityAt(39).isOwned(), false);
-    assert.equal(game.playerById('s1').cash, 5_000 + 30_000 + 400_000 - 140_000);
+    assert.equal(game.playerById('s1').cash, 5_000 + 45_000 + 600_000 - 210_000);
     assertMoneyConserved(game, '자동 매각');
   });
 
   describe('정리로 낸 통행료 뒤에는 인수를 제안하지 않는다(현금으로만 인수)', () => {
-    /** 방콕(3, 통행료 140,000 / 인수가 392,000) 통행료를 못 내는 상태 + 팔면 넉넉해지는 서울. */
+    /** 방콕(3, 통행료 210,000 / 인수가 588,000) 통행료를 못 내는 상태 + 팔면 넉넉해지는 서울. */
     const richAssetGame = () =>
       insolventGame({
         cities: [
@@ -138,7 +141,7 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
       // When
       const events = game.execute('s1', COMMAND_TYPES.TAKE_LOAN);
 
-      // Then (대출금 덕에 인수가 392,000원을 낼 수는 있지만 제안하지 않는다)
+      // Then (대출금 덕에 인수가 588,000원을 낼 수는 있지만 제안하지 않는다)
       assert.ok(game.playerById('s1').cash >= game.board.cityAt(3).acquisitionPrice());
       assert.equal(findEvent(events, EVENT_TYPES.ACQUIRE_OFFERED), undefined);
       assert.notEqual(game.phase, PHASES.AWAIT_ACQUIRE);
@@ -177,7 +180,7 @@ describe('Game(지불 불능 - 정리 페이즈)', () => {
     });
 
     it('현금으로 바로 낸 경우에는 그대로 인수를 제안한다', () => {
-      // Given (통행료 140,000원을 처음부터 현금으로 낼 수 있다)
+      // Given (통행료 210,000원을 처음부터 현금으로 낼 수 있다)
       const game = buildGame({
         cities: [{ index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL] }],
         random: new FakeRandomSource([1, 2]),
@@ -249,7 +252,7 @@ describe('Game(정리 페이즈에 채무가 없는 깨진 상태)', () => {
 });
 
 describe('Game(대출)', () => {
-  it('대출을 받으면 현금 1,000,000원이 들어오고 채무 1,200,000원이 생긴다', () => {
+  it('대출을 받으면 현금 1,500,000원이 들어오고 채무 1,800,000원이 생긴다', () => {
     // Given
     const game = insolventGame();
 
@@ -262,7 +265,7 @@ describe('Game(대출)', () => {
     assert.equal(loan.principal, LOAN_PRINCIPAL);
     assert.equal(loan.debt, LOAN_DEBT);
     assert.equal(game.playerById('s1').loanDebt, LOAN_DEBT);
-    assert.equal(game.playerById('s1').cash, 5_000 + LOAN_PRINCIPAL - 140_000);
+    assert.equal(game.playerById('s1').cash, 5_000 + LOAN_PRINCIPAL - 210_000);
     assertMoneyConserved(game, '대출');
   });
 
@@ -282,7 +285,7 @@ describe('Game(대출)', () => {
   });
 
   describe('대출로도 메우지 못하는 큰 채무', () => {
-    /** 서울(39, 관광명소) 통행료 2,800,000원을 현금 5,000원으로 맞닥뜨린다. */
+    /** 서울(39, 관광명소) 통행료 4,200,000원을 현금 5,000원으로 맞닥뜨린다. */
     const hugeDebtGame = (overrides = {}) =>
       buildGame({
         positions: { s1: 36 },
@@ -297,7 +300,7 @@ describe('Game(대출)', () => {
       const game = hugeDebtGame();
       game.execute('s1', COMMAND_TYPES.ROLL);
       assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
-      assert.equal(game.pendingDecision.amountDue, 2_800_000);
+      assert.equal(game.pendingDecision.amountDue, 4_200_000);
 
       // When (실제로 대출을 한 번 받는다 — loanUsed를 주입하지 않는다)
       game.execute('s1', COMMAND_TYPES.TAKE_LOAN);
@@ -305,7 +308,7 @@ describe('Game(대출)', () => {
       // Then (여전히 부족해 정리 페이즈이며 채무는 그대로다)
       assert.equal(game.playerById('s1').cash, 5_000 + LOAN_PRINCIPAL);
       assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
-      assert.equal(game.pendingDecision.amountDue, 2_800_000);
+      assert.equal(game.pendingDecision.amountDue, 4_200_000);
       assert.equal(game.pendingDecision.canLoan, false);
 
       // When / Then (두 번째 대출은 거부)
@@ -330,11 +333,11 @@ describe('Game(대출)', () => {
       const events = game.execute('s1', COMMAND_TYPES.SELL, { cityIndex: 1 });
 
       // Then
-      assert.equal(findEvent(events, EVENT_TYPES.PROPERTY_SOLD).refund, 30_000);
+      assert.equal(findEvent(events, EVENT_TYPES.PROPERTY_SOLD).refund, 45_000);
       assert.equal(findEvent(events, EVENT_TYPES.DEBT_SETTLED), undefined);
       assert.equal(game.phase, PHASES.AWAIT_LIQUIDATION);
-      assert.equal(game.pendingDecision.amountDue, 2_800_000);
-      assert.equal(game.playerById('s1').cash, 35_000);
+      assert.equal(game.pendingDecision.amountDue, 4_200_000);
+      assert.equal(game.playerById('s1').cash, 50_000);
       assert.equal(game.pendingDecision.canSell, false, '팔 자산이 더 없다');
       assertMoneyConserved(game, '부족한 매각');
     });
@@ -403,9 +406,9 @@ describe('Game(대출)', () => {
 
 describe('Game(순위 동점 처리)', () => {
   it('총자산이 같으면 현금이 많은 쪽이 앞선다', () => {
-    // Given (총자산 1,000,000원 동점: s1은 전액 현금, s2는 현금 200,000 + 서울 800,000)
+    // Given (총자산 1,400,000원 동점: s1은 전액 현금, s2는 현금 200,000 + 서울 1,200,000)
     const game = buildGame({
-      cash: { s1: 1_000_000, s2: 200_000 },
+      cash: { s1: 1_400_000, s2: 200_000 },
       cities: [{ index: 39, ownerId: 's2' }],
       random: new FakeRandomSource([]),
     });

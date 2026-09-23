@@ -63,7 +63,8 @@ describe('E2E: 증권거래소 골든 리플레이', () => {
     //        프로덕션 코드를 지워도 통과하는 테스트가 된다)
     const scenarios = [
       { seed: 1, roundLimit: 30 },
-      { seed: 20_260_921, roundLimit: null },
+      // D47: 20_260_921은 1.5배 경제에서 끝나지 않는다(생존 2명 균형) — 끝나는 시드로 검사한다.
+      { seed: 123, roundLimit: null },
     ];
 
     // When / Then

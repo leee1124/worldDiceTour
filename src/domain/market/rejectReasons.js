@@ -18,9 +18,9 @@ export const REJECT_REASONS = Object.freeze({
   DELISTED: 'DELISTED',
   /** 목록에 없는 종목이다. */
   UNKNOWN_INSTRUMENT: 'UNKNOWN_INSTRUMENT',
-  /** 창구 주문 수(3건)를 다 썼다. */
+  /** 창구 주문 수 상한을 다 썼다(D46부터 상한 없음 — 상한을 되살릴 때를 위해 남겨 둔 사유). */
   ORDER_LIMIT: 'ORDER_LIMIT',
-  /** 명목금액 한도(1건 1,000,000원 / 창구 2,000,000원)를 넘었다. */
+  /** 명목금액 상한을 넘었다(D46부터 상한 없음 — 위와 같은 이유로 남겨 둔 사유). */
   NOTIONAL_LIMIT: 'NOTIONAL_LIMIT',
   /** 종목 보유 상한(500주)을 넘었다. */
   POSITION_LIMIT: 'POSITION_LIMIT',

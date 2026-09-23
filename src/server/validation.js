@@ -6,7 +6,14 @@ import { MAX_POSITION_PER_INSTRUMENT } from '../domain/market/Holdings.js';
 import { DEPOSIT_ASSET_KIND, STOCK_ASSET_KIND } from '../domain/market/MarketAssets.js';
 import { PROPERTY_ASSET_KIND } from '../domain/game/payment/PropertyAssets.js';
 import { BUILDING_TYPES } from '../domain/game/City.js';
-import { CASINO_GAMES, HIGH_LOW_SEVEN_CHOICES, ODD_EVEN_CHOICES } from '../domain/game/Casino.js';
+import {
+  BET_UNIT,
+  CASINO_GAMES,
+  HIGH_LOW_SEVEN_CHOICES,
+  MAX_BET,
+  MIN_BET,
+  ODD_EVEN_CHOICES,
+} from '../domain/game/Casino.js';
 import { BOARD_SIZE } from '../domain/game/data/board.js';
 import { ALLOWED_ROUND_LIMITS } from '../domain/room/Room.js';
 import { ALLOWED_FINANCE_OPTIONS, FINANCE_OPTION_KEYS } from '../domain/room/FinanceOptions.js';
@@ -360,8 +367,8 @@ function parseCasinoBet(payload) {
   if (!CASINO_GAME_LIST.includes(payload.game)) {
     throw invalid(`카지노 게임 값 오류: ${safeText(payload.game)}`);
   }
-  const bet = requireInteger(payload.bet, { min: 10_000, max: 500_000, field: 'bet' });
-  if (bet % 10_000 !== 0) {
+  const bet = requireInteger(payload.bet, { min: MIN_BET, max: MAX_BET, field: 'bet' });
+  if (bet % BET_UNIT !== 0) {
     throw invalid(`bet 단위 오류: ${safeText(bet)}`);
   }
   let choice = null;

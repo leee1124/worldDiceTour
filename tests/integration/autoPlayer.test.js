@@ -34,7 +34,7 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
 
   it('현금이 가격의 2배 미만이면 매입하지 않는다', () => {
     // Given
-    const game = buildGame({ cash: { s1: 100_000 }, random: new FakeRandomSource([1, 2]) });
+    const game = buildGame({ cash: { s1: 150_000 }, random: new FakeRandomSource([1, 2]) });
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // When / Then
@@ -42,10 +42,10 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
   });
 
   it('건설 후에도 최소 현금이 남는 범위에서 가장 비싼 조합을 고른다', () => {
-    // Given (3바퀴 방콕: 별장 21,000 / 빌딩 42,000 / 호텔 63,000)
+    // Given (3바퀴 방콕: 별장 31,500 / 빌딩 63,000 / 호텔 94,500)
     const game = buildGame({
       laps: { s1: 3 },
-      cash: { s1: 400_000 },
+      cash: { s1: 600_000 },
       cities: [{ index: 3, ownerId: 's1' }],
       random: new FakeRandomSource([1, 2]),
     });
@@ -54,7 +54,7 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     // When
     const decision = decideFor(game);
 
-    // Then (예산 100,000원 → 호텔 63,000 + 별장 21,000)
+    // Then (예산 150,000원 → 호텔 94,500 + 별장 31,500)
     assert.equal(decision.type, COMMAND_TYPES.BUILD);
     assert.deepEqual(decision.payload.buildings, [BUILDING_TYPES.HOTEL, BUILDING_TYPES.VILLA]);
   });
@@ -73,14 +73,14 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
   });
 
   it('관광명소는 현금이 건설비의 2배 이상일 때만 짓는다', () => {
-    // Given (방콕 관광명소 70,000원)
+    // Given (방콕 관광명소 105,000원 → 기준 210,000)
     const rich = buildGame({
-      cash: { s1: 200_000 },
+      cash: { s1: 250_000 },
       cities: [{ index: 3, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'] }],
       random: new FakeRandomSource([1, 2]),
     });
     const poor = buildGame({
-      cash: { s1: 100_000 },
+      cash: { s1: 150_000 },
       cities: [{ index: 3, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'] }],
       random: new FakeRandomSource([1, 2]),
     });
@@ -292,9 +292,9 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
 
   describe('판단 기준의 경계값', () => {
     it('매입: 현금이 가격의 정확히 2배면 사고, 1원 모자라면 사지 않는다', () => {
-      // Given (방콕 70,000 → 기준 140,000)
-      const atThreshold = buildGame({ cash: { s1: 140_000 }, random: new FakeRandomSource([1, 2]) });
-      const justBelow = buildGame({ cash: { s1: 139_999 }, random: new FakeRandomSource([1, 2]) });
+      // Given (방콕 105,000 → 기준 210,000)
+      const atThreshold = buildGame({ cash: { s1: 210_000 }, random: new FakeRandomSource([1, 2]) });
+      const justBelow = buildGame({ cash: { s1: 209_999 }, random: new FakeRandomSource([1, 2]) });
       atThreshold.execute('s1', COMMAND_TYPES.ROLL);
       justBelow.execute('s1', COMMAND_TYPES.ROLL);
 
@@ -304,14 +304,14 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     });
 
     it('건설: 남길 현금 300,000원을 지키는 마지막 1원까지 짓는다', () => {
-      // Given (방콕 별장 21,000 → 기준 321,000)
+      // Given (방콕 별장 31,500 → 기준 481,500)
       const atThreshold = buildGame({
-        cash: { s1: 321_000 },
+        cash: { s1: 481_500 },
         cities: [{ index: 3, ownerId: 's1' }],
         random: new FakeRandomSource([1, 2]),
       });
       const justBelow = buildGame({
-        cash: { s1: 320_999 },
+        cash: { s1: 481_499 },
         cities: [{ index: 3, ownerId: 's1' }],
         random: new FakeRandomSource([1, 2]),
       });
@@ -326,7 +326,7 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     it('건설: 예산이 정확히 0이면 짓지 않는다', () => {
       // Given
       const game = buildGame({
-        cash: { s1: 300_000 },
+        cash: { s1: 450_000 },
         cities: [{ index: 3, ownerId: 's1' }],
         random: new FakeRandomSource([1, 2]),
       });
@@ -337,15 +337,15 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     });
 
     it('관광명소: 현금이 건설비의 정확히 2배면 짓고, 1원 모자라면 짓지 않는다', () => {
-      // Given (방콕 관광명소 70,000 → 기준 140,000)
+      // Given (방콕 관광명소 105,000 → 기준 210,000)
       const built = [{ index: 3, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'] }];
       const atThreshold = buildGame({
-        cash: { s1: 140_000 },
+        cash: { s1: 210_000 },
         cities: built,
         random: new FakeRandomSource([1, 2]),
       });
       const justBelow = buildGame({
-        cash: { s1: 139_999 },
+        cash: { s1: 209_999 },
         cities: built,
         random: new FakeRandomSource([1, 2]),
       });
@@ -358,15 +358,15 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     });
 
     it('인수: 통행료를 낸 뒤 현금이 인수가의 정확히 3배면 인수한다', () => {
-      // Given (방콕 인수가 140,000 → 기준 420,000, 통행료 7,000을 먼저 낸다)
+      // Given (방콕 인수가 210,000 → 기준 630,000, 통행료 10,500을 먼저 낸다)
       const cities = [{ index: 3, ownerId: 's2' }];
       const atThreshold = buildGame({
-        cash: { s1: 427_000 },
+        cash: { s1: 640_500 },
         cities,
         random: new FakeRandomSource([1, 2]),
       });
       const justBelow = buildGame({
-        cash: { s1: 426_999 },
+        cash: { s1: 640_499 },
         cities,
         random: new FakeRandomSource([1, 2]),
       });
@@ -374,17 +374,17 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
       justBelow.execute('s1', COMMAND_TYPES.ROLL);
 
       // Then
-      assert.equal(atThreshold.playerById('s1').cash, 420_000);
-      assert.equal(justBelow.playerById('s1').cash, 419_999);
+      assert.equal(atThreshold.playerById('s1').cash, 630_000);
+      assert.equal(justBelow.playerById('s1').cash, 629_999);
       assert.equal(decideFor(atThreshold).type, COMMAND_TYPES.ACQUIRE);
       assert.equal(decideFor(justBelow).type, COMMAND_TYPES.SKIP_ACQUIRE);
     });
 
     it('출발 보너스: 가장 비싼 도시를 지을 수 없으면 다음 후보로 내려간다', () => {
-      // Given (서울 별장 240,000은 예산 밖, 하노이 별장 18,000은 가능)
+      // Given (서울 별장 360,000은 예산 밖, 하노이 별장 27,000은 가능)
       const game = buildGame({
         positions: { s1: 37 },
-        cash: { s1: 120_000 },
+        cash: { s1: 180_000 },
         cities: [
           { index: 1, ownerId: 's1' },
           { index: 39, ownerId: 's1' },
@@ -392,13 +392,13 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
         random: new FakeRandomSource([1, 2]),
       });
 
-      // When (37 + 3 = 0번 출발 칸, 월급 200,000을 더해 현금 320,000)
+      // When (37 + 3 = 0번 출발 칸, 월급 300,000을 더해 현금 480,000)
       game.execute('s1', COMMAND_TYPES.ROLL);
       const decision = decideFor(game);
 
       // Then
       assert.equal(game.phase, PHASES.AWAIT_START_BUILD);
-      assert.equal(game.playerById('s1').cash, 320_000);
+      assert.equal(game.playerById('s1').cash, 480_000);
       assert.equal(decision.type, COMMAND_TYPES.START_BUILD);
       assert.equal(decision.payload.cityIndex, 1, '비싼 서울을 건너뛰고 하노이를 고른다');
       assert.deepEqual(decision.payload.buildings, [BUILDING_TYPES.VILLA]);
@@ -413,7 +413,7 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
         random: new FakeRandomSource([1, 2]),
       });
 
-      // When (월급을 더해도 310,000 → 예산 10,000)
+      // When (월급을 더해도 410,000 → 예산 -40,000)
       game.execute('s1', COMMAND_TYPES.ROLL);
 
       // Then

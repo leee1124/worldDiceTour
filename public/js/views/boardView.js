@@ -24,7 +24,7 @@ import { diceIcon, landmarkBadge, spaceKindIcon } from './icons.js';
 
 /** 모서리 칸의 큰 장식(SVG 글리프 + 문구). 이미지 에셋 없이 인라인 SVG만 쓴다. */
 const CORNER_ART = Object.freeze({
-  START: { caption: '출발', note: '월급 200,000원' },
+  START: { caption: '출발', note: '월급 300,000원' },
   ISLAND: { caption: '조난 섬', note: '최대 3턴' },
   CASINO: { caption: '카지노', note: '최대 3판' },
   AIRPORT: { caption: '공항', note: '다음 턴 이동' },

@@ -25,11 +25,11 @@ describe('Board(보드 40칸)', () => {
 
       // When / Then
       assert.equal(board.cityAt(1).name, '하노이');
-      assert.equal(board.cityAt(1).price, 60_000);
+      assert.equal(board.cityAt(1).price, 90_000);
       assert.equal(board.cityAt(39).name, '서울');
-      assert.equal(board.cityAt(39).price, 800_000);
+      assert.equal(board.cityAt(39).price, 1_200_000);
       assert.equal(board.cityAt(5).kind, SPACE_KINDS.RESORT);
-      assert.equal(board.cityAt(5).price, 200_000);
+      assert.equal(board.cityAt(5).price, 300_000);
     });
 
     it('행운 티켓 6칸, 세관 1칸, 휴양지 4칸을 가진다', () => {
@@ -142,7 +142,7 @@ describe('Board(보드 40칸)', () => {
       assert.equal(board.ownedBy('p1').length, 3);
       assert.equal(board.resortCountOf('p1'), 2);
       assert.equal(board.buildingCountOf('p1'), 2);
-      assert.equal(board.totalAssetValueOf('p1'), 60_000 + 18_000 + 36_000 + 200_000 + 200_000);
+      assert.equal(board.totalAssetValueOf('p1'), 90_000 + 27_000 + 54_000 + 300_000 + 300_000);
       assert.equal(board.cityCountOf('p1'), 1);
     });
 

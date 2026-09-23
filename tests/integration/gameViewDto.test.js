@@ -9,7 +9,7 @@ import { buildGame } from '../support/gameBuilder.js';
 
 const { VILLA, BUILDING, HOTEL, LANDMARK } = BUILDING_TYPES;
 
-/** 0번 칸에서 1+2로 3번 방콕(70,000원)에 도착시킨다. */
+/** 0번 칸에서 1+2로 3번 방콕(105,000원)에 도착시킨다. */
 const rollToBangkok = () => new FakeRandomSource([1, 2]);
 
 describe('GameViewDto(바퀴 수와 건설 선택지)', () => {
@@ -41,7 +41,7 @@ describe('GameViewDto(바퀴 수와 건설 선택지)', () => {
 
     // Then
     assert.equal(pending.kind, 'BUILD');
-    assert.deepEqual(pending.options, [{ type: VILLA, cost: 21_000, locked: false, unlockLap: 1 }]);
+    assert.deepEqual(pending.options, [{ type: VILLA, cost: 31_500, locked: false, unlockLap: 1 }]);
   });
 
   it('건설 기회의 lockedOptions는 잠긴 건물과 열리는 바퀴를 알려 준다', () => {
@@ -58,8 +58,8 @@ describe('GameViewDto(바퀴 수와 건설 선택지)', () => {
 
     // Then
     assert.deepEqual(pending.lockedOptions, [
-      { type: BUILDING, cost: 42_000, locked: true, unlockLap: 2 },
-      { type: HOTEL, cost: 63_000, locked: true, unlockLap: 3 },
+      { type: BUILDING, cost: 63_000, locked: true, unlockLap: 2 },
+      { type: HOTEL, cost: 94_500, locked: true, unlockLap: 3 },
     ]);
   });
 
@@ -96,7 +96,7 @@ describe('GameViewDto(바퀴 수와 건설 선택지)', () => {
     const { pending } = toGameViewDto(game);
 
     // Then
-    assert.deepEqual(pending.options, [{ type: LANDMARK, cost: 70_000, locked: false, unlockLap: 1 }]);
+    assert.deepEqual(pending.options, [{ type: LANDMARK, cost: 105_000, locked: false, unlockLap: 1 }]);
     assert.deepEqual(pending.lockedOptions, []);
   });
 
@@ -120,7 +120,7 @@ describe('GameViewDto(바퀴 수와 건설 선택지)', () => {
       [VILLA, BUILDING],
     );
     assert.deepEqual(pending.candidates[0].lockedOptions, [
-      { type: HOTEL, cost: 63_000, locked: true, unlockLap: 3 },
+      { type: HOTEL, cost: 94_500, locked: true, unlockLap: 3 },
     ]);
   });
 });

@@ -15,9 +15,10 @@ export const HIGH_LOW_SEVEN_CHOICES = Object.freeze(['LOW', 'HIGH', 'SEVEN']);
 /** 슬롯 심볼 6종(균등 확률). 마지막 심볼이 잭팟 심볼. */
 export const SLOT_SYMBOLS = Object.freeze(['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣']);
 
-const BET_UNIT = 10_000;
-const MIN_BET = 10_000;
-const MAX_BET = 500_000;
+/** 베팅 단위·최소·최대. 서버 입력 검증(validation.js)도 이 값을 그대로 쓴다(중복 정의 금지). */
+export const BET_UNIT = 10_000;
+export const MIN_BET = 10_000;
+export const MAX_BET = 750_000;
 const MAX_ROUNDS_PER_VISIT = 3;
 
 /**

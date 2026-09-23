@@ -22,8 +22,11 @@ import { actionRow, infoRow, moneyRow, quietButton } from './parts.js';
 
 export const LIQUIDATION_MODAL_ID = 'liquidation';
 
-const LOAN_PRINCIPAL = 1_000_000;
-const LOAN_DEBT = 1_200_000;
+// 대출 금액은 서버 pending(`loanPrincipal`/`loanDebt`)이 알려 준다. 필드가 없는 예전 서버만 이 값으로 그린다.
+const FALLBACK_LOAN_PRINCIPAL = 1_500_000;
+const FALLBACK_LOAN_DEBT = 1_800_000;
+const loanPrincipalOf = (pending) => Number.isInteger(pending?.loanPrincipal) ? pending.loanPrincipal : FALLBACK_LOAN_PRINCIPAL;
+const loanDebtOf = (pending) => Number.isInteger(pending?.loanDebt) ? pending.loanDebt : FALLBACK_LOAN_DEBT;
 
 const SECTIONS = Object.freeze([
   { kind: 'PROPERTY', title: '부동산', help: '환급액은 투자액의 50%입니다. 건물도 함께 사라집니다.' },
@@ -309,7 +312,7 @@ export function liquidationModalSpec({
                 dataset: { focusKey: 'take-loan' },
                 on: { click: onTakeLoan },
               },
-              `대출 받기 (+${formatWon(LOAN_PRINCIPAL)})`,
+              `대출 받기 (+${formatWon(loanPrincipalOf(pending))})`,
             ),
           ]),
           el('p', {
@@ -319,8 +322,8 @@ export function liquidationModalSpec({
           el('p', {
             class: 'modal-help',
             text: pending.canLoan
-              ? `대출은 게임당 1회입니다. 현금 ${formatWon(LOAN_PRINCIPAL)}을 받고 채무 ${formatWon(
-                  LOAN_DEBT,
+              ? `대출은 게임당 1회입니다. 현금 ${formatWon(loanPrincipalOf(pending))}을 받고 채무 ${formatWon(
+                  loanDebtOf(pending),
                 )}이 생기며, 이후 월급이 전액 채무 상환에 압류됩니다.`
               : '대출은 게임당 1회만 가능하며 이미 사용했습니다.',
           }),

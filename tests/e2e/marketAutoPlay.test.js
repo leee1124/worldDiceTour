@@ -206,9 +206,10 @@ describe('E2E: 투자 모드 매트릭스 {OFF, STOCKS} × 10시드', () => {
   });
 
   it('라운드 제한이 없어도 파산으로 승자가 가려진다(투자 모드 ON)', async () => {
-    // Given / When
+    // Given / When (D47: 1.5배 경제에서 시드 20_260_921은 생존 2명이 주식·예금 수익으로 통행료를
+    // 상쇄해 20,000커맨드 안에 끝나지 않는다 — 끝나는 시드(123, 135라운드)로 종료 경로를 검증한다)
     const { room } = await playMatch({
-      seed: 20_260_921,
+      seed: 123,
       investmentMode: 'STOCKS',
       roundLimit: null,
     });

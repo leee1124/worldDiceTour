@@ -268,12 +268,12 @@ describe('City(도시/휴양지 칸)', () => {
       assert.equal(city.tollFor({}), 2_800_000);
     });
 
-    it('휴양지 통행료는 소유자가 가진 휴양지 수 × 50,000원이다', () => {
+    it('휴양지 통행료는 소유자가 가진 휴양지 수 × 75,000원이다', () => {
       // Given
       const resort = jeju({ ownerId: 'p1' });
 
       // When / Then
-      assert.equal(resort.tollFor({ resortCount: 3 }), 150_000);
+      assert.equal(resort.tollFor({ resortCount: 3 }), 225_000);
     });
 
     it('주인이 없으면 통행료는 0원이다', () => {

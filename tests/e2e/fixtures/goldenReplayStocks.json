@@ -3,59 +3,59 @@
     {
       "seed": 1,
       "roundLimit": 30,
-      "commands": 580,
+      "commands": 592,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 573786,
+      "jackpot": 483845,
       "initialTotal": 40000000,
-      "netFromBank": -15814397,
-      "totalCash": 23611817,
-      "eventCount": 1781,
-      "eventSequenceHash": "c6a6ac1ac22a090236ebd86966c9475928c5e07ec7bcc5dd3229aa9bea4f2a48",
-      "commandSequenceHash": "1f735da73b5cd2a9ba30270068063ea71d5ed085e762baf34d4dc381b2d13cdb",
+      "netFromBank": -35137315,
+      "totalCash": 4378840,
+      "eventCount": 1727,
+      "eventSequenceHash": "ee9c497a5ec4b59236940e6e8ccb73d8a878a173c0e483452391a53b5973e1d1",
+      "commandSequenceHash": "cb329ad2fe580d7932c59b0903cbe169f8609b676d308c1c9d357b91bb4a4d1d",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 9164791,
+          "cash": 2837108,
           "loanDebt": 0,
-          "totalAssets": 16303791
+          "totalAssets": 23111308
         },
         {
           "rank": 2,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 8944733,
+          "cash": 1347780,
           "loanDebt": 0,
-          "totalAssets": 15815633
+          "totalAssets": 11109180
         },
         {
           "rank": 3,
-          "playerId": "seat-4",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 4575233,
+          "cash": 117523,
           "loanDebt": 0,
-          "totalAssets": 10834133
+          "totalAssets": 10085523
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 927060,
+          "cash": 76429,
           "loanDebt": 0,
-          "totalAssets": 6127060
+          "totalAssets": 6958229
         }
       ],
       "market": {
-        "cyclePhase": "OVERHEAT",
-        "baseRateBp": 75,
+        "cyclePhase": "RECESSION",
+        "baseRateBp": 150,
         "prices": {
-          "AIR": 20500,
-          "CON": 23800,
-          "HOT": 25400,
-          "ENT": 5100,
-          "NRG": 30800
+          "AIR": 10800,
+          "CON": 15700,
+          "HOT": 24000,
+          "ENT": 8600,
+          "NRG": 33200
         },
         "states": {
           "AIR": "LISTED",
@@ -65,64 +65,64 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "ENT:150",
-          "seat-2": "AIR:13,ENT:150,HOT:11",
-          "seat-3": "",
-          "seat-4": "AIR:13,ENT:150,HOT:11"
+          "seat-1": "ENT:28",
+          "seat-2": "AIR:11,ENT:14,HOT:6",
+          "seat-3": "HOT:11",
+          "seat-4": "AIR:22,ENT:28,HOT:6"
         },
         "deposits": {
-          "seat-1": 0,
-          "seat-2": 0,
-          "seat-3": 0,
-          "seat-4": 0
+          "seat-1": 2900000,
+          "seat-2": 10000000,
+          "seat-3": 3500000,
+          "seat-4": 2200000
         }
       }
     },
     {
       "seed": 7,
       "roundLimit": 30,
-      "commands": 541,
+      "commands": 535,
       "finalRound": 31,
       "isOver": true,
       "jackpot": 5000,
       "initialTotal": 40000000,
-      "netFromBank": -18654321,
-      "totalCash": 21340679,
-      "eventCount": 1609,
-      "eventSequenceHash": "dcf275da3771b62c7bf9eb020b84996a0b6019a33ea286ae5e1d2f6cb936b946",
-      "commandSequenceHash": "12a3863cd8e2a081c90d44bb70d649330162db6124059179e96f14580589a9ef",
+      "netFromBank": -23180921,
+      "totalCash": 16814079,
+      "eventCount": 1596,
+      "eventSequenceHash": "d2f904305609b53ae4bdcbc8dbb3135d3bd2996002cd03482f22417d102a4c7e",
+      "commandSequenceHash": "468c630d53eab2a0040aff484876a9da35a660f398411cb0b6b9cdcc5897ee30",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 10722058,
+          "cash": 8174739,
           "loanDebt": 0,
-          "totalAssets": 15734958
+          "totalAssets": 15912639
         },
         {
           "rank": 2,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 7013115,
+          "cash": 4516443,
           "loanDebt": 0,
-          "totalAssets": 14980015
+          "totalAssets": 13694343
         },
         {
           "rank": 3,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 2857649,
+          "cash": 2607349,
           "loanDebt": 0,
-          "totalAssets": 9189649
+          "totalAssets": 10392349
         },
         {
           "rank": 4,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 747857,
+          "cash": 1515548,
           "loanDebt": 0,
-          "totalAssets": 7435857
+          "totalAssets": 9514448
         }
       ],
       "market": {
@@ -130,7 +130,7 @@
         "baseRateBp": 50,
         "prices": {
           "AIR": 9900,
-          "CON": 18400,
+          "CON": 18200,
           "HOT": 30700,
           "ENT": 9000,
           "NRG": 23600
@@ -146,7 +146,7 @@
           "seat-1": "AIR:121,ENT:1",
           "seat-2": "AIR:121,ENT:1",
           "seat-3": "AIR:120",
-          "seat-4": "AIR:120"
+          "seat-4": "AIR:121"
         },
         "deposits": {
           "seat-1": 0,
@@ -159,48 +159,48 @@
     {
       "seed": 42,
       "roundLimit": 30,
-      "commands": 608,
+      "commands": 576,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 1488799,
+      "jackpot": 1419613,
       "initialTotal": 40000000,
-      "netFromBank": -35158377,
-      "totalCash": 3352824,
-      "eventCount": 1716,
-      "eventSequenceHash": "9ebe3649d3abe8db4c13c34d46c0c83f1d7ced10d81f4876e278b421a1ac7245",
-      "commandSequenceHash": "1b6883b1d63569405915b214d2613f6e51d62645d5f5b2e6df80163d125a1fbf",
+      "netFromBank": -32583354,
+      "totalCash": 5997033,
+      "eventCount": 1659,
+      "eventSequenceHash": "39ee9193361deb0254fde0f54f03389866c7d2ee3a5e2347c92e04a0d0c9d3d0",
+      "commandSequenceHash": "69f42e305401336ceda80d8811038fa87894d55b5476fee69810a1e699ee1746",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 1374316,
+          "cash": 1483650,
           "loanDebt": 0,
-          "totalAssets": 13179916
+          "totalAssets": 14213450
         },
         {
           "rank": 2,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 443636,
+          "cash": 2808193,
           "loanDebt": 0,
-          "totalAssets": 12193636
+          "totalAssets": 12714193
         },
         {
           "rank": 3,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 1057159,
+          "cash": 692496,
           "loanDebt": 0,
-          "totalAssets": 11845359
+          "totalAssets": 11310096
         },
         {
           "rank": 4,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 477713,
+          "cash": 1012694,
           "loanDebt": 0,
-          "totalAssets": 11460613
+          "totalAssets": 10772494
         }
       ],
       "market": {
@@ -208,7 +208,7 @@
         "baseRateBp": 75,
         "prices": {
           "AIR": 19100,
-          "CON": 10700,
+          "CON": 9500,
           "HOT": 21600,
           "ENT": 9400,
           "NRG": 24600
@@ -221,10 +221,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:182,CON:5,NRG:72",
-          "seat-2": "AIR:183,CON:5,NRG:168",
-          "seat-3": "AIR:178,CON:2,NRG:48",
-          "seat-4": "AIR:181,CON:5,NRG:96"
+          "seat-1": "AIR:93,CON:133",
+          "seat-2": "AIR:183,CON:259",
+          "seat-3": "",
+          "seat-4": "AIR:91,CON:191"
         },
         "deposits": {
           "seat-1": 0,
@@ -237,59 +237,59 @@
     {
       "seed": 99,
       "roundLimit": 30,
-      "commands": 609,
+      "commands": 591,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 240446,
+      "jackpot": 661502,
       "initialTotal": 40000000,
-      "netFromBank": -37125045,
-      "totalCash": 2634509,
-      "eventCount": 1778,
-      "eventSequenceHash": "7a1b7fa4f0039f06b7f7d6a79859472699fc05972405281d26e5541ab172db0a",
-      "commandSequenceHash": "c37e872bb475d17047f5f8e7c838b76bebd2995daecd514ec872f72cde613c4a",
+      "netFromBank": -24062123,
+      "totalCash": 15276375,
+      "eventCount": 1716,
+      "eventSequenceHash": "9954df7b36534342a771da80f3d32c7f10f21e19265c998e016fcb4a5fdac60d",
+      "commandSequenceHash": "1c357a1831ee38a065446fd362450cf59a10408053a88fc161b536d60053b334",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 572647,
+          "cash": 8302483,
           "loanDebt": 0,
-          "totalAssets": 17856247
+          "totalAssets": 17554183
         },
         {
           "rank": 2,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 995305,
+          "cash": 959219,
           "loanDebt": 0,
-          "totalAssets": 12717305
+          "totalAssets": 13073319
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 528822,
+          "cash": 3938319,
           "loanDebt": 0,
-          "totalAssets": 11728822
+          "totalAssets": 10560719
         },
         {
           "rank": 4,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 537735,
+          "cash": 2076354,
           "loanDebt": 0,
-          "totalAssets": 10417735
+          "totalAssets": 9151654
         }
       ],
       "market": {
-        "cyclePhase": "EXPANSION",
-        "baseRateBp": 125,
+        "cyclePhase": "OVERHEAT",
+        "baseRateBp": 100,
         "prices": {
-          "AIR": 13600,
-          "CON": 24600,
-          "HOT": 19200,
-          "ENT": 6200,
-          "NRG": 27600
+          "AIR": 11200,
+          "CON": 19000,
+          "HOT": 17700,
+          "ENT": 4600,
+          "NRG": 27800
         },
         "states": {
           "AIR": "LISTED",
@@ -299,88 +299,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "",
-          "seat-2": "AIR:2,HOT:85,NRG:4",
-          "seat-3": "",
-          "seat-4": ""
-        },
-        "deposits": {
-          "seat-1": 3500000,
-          "seat-2": 10000000,
-          "seat-3": 5700000,
-          "seat-4": 6400000
-        }
-      }
-    },
-    {
-      "seed": 123,
-      "roundLimit": 30,
-      "commands": 565,
-      "finalRound": 31,
-      "isOver": true,
-      "jackpot": 507221,
-      "initialTotal": 40000000,
-      "netFromBank": -21011690,
-      "totalCash": 18481089,
-      "eventCount": 1658,
-      "eventSequenceHash": "e80d9b124f2dcaeb52b3c390ee016704ee87bc165111866fc28f081df99ed997",
-      "commandSequenceHash": "5f0dc0bfafdda8c5d84bf8aa26c9ea703c9746e413a3365d15c2874d977a4c4f",
-      "rankings": [
-        {
-          "rank": 1,
-          "playerId": "seat-2",
-          "eliminated": false,
-          "cash": 3492752,
-          "loanDebt": 0,
-          "totalAssets": 13508752
-        },
-        {
-          "rank": 2,
-          "playerId": "seat-4",
-          "eliminated": false,
-          "cash": 7638253,
-          "loanDebt": 0,
-          "totalAssets": 11775253
-        },
-        {
-          "rank": 3,
-          "playerId": "seat-3",
-          "eliminated": false,
-          "cash": 2975086,
-          "loanDebt": 0,
-          "totalAssets": 10821086
-        },
-        {
-          "rank": 4,
-          "playerId": "seat-1",
-          "eliminated": false,
-          "cash": 4374998,
-          "loanDebt": 0,
-          "totalAssets": 10716998
-        }
-      ],
-      "market": {
-        "cyclePhase": "EXPANSION",
-        "baseRateBp": 25,
-        "prices": {
-          "AIR": 14600,
-          "CON": 13700,
-          "HOT": 18800,
-          "ENT": 3600,
-          "NRG": 25400
-        },
-        "states": {
-          "AIR": "LISTED",
-          "CON": "LISTED",
-          "HOT": "LISTED",
-          "ENT": "LISTED",
-          "NRG": "LISTED"
-        },
-        "holdings": {
-          "seat-1": "AIR:2,ENT:500,HOT:1",
-          "seat-2": "AIR:2,ENT:500,HOT:1",
-          "seat-3": "AIR:2,ENT:500,HOT:1",
-          "seat-4": "AIR:2,ENT:500,HOT:1"
+          "seat-1": "ENT:150,HOT:21",
+          "seat-2": "AIR:2,ENT:150,HOT:23,NRG:7",
+          "seat-3": "ENT:100,HOT:29",
+          "seat-4": "ENT:50,HOT:22"
         },
         "deposits": {
           "seat-1": 0,
@@ -391,60 +313,138 @@
       }
     },
     {
-      "seed": 2024,
+      "seed": 123,
       "roundLimit": 30,
-      "commands": 582,
+      "commands": 572,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 1112124,
+      "jackpot": 230971,
       "initialTotal": 40000000,
-      "netFromBank": -16792307,
-      "totalCash": 22095569,
-      "eventCount": 1730,
-      "eventSequenceHash": "0bd32822004ff76a468e91b7896bc6e5c5f892db1d7f120ce52ab8e5e3bd3b32",
-      "commandSequenceHash": "836f69f45a9ea73813f94cbec55bb085216276681c2e311eeebb6642d7cc1940",
+      "netFromBank": -37125199,
+      "totalCash": 2643830,
+      "eventCount": 1718,
+      "eventSequenceHash": "fbe3021bb3205103f19e04d2b58ff17b47a4d134c98df4cb609d5ee6a2b83cd4",
+      "commandSequenceHash": "21c07b8dc469148ba50ed99ac906226d2e46e79e9e198539cbdc7229d770601f",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 6540130,
+          "cash": 822838,
           "loanDebt": 0,
-          "totalAssets": 13929530
+          "totalAssets": 15493138
+        },
+        {
+          "rank": 2,
+          "playerId": "seat-4",
+          "eliminated": false,
+          "cash": 802731,
+          "loanDebt": 0,
+          "totalAssets": 15132031
+        },
+        {
+          "rank": 3,
+          "playerId": "seat-3",
+          "eliminated": false,
+          "cash": 915421,
+          "loanDebt": 0,
+          "totalAssets": 13023521
+        },
+        {
+          "rank": 4,
+          "playerId": "seat-1",
+          "eliminated": false,
+          "cash": 102840,
+          "loanDebt": 0,
+          "totalAssets": 11354940
+        }
+      ],
+      "market": {
+        "cyclePhase": "EXPANSION",
+        "baseRateBp": 125,
+        "prices": {
+          "AIR": 17300,
+          "CON": 16600,
+          "HOT": 21000,
+          "ENT": 7800,
+          "NRG": 30200
+        },
+        "states": {
+          "AIR": "LISTED",
+          "CON": "LISTED",
+          "HOT": "LISTED",
+          "ENT": "LISTED",
+          "NRG": "LISTED"
+        },
+        "holdings": {
+          "seat-1": "AIR:7",
+          "seat-2": "AIR:7,ENT:19,HOT:5",
+          "seat-3": "AIR:13,ENT:19,HOT:10",
+          "seat-4": "AIR:13,ENT:38,HOT:20"
+        },
+        "deposits": {
+          "seat-1": 3400000,
+          "seat-2": 10000000,
+          "seat-3": 5900000,
+          "seat-4": 6200000
+        }
+      }
+    },
+    {
+      "seed": 2024,
+      "roundLimit": 30,
+      "commands": 556,
+      "finalRound": 31,
+      "isOver": true,
+      "jackpot": 76043,
+      "initialTotal": 40000000,
+      "netFromBank": -23829166,
+      "totalCash": 16094791,
+      "eventCount": 1686,
+      "eventSequenceHash": "d97c17e525acf085eebf21e67518ea93eb26948909e62ae61960497258890265",
+      "commandSequenceHash": "97fa4f83c42ac2879b4a65885fd3049a27b63d24267fbba297fc6ccd7051c706",
+      "rankings": [
+        {
+          "rank": 1,
+          "playerId": "seat-1",
+          "eliminated": false,
+          "cash": 8379284,
+          "loanDebt": 0,
+          "totalAssets": 18869784
         },
         {
           "rank": 2,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 3711221,
+          "cash": 1933060,
           "loanDebt": 0,
-          "totalAssets": 13587521
+          "totalAssets": 13072560
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 7345857,
+          "cash": 3154810,
           "loanDebt": 0,
-          "totalAssets": 13451157
+          "totalAssets": 11024710
         },
         {
           "rank": 4,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 4498361,
+          "cash": 2627637,
           "loanDebt": 0,
-          "totalAssets": 10026761
+          "totalAssets": 10924637
         }
       ],
       "market": {
         "cyclePhase": "RECOVERY",
-        "baseRateBp": 25,
+        "baseRateBp": 75,
         "prices": {
-          "AIR": 21200,
-          "CON": 17900,
-          "HOT": 25400,
-          "ENT": 5000,
+          "AIR": 20100,
+          "CON": 11500,
+          "HOT": 22800,
+          "ENT": 10400,
           "NRG": 20000
         },
         "states": {
@@ -455,10 +455,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:4,CON:3,ENT:255,HOT:2,NRG:3",
-          "seat-2": "ENT:244,HOT:1,NRG:1",
-          "seat-3": "AIR:4,CON:3,ENT:255,HOT:2,NRG:3",
-          "seat-4": "ENT:248,HOT:1,NRG:2"
+          "seat-1": "AIR:4,CON:5,ENT:8,HOT:3,NRG:65",
+          "seat-2": "NRG:61",
+          "seat-3": "AIR:4,CON:5,ENT:8,HOT:3,NRG:64",
+          "seat-4": "AIR:7,CON:9,ENT:8,NRG:64"
         },
         "deposits": {
           "seat-1": 0,
@@ -471,59 +471,59 @@
     {
       "seed": 31337,
       "roundLimit": 30,
-      "commands": 565,
+      "commands": 529,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 1202865,
+      "jackpot": 1354248,
       "initialTotal": 40000000,
-      "netFromBank": -26100759,
-      "totalCash": 12696376,
-      "eventCount": 1742,
-      "eventSequenceHash": "ae63fdcf06b4190fcbd1e64ee5895ffbb7b501f6aa18ec28d25fd373d8c5bd2c",
-      "commandSequenceHash": "2e4009fccbe797edfb04b05b2057907b70b526c90f1fda9967dc892ba4cb171e",
+      "netFromBank": -18022080,
+      "totalCash": 20623672,
+      "eventCount": 1600,
+      "eventSequenceHash": "735cfb9fb652b206584397fe473a9ad384b0c93126480ad43aee295a7812ede9",
+      "commandSequenceHash": "59e4e9e771e9ee8fc5195abf64d5616d262f6cf0a775e37c9516bdcd881d8176",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-1",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 2795505,
+          "cash": 4770317,
           "loanDebt": 0,
-          "totalAssets": 17492705
+          "totalAssets": 18883617
         },
         {
           "rank": 2,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 1009353,
+          "cash": 6503281,
           "loanDebt": 0,
-          "totalAssets": 16068653
+          "totalAssets": 12310381
         },
         {
           "rank": 3,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 8092107,
+          "cash": 5063441,
           "loanDebt": 0,
-          "totalAssets": 12880107
+          "totalAssets": 11719441
         },
         {
           "rank": 4,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 799411,
+          "cash": 4286633,
           "loanDebt": 0,
-          "totalAssets": 8743411
+          "totalAssets": 10620633
         }
       ],
       "market": {
-        "cyclePhase": "EXPANSION",
-        "baseRateBp": 150,
+        "cyclePhase": "RECESSION",
+        "baseRateBp": 25,
         "prices": {
-          "AIR": 18700,
-          "CON": 22800,
-          "HOT": 18500,
-          "ENT": 14900,
-          "NRG": 23400
+          "AIR": 25900,
+          "CON": 15300,
+          "HOT": 17800,
+          "ENT": 7000,
+          "NRG": 23900
         },
         "states": {
           "AIR": "LISTED",
@@ -533,16 +533,16 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:1,HOT:1",
-          "seat-2": "",
-          "seat-3": "",
-          "seat-4": "AIR:1,HOT:74,NRG:54"
+          "seat-1": "ENT:10",
+          "seat-2": "AIR:1,ENT:38,HOT:24",
+          "seat-3": "ENT:8",
+          "seat-4": "AIR:1,ENT:75,HOT:48"
         },
         "deposits": {
-          "seat-1": 8400000,
-          "seat-2": 2200000,
+          "seat-1": 0,
+          "seat-2": 0,
           "seat-3": 0,
-          "seat-4": 9700000
+          "seat-4": 0
         }
       }
     },
@@ -552,56 +552,56 @@
       "commands": 586,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 0,
+      "jackpot": 1704951,
       "initialTotal": 40000000,
-      "netFromBank": 7596865,
-      "totalCash": 47596865,
-      "eventCount": 1765,
-      "eventSequenceHash": "97daec9c3f366f359aa05ee605d9ed41651a753dadfa7a7eab6a9d749274e109",
-      "commandSequenceHash": "7521d22cd3aa2a8745cb5caa799af68b2a29e4bc7081ab8d3b4456e4f43d0c68",
+      "netFromBank": -21165253,
+      "totalCash": 17129796,
+      "eventCount": 1774,
+      "eventSequenceHash": "a58f58f0f11fcb1b15f9c60b9904f86ddd0a2c7dfd608f45904605fb2a8f03d6",
+      "commandSequenceHash": "b21b3442ec48f11be7aa52f78cf8cf02a2549c558c14ab42b238d29983165711",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-2",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 15570086,
+          "cash": 7747050,
           "loanDebt": 0,
-          "totalAssets": 25050686
+          "totalAssets": 17051850
         },
         {
           "rank": 2,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 10825243,
+          "cash": 6781181,
           "loanDebt": 0,
-          "totalAssets": 20742443
+          "totalAssets": 14824581
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 9262264,
+          "cash": 1958388,
           "loanDebt": 0,
-          "totalAssets": 19513864
+          "totalAssets": 11780388
         },
         {
           "rank": 4,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 11939272,
+          "cash": 643177,
           "loanDebt": 0,
-          "totalAssets": 16429172
+          "totalAssets": 8836377
         }
       ],
       "market": {
         "cyclePhase": "RECOVERY",
-        "baseRateBp": 100,
+        "baseRateBp": 50,
         "prices": {
-          "AIR": 17200,
-          "CON": 20200,
-          "HOT": 38800,
-          "ENT": 11400,
-          "NRG": 33100
+          "AIR": 11000,
+          "CON": 18100,
+          "HOT": 20800,
+          "ENT": 11600,
+          "NRG": 16400
         },
         "states": {
           "AIR": "LISTED",
@@ -611,10 +611,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:104,CON:28,ENT:48",
-          "seat-2": "AIR:89,CON:28,ENT:63",
-          "seat-3": "AIR:144,CON:112",
-          "seat-4": "AIR:68,CON:14,NRG:5"
+          "seat-1": "NRG:72",
+          "seat-2": "",
+          "seat-3": "AIR:2,ENT:2,NRG:73",
+          "seat-4": "NRG:73"
         },
         "deposits": {
           "seat-1": 0,
@@ -627,59 +627,59 @@
     {
       "seed": 777777,
       "roundLimit": 30,
-      "commands": 571,
+      "commands": 546,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 135600,
+      "jackpot": 12500,
       "initialTotal": 40000000,
-      "netFromBank": -32245313,
-      "totalCash": 7619087,
-      "eventCount": 1679,
-      "eventSequenceHash": "d30e450e90f4ca92101161df0555e1fea53753cc464254f780b5a5ba5c05111d",
-      "commandSequenceHash": "3558076930eedca603c9fd1cfb59c60fe00be09ac24dce84acf3e1e6f63e6832",
+      "netFromBank": -34325641,
+      "totalCash": 5661859,
+      "eventCount": 1625,
+      "eventSequenceHash": "a692ffcba3776cf66b2f5853a95ea883326d2dd02ed128b55fcc0cbce375dd8d",
+      "commandSequenceHash": "736a6a0c408d21788945520eb1c7e8fc1c1db0d2b84ac98a2362ea2d591c8cd6",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 2565286,
+          "cash": 1486193,
           "loanDebt": 0,
-          "totalAssets": 12129786
+          "totalAssets": 13494993
         },
         {
           "rank": 2,
-          "playerId": "seat-4",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 1490749,
+          "cash": 1372475,
           "loanDebt": 0,
-          "totalAssets": 10829049
+          "totalAssets": 11315675
         },
         {
           "rank": 3,
-          "playerId": "seat-1",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 1593281,
+          "cash": 1372281,
           "loanDebt": 0,
-          "totalAssets": 10477981
+          "totalAssets": 11057681
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 1969771,
+          "cash": 1430910,
           "loanDebt": 0,
-          "totalAssets": 10349271
+          "totalAssets": 8773510
         }
       ],
       "market": {
-        "cyclePhase": "EXPANSION",
+        "cyclePhase": "RECOVERY",
         "baseRateBp": 75,
         "prices": {
-          "AIR": 8600,
-          "CON": 12300,
-          "HOT": 13100,
-          "ENT": 9500,
-          "NRG": 24700
+          "AIR": 8200,
+          "CON": 10300,
+          "HOT": 14200,
+          "ENT": 10200,
+          "NRG": 23000
         },
         "states": {
           "AIR": "LISTED",
@@ -689,10 +689,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:300,NRG:1",
-          "seat-2": "AIR:433,NRG:1",
-          "seat-3": "AIR:438,NRG:1",
-          "seat-4": "AIR:366,NRG:1"
+          "seat-1": "AIR:301,NRG:1",
+          "seat-2": "AIR:73",
+          "seat-3": "AIR:447,NRG:1",
+          "seat-4": "AIR:449,NRG:1"
         },
         "deposits": {
           "seat-1": 0,
@@ -705,59 +705,59 @@
     {
       "seed": 1000003,
       "roundLimit": 30,
-      "commands": 571,
+      "commands": 551,
       "finalRound": 31,
       "isOver": true,
-      "jackpot": 54419,
+      "jackpot": 41728,
       "initialTotal": 40000000,
-      "netFromBank": -8790868,
-      "totalCash": 31154713,
-      "eventCount": 1730,
-      "eventSequenceHash": "6ebc39ae44098481262ad9d8c5a3fbd0d2a0e46178ab1d552f686bd0dc7b1dd9",
-      "commandSequenceHash": "ac83cec625255c9b6c6deb7614115f07f7d1bc3aacb2fedd93d2c7492b970f47",
+      "netFromBank": -15961292,
+      "totalCash": 23996980,
+      "eventCount": 1697,
+      "eventSequenceHash": "02368c7d8459e1e5d6674d7b07865439904b535e8a01b4989a633256c3832271",
+      "commandSequenceHash": "322d44040322b6f348dc4199198543a151b0f3ada4d65ac3a36e2dfb30d78a7a",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 8410268,
+          "cash": 14726258,
           "loanDebt": 0,
-          "totalAssets": 16497468
+          "totalAssets": 23645858
         },
         {
           "rank": 2,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 7532403,
+          "cash": 4355305,
           "loanDebt": 0,
-          "totalAssets": 16053603
+          "totalAssets": 17192505
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 8622215,
+          "cash": 3859533,
           "loanDebt": 0,
-          "totalAssets": 13801415
+          "totalAssets": 13346133
         },
         {
           "rank": 4,
-          "playerId": "seat-4",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 6589827,
+          "cash": 1055884,
           "loanDebt": 0,
-          "totalAssets": 9532827
+          "totalAssets": 1055884
         }
       ],
       "market": {
-        "cyclePhase": "OVERHEAT",
-        "baseRateBp": 50,
+        "cyclePhase": "EXPANSION",
+        "baseRateBp": 25,
         "prices": {
-          "AIR": 26400,
-          "CON": 11100,
-          "HOT": 20900,
-          "ENT": 4600,
-          "NRG": 34700
+          "AIR": 20600,
+          "CON": 9700,
+          "HOT": 25100,
+          "ENT": 6100,
+          "NRG": 29000
         },
         "states": {
           "AIR": "LISTED",
@@ -767,10 +767,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:4,ENT:38,NRG:4",
-          "seat-2": "AIR:4,ENT:38,NRG:4",
-          "seat-3": "AIR:7,ENT:38,NRG:8",
-          "seat-4": "AIR:2,ENT:38,NRG:2"
+          "seat-1": "",
+          "seat-2": "AIR:1,ENT:500,NRG:1",
+          "seat-3": "AIR:2,ENT:500,NRG:1",
+          "seat-4": "AIR:1,ENT:500,NRG:1"
         },
         "deposits": {
           "seat-1": 0,
@@ -783,48 +783,48 @@
     {
       "seed": 3,
       "roundLimit": 20,
-      "commands": 396,
+      "commands": 371,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 887200,
+      "jackpot": 690231,
       "initialTotal": 40000000,
-      "netFromBank": -36906691,
-      "totalCash": 2206109,
-      "eventCount": 1146,
-      "eventSequenceHash": "aebe3143e25735871e6f58d31466a906ad35fc899cf4748c0e671b9dc7489c1c",
-      "commandSequenceHash": "24888e0ee7b454e8a8e135c15dff1b9f8ff5ca198e6d2b96f8cfc5f64350f20e",
+      "netFromBank": -36023570,
+      "totalCash": 3286199,
+      "eventCount": 1096,
+      "eventSequenceHash": "7cf0abc9837a21b3ebe966d9e38020a10d4d77189193fa3d6b32ec6d69599606",
+      "commandSequenceHash": "64823862667741aa21ac3d7c1e9dd9d72f4ab96e538465eeeca17ddbce76c2be",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 547667,
+          "cash": 532091,
           "loanDebt": 0,
-          "totalAssets": 13581167
+          "totalAssets": 13503591
         },
         {
           "rank": 2,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 425544,
+          "cash": 720408,
           "loanDebt": 0,
-          "totalAssets": 12672344
+          "totalAssets": 13112608
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-4",
           "eliminated": false,
-          "cash": 870982,
+          "cash": 857740,
           "loanDebt": 0,
-          "totalAssets": 12117182
+          "totalAssets": 12888740
         },
         {
           "rank": 4,
-          "playerId": "seat-4",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 361916,
+          "cash": 1175960,
           "loanDebt": 0,
-          "totalAssets": 11936416
+          "totalAssets": 11139460
         }
       ],
       "market": {
@@ -845,10 +845,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:346,ENT:500,NRG:7",
-          "seat-2": "AIR:240,ENT:500,NRG:7",
-          "seat-3": "AIR:293,ENT:500,NRG:7",
-          "seat-4": "AIR:293,ENT:500,NRG:7"
+          "seat-1": "AIR:240,ENT:500,NRG:7",
+          "seat-2": "AIR:75,ENT:500",
+          "seat-3": "AIR:128,ENT:500,NRG:7",
+          "seat-4": "AIR:183,ENT:500,NRG:7"
         },
         "deposits": {
           "seat-1": 0,
@@ -861,48 +861,48 @@
     {
       "seed": 11,
       "roundLimit": 20,
-      "commands": 395,
+      "commands": 384,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 1282638,
+      "jackpot": 844952,
       "initialTotal": 40000000,
-      "netFromBank": -18458468,
-      "totalCash": 20258894,
-      "eventCount": 1169,
-      "eventSequenceHash": "57278a429fbbfe1c6608ca93825c6b8065b03d72f7426d8ebe02ac338ee99f76",
-      "commandSequenceHash": "4ae60be13a0a4cb8eee621a50f666ec61265c3455c4c8b1b6841babbb22d441c",
+      "netFromBank": -24954332,
+      "totalCash": 14200716,
+      "eventCount": 1147,
+      "eventSequenceHash": "2ad692b495e323392d482f5d54c18bbb0bdc2e00be4a3bee8864e6e0b30e630b",
+      "commandSequenceHash": "bd4f6aeed63955ee6398cee609889ad56dfff017920d13eec8e8b7061ce9b0c6",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 8923488,
+          "cash": 9751824,
           "loanDebt": 0,
-          "totalAssets": 15434588
+          "totalAssets": 18227724
         },
         {
           "rank": 2,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 4965808,
+          "cash": 1469576,
           "loanDebt": 0,
-          "totalAssets": 15198908
+          "totalAssets": 13815476
         },
         {
           "rank": 3,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 3430922,
+          "cash": 1117660,
           "loanDebt": 0,
-          "totalAssets": 8990022
+          "totalAssets": 8963560
         },
         {
           "rank": 4,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 2938676,
+          "cash": 1861656,
           "loanDebt": 0,
-          "totalAssets": 8465776
+          "totalAssets": 7866456
         }
       ],
       "market": {
@@ -910,7 +910,7 @@
         "baseRateBp": 50,
         "prices": {
           "AIR": 11700,
-          "CON": 16200,
+          "CON": 15200,
           "HOT": 18700,
           "ENT": 4700,
           "NRG": 26000
@@ -923,10 +923,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:13,CON:5,ENT:500",
-          "seat-2": "AIR:13,CON:5,ENT:500",
-          "seat-3": "AIR:13,CON:5,ENT:500",
-          "seat-4": "AIR:13,CON:5,ENT:500"
+          "seat-1": "AIR:7,CON:10,ENT:500",
+          "seat-2": "AIR:13,CON:10,ENT:431",
+          "seat-3": "AIR:7,CON:10,ENT:500",
+          "seat-4": "AIR:7,CON:10,ENT:500"
         },
         "deposits": {
           "seat-1": 0,
@@ -939,59 +939,59 @@
     {
       "seed": 77,
       "roundLimit": 20,
-      "commands": 409,
+      "commands": 399,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 501074,
+      "jackpot": 0,
       "initialTotal": 40000000,
-      "netFromBank": -10062733,
-      "totalCash": 29436193,
-      "eventCount": 1179,
-      "eventSequenceHash": "b9e28467617b203c812cc29ee877c95b2b7886f81d30f789ee39adf45d41de13",
-      "commandSequenceHash": "88f77faef238a2807b05054433da7773ea89fc6e576e3c3e13c3c0d239d66d7a",
+      "netFromBank": -20188909,
+      "totalCash": 19811091,
+      "eventCount": 1171,
+      "eventSequenceHash": "0a02dcfcb39c82ba2beb78d9b0ef61289ad3f5e56323e2131839d5c09035c2db",
+      "commandSequenceHash": "5613c95e3a84cac154234c244b58b6f08d81c96239c7f3e276ffb4629d63a09f",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-1",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 7800900,
+          "cash": 5647731,
           "loanDebt": 0,
-          "totalAssets": 14150900
+          "totalAssets": 15148631
         },
         {
           "rank": 2,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 8080714,
+          "cash": 5142190,
           "loanDebt": 0,
-          "totalAssets": 12116314
+          "totalAssets": 12935090
         },
         {
           "rank": 3,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 8305928,
+          "cash": 7409645,
           "loanDebt": 0,
-          "totalAssets": 12114328
+          "totalAssets": 12923645
         },
         {
           "rank": 4,
-          "playerId": "seat-2",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 5248651,
+          "cash": 1611525,
           "loanDebt": 0,
-          "totalAssets": 10176751
+          "totalAssets": 8841525
         }
       ],
       "market": {
-        "cyclePhase": "RECESSION",
-        "baseRateBp": 25,
+        "cyclePhase": "OVERHEAT",
+        "baseRateBp": 100,
         "prices": {
-          "AIR": 12300,
-          "CON": 7200,
-          "HOT": 15600,
-          "ENT": 5000,
-          "NRG": 17600
+          "AIR": 16100,
+          "CON": 6600,
+          "HOT": 16000,
+          "ENT": 6600,
+          "NRG": 19700
         },
         "states": {
           "AIR": "LISTED",
@@ -1001,10 +1001,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:4,ENT:13,HOT:3",
-          "seat-2": "AIR:7,ENT:26,HOT:6,NRG:4",
-          "seat-3": "AIR:2,ENT:7,HOT:3,NRG:2",
-          "seat-4": "AIR:2,ENT:7,HOT:3"
+          "seat-1": "AIR:4,CON:150,HOT:2",
+          "seat-2": "AIR:7,CON:150,ENT:26,HOT:11,NRG:8",
+          "seat-3": "",
+          "seat-4": "AIR:7,CON:150,ENT:13,HOT:4"
         },
         "deposits": {
           "seat-1": 0,
@@ -1017,48 +1017,48 @@
     {
       "seed": 512,
       "roundLimit": 20,
-      "commands": 445,
+      "commands": 430,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 3681361,
+      "jackpot": 3536963,
       "initialTotal": 40000000,
-      "netFromBank": -15913706,
-      "totalCash": 20404933,
-      "eventCount": 1188,
-      "eventSequenceHash": "e465844aa888bdf432761bae05d2e39fac00032fc63aecf752b84451c8fde68f",
-      "commandSequenceHash": "afe680fddfd8c102f3c3edaf0fea8d3d9bb33a2e2c1b329fa2b7d61fdf47ce6d",
+      "netFromBank": -21801656,
+      "totalCash": 14661381,
+      "eventCount": 1160,
+      "eventSequenceHash": "7facaa45ab40584daa4c10863e4c5318c29a790001e2759aa3ae9206f7d1feba",
+      "commandSequenceHash": "142a341f8917b636c177580ca20b82a1e17ff9b582237b53e04b3cb0cae9e3bb",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 9297628,
+          "cash": 4880233,
           "loanDebt": 0,
-          "totalAssets": 14423028
+          "totalAssets": 14363933
         },
         {
           "rank": 2,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 6303354,
+          "cash": 5027453,
           "loanDebt": 0,
-          "totalAssets": 10650754
+          "totalAssets": 10667153
         },
         {
           "rank": 3,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 2270413,
+          "cash": 3751883,
           "loanDebt": 0,
-          "totalAssets": 7659813
+          "totalAssets": 9352583
         },
         {
           "rank": 4,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 2533538,
+          "cash": 1001812,
           "loanDebt": 0,
-          "totalAssets": 7136938
+          "totalAssets": 6484012
         }
       ],
       "market": {
@@ -1066,7 +1066,7 @@
         "baseRateBp": 25,
         "prices": {
           "AIR": 8000,
-          "CON": 8800,
+          "CON": 7900,
           "HOT": 12500,
           "ENT": 13500,
           "NRG": 23200
@@ -1080,9 +1080,9 @@
         },
         "holdings": {
           "seat-1": "AIR:3,CON:3,ENT:2",
-          "seat-2": "AIR:3,CON:3,ENT:2",
+          "seat-2": "AIR:2,CON:3,ENT:2",
           "seat-3": "AIR:3,CON:3,ENT:2",
-          "seat-4": "AIR:3,CON:3,ENT:2"
+          "seat-4": "AIR:3,CON:3,ENT:1"
         },
         "deposits": {
           "seat-1": 0,
@@ -1095,59 +1095,59 @@
     {
       "seed": 4096,
       "roundLimit": 20,
-      "commands": 334,
+      "commands": 369,
       "finalRound": 21,
       "isOver": true,
-      "jackpot": 5000,
+      "jackpot": 775729,
       "initialTotal": 40000000,
-      "netFromBank": -427889,
-      "totalCash": 39567111,
-      "eventCount": 1027,
-      "eventSequenceHash": "677c1de92c315dc4455beba5dd9e389302fb7a22c3b5a96addcc8e1f5619ca3f",
-      "commandSequenceHash": "156884182dc33396dbda519dc3fc64656b9b88ef4807d4364df0d74a24b32abe",
+      "netFromBank": -15099774,
+      "totalCash": 24124497,
+      "eventCount": 1039,
+      "eventSequenceHash": "8bd80af2406c5d33c9f3572fe35e4b644c0d1fcc882385c0b4e838a806411361",
+      "commandSequenceHash": "b6a8e0382622876af96a24f4af73a7b39655da4a53009a64903e447e82e6644e",
       "rankings": [
         {
           "rank": 1,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 13522684,
+          "cash": 8973790,
           "loanDebt": 0,
-          "totalAssets": 15843384
+          "totalAssets": 12891290
         },
         {
           "rank": 2,
-          "playerId": "seat-1",
+          "playerId": "seat-3",
           "eliminated": false,
-          "cash": 8516339,
+          "cash": 5506409,
           "loanDebt": 0,
-          "totalAssets": 13223539
+          "totalAssets": 12174909
         },
         {
           "rank": 3,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 8455767,
+          "cash": 3324544,
           "loanDebt": 0,
-          "totalAssets": 13211067
+          "totalAssets": 11149044
         },
         {
           "rank": 4,
-          "playerId": "seat-3",
+          "playerId": "seat-1",
           "eliminated": false,
-          "cash": 9072321,
+          "cash": 6319754,
           "loanDebt": 0,
-          "totalAssets": 12948021
+          "totalAssets": 11086254
         }
       ],
       "market": {
         "cyclePhase": "RECESSION",
-        "baseRateBp": 100,
+        "baseRateBp": 25,
         "prices": {
-          "AIR": 13200,
-          "CON": 11100,
-          "HOT": 19300,
-          "ENT": 11700,
-          "NRG": 23700
+          "AIR": 10500,
+          "CON": 8100,
+          "HOT": 17500,
+          "ENT": 5700,
+          "NRG": 19000
         },
         "states": {
           "AIR": "LISTED",
@@ -1157,10 +1157,10 @@
           "NRG": "LISTED"
         },
         "holdings": {
-          "seat-1": "AIR:100,NRG:76",
-          "seat-2": "AIR:9,NRG:7",
-          "seat-3": "AIR:25,NRG:21",
-          "seat-4": "AIR:13,NRG:11"
+          "seat-1": "AIR:1,NRG:1",
+          "seat-2": "AIR:1,NRG:1",
+          "seat-3": "AIR:1,NRG:1",
+          "seat-4": "AIR:2,NRG:2"
         },
         "deposits": {
           "seat-1": 0,
@@ -1171,41 +1171,41 @@
       }
     },
     {
-      "seed": 20260921,
+      "seed": 123,
       "roundLimit": null,
-      "commands": 3682,
-      "finalRound": 313,
+      "commands": 1777,
+      "finalRound": 135,
       "isOver": true,
-      "jackpot": 47426535,
+      "jackpot": 2482744,
       "initialTotal": 40000000,
-      "netFromBank": 66536468,
-      "totalCash": 59109933,
-      "eventCount": 12650,
-      "eventSequenceHash": "1f4ba8654eabad923adf4e15d82072fc5923a94135092eba4b90140df7f1aade",
-      "commandSequenceHash": "331d29afb3d30f08a8e02efefc93738dea58b2125ffccbff780048fdeba539d0",
+      "netFromBank": 347537,
+      "totalCash": 37864793,
+      "eventCount": 5919,
+      "eventSequenceHash": "661812de7f212550df9ec6b8293696b9794558e9e1e281a37921665f446bdf91",
+      "commandSequenceHash": "7ed40c5fcb30442ff4a67a9fa5ac332a7b94e6a09470c22e4defe65894038fa8",
       "rankings": [
         {
           "rank": 1,
-          "playerId": "seat-3",
+          "playerId": "seat-2",
           "eliminated": false,
-          "cash": 59109933,
+          "cash": 37864793,
           "loanDebt": 0,
-          "totalAssets": 80820033
+          "totalAssets": 70837393
         },
         {
           "rank": 2,
           "playerId": "seat-1",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 1200000,
+          "loanDebt": 900000,
           "totalAssets": 0
         },
         {
           "rank": 3,
-          "playerId": "seat-2",
+          "playerId": "seat-3",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 1200000,
+          "loanDebt": 1500000,
           "totalAssets": 0
         },
         {
@@ -1213,19 +1213,19 @@
           "playerId": "seat-4",
           "eliminated": true,
           "cash": 0,
-          "loanDebt": 0,
+          "loanDebt": 1800000,
           "totalAssets": 0
         }
       ],
       "market": {
-        "cyclePhase": "RECESSION",
-        "baseRateBp": 50,
+        "cyclePhase": "OVERHEAT",
+        "baseRateBp": 100,
         "prices": {
-          "AIR": 16800,
-          "CON": 16900,
-          "HOT": 27600,
-          "ENT": 12000,
-          "NRG": 42300
+          "AIR": 18000,
+          "CON": 30800,
+          "HOT": 37600,
+          "ENT": 13000,
+          "NRG": 49700
         },
         "states": {
           "AIR": "LISTED",
@@ -1236,8 +1236,8 @@
         },
         "holdings": {
           "seat-1": "",
-          "seat-2": "",
-          "seat-3": "AIR:3,CON:2,ENT:4,HOT:1,NRG:1",
+          "seat-2": "AIR:6,ENT:1,HOT:1",
+          "seat-3": "",
           "seat-4": ""
         },
         "deposits": {

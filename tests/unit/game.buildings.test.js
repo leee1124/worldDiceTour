@@ -12,7 +12,7 @@ import { buildGame, eventTypes, findEvent, assertMoneyConserved } from '../suppo
 
 const { VILLA, BUILDING, HOTEL, LANDMARK } = BUILDING_TYPES;
 
-/** 0번 칸에서 주사위 1+2로 3번 방콕(70,000원)에 도착시킨다. */
+/** 0번 칸에서 주사위 1+2로 3번 방콕(105,000원)에 도착시킨다. */
 const rollToBangkok = () => new FakeRandomSource([1, 2]);
 
 describe('Game(건설 기회)', () => {
@@ -60,8 +60,8 @@ describe('Game(건설 기회)', () => {
     // Then
     const built = findEvent(events, EVENT_TYPES.BUILT);
     assert.deepEqual(built.buildings, [VILLA, HOTEL]);
-    assert.equal(built.cost, 21_000 + 63_000);
-    assert.equal(game.playerById('s1').cash, STARTING_CASH - 84_000);
+    assert.equal(built.cost, 31_500 + 94_500);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH - 126_000);
     assert.equal(game.currentPlayerId, 's2');
     assertMoneyConserved(game, '건설 후');
   });
@@ -80,7 +80,7 @@ describe('Game(건설 기회)', () => {
     // Then
     assert.ok(eventTypes(events).includes(EVENT_TYPES.LANDMARK_BUILT));
     assert.equal(game.board.cityAt(3).landmark, true);
-    assert.equal(game.playerById('s1').cash, STARTING_CASH - 70_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH - 105_000);
   });
 
   it('3종을 완성하는 기회에서 관광명소를 함께 요청하면 거부한다', () => {
@@ -147,7 +147,7 @@ describe('Game(건설 기회)', () => {
     // Given
     const game = buildGame({
       laps: { s1: 2 },
-      cash: { s1: 30_000 },
+      cash: { s1: 45_000 },
       cities: [{ index: 3, ownerId: 's1' }],
       random: rollToBangkok(),
     });
@@ -157,7 +157,7 @@ describe('Game(건설 기회)', () => {
     assert.throws(() => game.execute('s1', COMMAND_TYPES.BUILD, { buildings: [VILLA, BUILDING] }), {
       code: DOMAIN_ERROR_CODES.INSUFFICIENT_CASH,
     });
-    assert.equal(game.playerById('s1').cash, 30_000);
+    assert.equal(game.playerById('s1').cash, 45_000);
   });
 });
 
@@ -176,8 +176,8 @@ describe('Game(바퀴별 건설 제한)', () => {
     const pending = game.pendingDecision;
     assert.deepEqual(optionTypes(pending.options), [VILLA]);
     assert.deepEqual(pending.lockedOptions, [
-      { type: BUILDING, cost: 42_000, locked: true, unlockLap: 2 },
-      { type: HOTEL, cost: 63_000, locked: true, unlockLap: 3 },
+      { type: BUILDING, cost: 63_000, locked: true, unlockLap: 2 },
+      { type: HOTEL, cost: 94_500, locked: true, unlockLap: 3 },
     ]);
     assert.deepEqual(optionTypes(findEvent(events, EVENT_TYPES.BUILD_OFFERED).options), [VILLA]);
   });
@@ -390,7 +390,7 @@ describe('Game(출발 칸 보너스)', () => {
 
     // Then
     assert.deepEqual(game.board.cityAt(3).buildings, [VILLA]);
-    assert.equal(findEvent(events, EVENT_TYPES.BUILT).cost, 21_000);
+    assert.equal(findEvent(events, EVENT_TYPES.BUILT).cost, 31_500);
     assert.equal(game.currentPlayerId, 's2');
   });
 
@@ -476,7 +476,7 @@ describe('Game(도시 인수)', () => {
     assert.ok(eventTypes(events).includes(EVENT_TYPES.TOLL_PAID));
     assert.equal(game.phase, PHASES.AWAIT_ACQUIRE);
     assert.equal(game.pendingDecision.kind, 'ACQUIRE');
-    assert.equal(game.pendingDecision.price, 140_000);
+    assert.equal(game.pendingDecision.price, 210_000);
   });
 
   it('인수하면 투자액의 2배를 소유자에게 주고 건물과 함께 넘겨받는다', () => {
@@ -493,7 +493,7 @@ describe('Game(도시 인수)', () => {
     const events = game.execute('s1', COMMAND_TYPES.ACQUIRE);
 
     // Then
-    assert.equal(price, (70_000 + 21_000) * 2);
+    assert.equal(price, (105_000 + 31_500) * 2);
     assert.equal(findEvent(events, EVENT_TYPES.ACQUIRED).price, price);
     assert.equal(game.board.cityAt(3).isOwnedBy('s1'), true);
     assert.deepEqual(game.board.cityAt(3).buildings, [VILLA]);
