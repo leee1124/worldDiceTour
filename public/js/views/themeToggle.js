@@ -22,7 +22,7 @@ export function createThemeToggleButton({ extraClass } = {}) {
 
   const element = button(
     {
-      class: ['btn', 'btn--quiet', 'btn--small', 'theme-toggle', extraClass],
+      class: ['btn', 'btn--quiet', 'theme-toggle', extraClass],
       'aria-label': '테마: 자동/라이트/다크',
       on: {
         click: () => {
