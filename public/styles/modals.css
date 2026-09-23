@@ -861,6 +861,13 @@
   overflow-wrap: anywhere;
 }
 
+/* 폰: 한 줄 안내가 두 줄이 되면 상황판(보드 아래 sticky, 약 4.2rem)과 겹친다 — 그 위로 올린다. */
+@media (max-width: 68rem) {
+  .notice-line {
+    bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ── 금액·상태 안내 카드(조난 · 월급 · 바퀴 · 잭팟) ─────────── */
 
 .info-notice {
@@ -1312,6 +1319,11 @@
   word-break: keep-all;
   overflow-wrap: anywhere;
   text-align: center;
+  /* 안전장치: 이름(최대 10자)+칸 이름이 길어도 3줄까지만 — 그 이상은 상단 바를 덮는다. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 /*
