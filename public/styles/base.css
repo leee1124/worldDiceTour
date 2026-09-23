@@ -1,20 +1,30 @@
 /* ==========================================================================
    월드 다이스 투어 — 기본 토큰 · 리셋 · 공통 컴포넌트
-   콘셉트: 깊은 남청색 테이블 위에 놓인 따뜻한 종이 보드, 금색 포인트.
+   콘셉트: 깊은 남청색 테이블 위에 놓인 따뜻한 종이 보드, 금색 포인트(다크) /
+   같은 종이·금색을 밝은 크림 테이블 위에 놓은 모습(라이트).
    이미지 에셋 없이 그라디언트 · 이모지 · 인라인 SVG만 사용한다.
+
+   ── 테마 적용 방식(색상 토큰화) ──────────────────────────────────────────
+   `:root`는 **라이트(기본값)** 을 담는다. 다크는 두 곳에서 같은 값으로 덮어쓴다.
+   1) `@media (prefers-color-scheme: dark)` + `:root:not([data-theme="light"])`
+      — 시스템이 다크를 선호하고, 사용자가 수동으로 라이트를 고르지 않았을 때(자동).
+   2) `:root[data-theme="dark"]` — 사용자가 수동으로 다크를 골랐을 때(시스템 설정 무시).
+   실제 선택(auto/light/dark) → `data-theme` 반영은 `public/js/theme.js`가 한다.
+   보드 칸(모서리 칸 등) · 카지노 화면 · 행운 티켓 뒷면은 실제 게임판·카드처럼
+   테마와 무관하게 늘 같은 톤을 쓴다(의도적으로 토큰화하지 않음).
    ========================================================================== */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* 테이블(바탕) */
-  --table-950: #050e18;
-  --table-900: #08151f;
-  --table-800: #0c1f2e;
-  --table-700: #113044;
-  --teal-600: #14506a;
+  /* 테이블(바탕) — 라이트: 따뜻한 크림 */
+  --table-950: #efe6d2;
+  --table-900: #f8f2e4;
+  --table-800: #fffbf2;
+  --table-700: #e8d9b0;
+  --teal-600: #bcdfe6;
 
-  /* 종이(보드 칸 · 카드) */
+  /* 종이(보드 칸 · 카드) — 보드는 늘 종이색이라 두 테마가 같다 */
   --paper-100: #f8f1e4;
   --paper-200: #eee0ca;
   --paper-300: #dfcbac;
@@ -22,36 +32,174 @@
   --ink-700: #33495b;
   --ink-500: #62798b;
 
-  /* 금색 포인트 */
-  --gold-300: #f7d894;
-  --gold-400: #efc165;
-  --gold-500: #d8a13a;
-  --gold-700: #8e6317;
+  /* 금색 포인트 — 라이트: 크림 위에서도 또렷하도록 더 짙은 금(호박)색 */
+  --gold-300: #7a5006;
+  --gold-400: #c8892a;
+  --gold-500: #b8791f;
+  --gold-700: #8a5f17;
 
-  /* 네온(카지노) */
+  /* 네온(카지노) — 카지노 화면은 테마와 무관하게 항상 이 색(고정) */
   --neon-pink: #ff3d9a;
   --neon-cyan: #2ff3e0;
   --neon-violet: #8f6cff;
 
-  /* 대륙 그룹(보드 네 변) */
+  /* 대륙 그룹(보드 네 변) — 보드 위 색 띠라 두 테마가 같다 */
   --group-asia: #e2753a;
   --group-europe: #4a77df;
   --group-america: #1ba077;
   --group-pacific: #d33f66;
 
-  /* 좌석 색(모양과 함께 써서 색맹 대비) */
+  /* 좌석 색(모양과 함께 써서 색맹 대비) — 두 테마가 같다(식별용 고정색) */
   --seat-ruby: #e64a55;
   --seat-azure: #3592e6;
   --seat-amber: #edb130;
   --seat-jade: #2fb98c;
 
-  /* 상태 */
+  /* 상태(테두리·아이콘·글자 겸용 — 라이트는 대비를 위해 더 짙게) */
+  --danger: #b3242f;
+  --warn: #8a5a06;
+  --ok: #0c7a55;
+  --info: #155c8e;
+
+  /* 배지·토스트·로그 등 "밝은 글자"가 필요했던 자리의 라이트용 짙은 대응색 */
+  --danger-text: #b3242f;
+  --ok-text: #0c7a55;
+  --warn-text: #7a4e05;
+  --info-text: #155c8e;
+  --mine-text: #086b63;
+  --violet-text: #5b3fc9;
+
+  /* 순위표 은·동메달 글자(금메달은 --gold-300을 그대로 쓴다) */
+  --medal-silver: #5a6674;
+  --medal-bronze: #8a5a1f;
+
+  /* 글자 */
+  --text-100: #1b2530;
+  --text-300: #45566a;
+  --text-500: #5a6d80;
+
+  --line: rgba(20, 30, 45, 0.14);
+  --line-strong: rgba(20, 30, 45, 0.26);
+  --surface: rgba(20, 30, 45, 0.035);
+  --surface-2: rgba(20, 30, 45, 0.07);
+
+  /* 카드·모달·입력창 등 "떠 있는" 표면. 라이트에서는 흰색 쪽으로, 다크에서는 어두운 쪽으로. */
+  --card-bg-1: rgba(255, 255, 255, 0.86);
+  --card-bg-2: rgba(255, 255, 255, 0.55);
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --toast-bg: rgba(255, 253, 247, 0.98);
+  --scrim: rgba(30, 24, 14, 0.4);
+  --modal-bg-1: #fffdf7;
+  --modal-bg-2: #f7efdd;
+  /* 헤드라인 그라디언트 글자의 "짙은 쪽" 끝(홈 히어로 제목 · 대기실 방 코드) */
+  --heading-strong: var(--ink-900);
+  /* 배당·통행료 등 "안내 카드"의 색 tint(첫 정지점). 둘째 정지점은 늘 --modal-bg-2 계열. */
+  --notice-tint-gold: rgba(247, 231, 196, 0.97);
+  --notice-tint-danger: rgba(250, 214, 210, 0.96);
+
+  --radius-xl: 22px;
+  --radius-lg: 16px;
+  --radius-md: 11px;
+  --radius-sm: 7px;
+
+  --shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.22);
+  --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.14);
+
+  /* 시스템 한글 글꼴 우선(외부 폰트 없음) */
+  --font-body: 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', 'Nanum Gothic',
+    system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  --font-num: 'SF Mono', 'Bahnschrift', 'DIN Alternate', 'Segoe UI', ui-monospace, monospace;
+
+  --tap: 44px;
+}
+
+/* ── 다크(자동: 시스템이 다크를 선호하고, 라이트를 수동으로 고르지 않았을 때) ── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --table-950: #050e18;
+    --table-900: #08151f;
+    --table-800: #0c1f2e;
+    --table-700: #113044;
+    --teal-600: #14506a;
+
+    --gold-300: #f7d894;
+    --gold-400: #efc165;
+    --gold-500: #d8a13a;
+    --gold-700: #8e6317;
+
+    --danger: #f0555f;
+    --warn: #eaa53c;
+    --ok: #43c491;
+    --info: #56b7e8;
+
+    --danger-text: #ff9aa0;
+    --ok-text: #7bf0b8;
+    --warn-text: #f5cd8c;
+    --info-text: #56b7e8;
+    --mine-text: #2ff3e0;
+    --violet-text: #ddd3ff;
+
+    --medal-silver: #d7dee6;
+    --medal-bronze: #d99a5b;
+
+    --text-100: #ecf3f9;
+    --text-300: #b9c8d6;
+    --text-500: #8399ab;
+
+    --line: rgba(255, 255, 255, 0.11);
+    --line-strong: rgba(255, 255, 255, 0.2);
+    --surface: rgba(255, 255, 255, 0.045);
+    --surface-2: rgba(255, 255, 255, 0.08);
+
+    --card-bg-1: rgba(255, 255, 255, 0.07);
+    --card-bg-2: rgba(255, 255, 255, 0.02);
+    --input-bg: rgba(3, 12, 20, 0.55);
+    --toast-bg: rgba(10, 24, 36, 0.96);
+    --scrim: rgba(3, 9, 15, 0.72);
+    --modal-bg-1: #102434;
+    --modal-bg-2: #0a1723;
+    --heading-strong: var(--paper-100);
+    --notice-tint-gold: rgba(56, 42, 12, 0.97);
+    --notice-tint-danger: rgba(56, 16, 22, 0.96);
+
+    --shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.5);
+    --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.32);
+  }
+}
+
+/* ── 다크(수동 선택: 시스템 설정과 무관하게 항상 다크) ── */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --table-950: #050e18;
+  --table-900: #08151f;
+  --table-800: #0c1f2e;
+  --table-700: #113044;
+  --teal-600: #14506a;
+
+  --gold-300: #f7d894;
+  --gold-400: #efc165;
+  --gold-500: #d8a13a;
+  --gold-700: #8e6317;
+
   --danger: #f0555f;
   --warn: #eaa53c;
   --ok: #43c491;
   --info: #56b7e8;
 
-  /* 글자 */
+  --danger-text: #ff9aa0;
+  --ok-text: #7bf0b8;
+  --warn-text: #f5cd8c;
+  --info-text: #56b7e8;
+  --mine-text: #2ff3e0;
+  --violet-text: #ddd3ff;
+
+  --medal-silver: #d7dee6;
+  --medal-bronze: #d99a5b;
+
   --text-100: #ecf3f9;
   --text-300: #b9c8d6;
   --text-500: #8399ab;
@@ -61,21 +209,19 @@
   --surface: rgba(255, 255, 255, 0.045);
   --surface-2: rgba(255, 255, 255, 0.08);
 
-  --radius-xl: 22px;
-  --radius-lg: 16px;
-  --radius-md: 11px;
-  --radius-sm: 7px;
+  --card-bg-1: rgba(255, 255, 255, 0.07);
+  --card-bg-2: rgba(255, 255, 255, 0.02);
+  --input-bg: rgba(3, 12, 20, 0.55);
+  --toast-bg: rgba(10, 24, 36, 0.96);
+  --scrim: rgba(3, 9, 15, 0.72);
+  --modal-bg-1: #102434;
+  --modal-bg-2: #0a1723;
+  --heading-strong: var(--paper-100);
+  --notice-tint-gold: rgba(56, 42, 12, 0.97);
+  --notice-tint-danger: rgba(56, 16, 22, 0.96);
 
   --shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.5);
   --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.32);
-
-  /* 시스템 한글 글꼴 우선(외부 폰트 없음) */
-  --font-body: 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', 'Nanum Gothic',
-    system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Apple SD Gothic Neo', 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
-  --font-num: 'SF Mono', 'Bahnschrift', 'DIN Alternate', 'Segoe UI', ui-monospace, monospace;
-
-  --tap: 44px;
 }
 
 * {
@@ -100,9 +246,9 @@ body {
   line-height: 1.5;
   color: var(--text-100);
   background:
-    radial-gradient(120% 80% at 12% 0%, rgba(20, 80, 106, 0.55), transparent 60%),
-    radial-gradient(90% 70% at 92% 8%, rgba(143, 108, 255, 0.18), transparent 58%),
-    radial-gradient(70% 60% at 50% 120%, rgba(216, 161, 58, 0.12), transparent 60%),
+    radial-gradient(120% 80% at 12% 0%, color-mix(in srgb, var(--teal-600) 55%, transparent), transparent 60%),
+    radial-gradient(90% 70% at 92% 8%, color-mix(in srgb, var(--neon-violet) 18%, transparent), transparent 58%),
+    radial-gradient(70% 60% at 50% 120%, color-mix(in srgb, var(--gold-500) 12%, transparent), transparent 60%),
     linear-gradient(180deg, var(--table-900), var(--table-950) 70%);
   background-attachment: fixed;
   -webkit-text-size-adjust: 100%;
@@ -184,7 +330,7 @@ kbd {
   padding: clamp(0.9rem, 1.6vw, 1.35rem);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  background: linear-gradient(180deg, var(--card-bg-1), var(--card-bg-2));
   box-shadow: var(--shadow-soft);
   backdrop-filter: blur(6px);
 }
@@ -241,7 +387,7 @@ kbd {
 }
 
 .btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--text-100) 14%, transparent);
   transform: translateY(-1px);
 }
 
@@ -258,7 +404,7 @@ kbd {
   border-color: transparent;
   background: linear-gradient(135deg, var(--gold-400), var(--gold-500) 60%, var(--gold-700));
   color: #22160a;
-  box-shadow: 0 10px 22px rgba(216, 161, 58, 0.28);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--gold-500) 28%, transparent);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -278,7 +424,9 @@ kbd {
 
 .btn--danger {
   border-color: transparent;
-  background: linear-gradient(135deg, #ff6b73, var(--danger));
+  /* 위험 버튼은 글자(#2b0708, 아주 짙은 적갈색)와의 대비를 위해 테마와 무관하게 밝은 빨강 계열로 고정한다
+     (--danger 자체는 라이트에서 글자로도 쓰이도록 짙게 조정돼 있어 배경으로 쓰면 대비가 부족해진다). */
+  background: linear-gradient(135deg, #ff6b73, #f0555f);
   color: #2b0708;
 }
 
@@ -303,9 +451,22 @@ kbd {
   font-size: 0.85rem;
 }
 
+/* ── 테마 토글(자동/라이트/다크 순환 버튼) ──────────────────────── */
+
+.theme-toggle {
+  min-width: var(--tap);
+  padding: 0.4rem;
+  border-radius: 999px;
+  font-size: 1.1rem;
+}
+
+.theme-toggle-icon {
+  display: inline-flex;
+}
+
 .btn--chip-on {
   border-color: var(--gold-400);
-  background: rgba(239, 193, 101, 0.18);
+  background: color-mix(in srgb, var(--gold-400) 18%, transparent);
   color: var(--gold-300);
 }
 
@@ -357,7 +518,7 @@ kbd {
   padding: 0.55rem 0.8rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
-  background: rgba(3, 12, 20, 0.55);
+  background: var(--input-bg);
   color: var(--text-100);
   font-family: inherit;
   font-size: 1rem;
@@ -404,33 +565,33 @@ kbd {
 }
 
 .badge--gold {
-  border-color: rgba(239, 193, 101, 0.5);
-  background: rgba(239, 193, 101, 0.16);
+  border-color: color-mix(in srgb, var(--gold-400) 50%, transparent);
+  background: color-mix(in srgb, var(--gold-400) 16%, transparent);
   color: var(--gold-300);
 }
 
 .badge--mine {
-  border-color: rgba(47, 243, 224, 0.45);
-  background: rgba(47, 243, 224, 0.14);
-  color: var(--neon-cyan);
+  border-color: color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+  background: color-mix(in srgb, var(--neon-cyan) 14%, transparent);
+  color: var(--mine-text);
 }
 
 .badge--warn {
-  border-color: rgba(234, 165, 60, 0.5);
-  background: rgba(234, 165, 60, 0.16);
-  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn-text);
 }
 
 .badge--danger {
-  border-color: rgba(240, 85, 95, 0.5);
-  background: rgba(240, 85, 95, 0.16);
-  color: #ff9aa0;
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger-text);
 }
 
 .badge--info {
-  border-color: rgba(86, 183, 232, 0.45);
-  background: rgba(86, 183, 232, 0.14);
-  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 45%, transparent);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  color: var(--info-text);
 }
 
 .badge--muted {
@@ -449,9 +610,9 @@ kbd {
 }
 
 .banner--warn {
-  border-color: rgba(234, 165, 60, 0.45);
-  background: rgba(234, 165, 60, 0.14);
-  color: #f5cd8c;
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn-text);
 }
 
 /* ── 토스트 ─────────────────────────────────────────────────── */
@@ -485,7 +646,7 @@ kbd {
   border: 1px solid var(--line-strong);
   border-left: 4px solid var(--info);
   border-radius: var(--radius-md);
-  background: rgba(10, 24, 36, 0.96);
+  background: var(--toast-bg);
   box-shadow: var(--shadow-lift);
   pointer-events: auto;
   animation: toast-in 220ms cubic-bezier(0.2, 1.2, 0.4, 1);
@@ -548,9 +709,9 @@ body.modal-open .toast-stack {
 /* ── 예약(준비 중) 패널 ─────────────────────────────────────── */
 
 .reserved-panel {
-  border: 1px dashed rgba(143, 108, 255, 0.45);
+  border: 1px dashed color-mix(in srgb, var(--neon-violet) 45%, transparent);
   border-radius: var(--radius-md);
-  background: rgba(143, 108, 255, 0.08);
+  background: color-mix(in srgb, var(--neon-violet) 8%, transparent);
 }
 
 .reserved-summary {
@@ -560,7 +721,7 @@ body.modal-open .toast-stack {
   gap: 0.5rem;
   min-height: 38px;
   padding: 0.35rem 0.7rem;
-  color: #cdbcff;
+  color: var(--violet-text);
   cursor: pointer;
   font-size: 0.82rem;
   font-weight: 700;
@@ -569,7 +730,7 @@ body.modal-open .toast-stack {
 .reserved-tag {
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
-  background: rgba(143, 108, 255, 0.28);
+  background: color-mix(in srgb, var(--neon-violet) 28%, transparent);
   font-size: 0.68rem;
 }
 
@@ -590,7 +751,7 @@ body.modal-open .toast-stack {
 .skeleton-bar {
   flex: 1;
   border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, rgba(143, 108, 255, 0.5), rgba(143, 108, 255, 0.1));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--neon-violet) 50%, transparent), color-mix(in srgb, var(--neon-violet) 10%, transparent));
 }
 
 .skeleton-bar:nth-child(1) {
@@ -605,6 +766,6 @@ body.modal-open .toast-stack {
 
 .tool-row--reserved {
   border-style: dashed;
-  border-color: rgba(143, 108, 255, 0.4);
-  background: rgba(143, 108, 255, 0.07);
+  border-color: color-mix(in srgb, var(--neon-violet) 40%, transparent);
+  background: color-mix(in srgb, var(--neon-violet) 7%, transparent);
 }

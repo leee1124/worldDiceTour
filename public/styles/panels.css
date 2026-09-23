@@ -12,7 +12,7 @@
   padding: 0.5rem 0.85rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(120deg, rgba(20, 80, 106, 0.3), rgba(8, 21, 31, 0.8));
+  background: linear-gradient(120deg, color-mix(in srgb, var(--teal-600) 30%, transparent), color-mix(in srgb, var(--table-900) 80%, transparent));
 }
 
 .topbar-left,
@@ -68,7 +68,7 @@
 
 .conn-pill[data-state='OPEN'] .conn-dot {
   background: var(--ok);
-  box-shadow: 0 0 0 3px rgba(67, 196, 145, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
 }
 
 .conn-pill[data-state='CONNECTING'] .conn-dot,
@@ -78,8 +78,8 @@
 }
 
 .conn-pill[data-state='CLOSED'] {
-  border-color: rgba(240, 85, 95, 0.45);
-  color: #ff9aa0;
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger-text);
 }
 
 .conn-pill[data-state='CLOSED'] .conn-dot {
@@ -128,7 +128,7 @@
   border: 1px solid var(--line);
   border-left: 4px solid var(--slot-color, var(--text-500));
   border-radius: var(--radius-md);
-  background: rgba(3, 12, 20, 0.45);
+  background: color-mix(in srgb, var(--table-900) 45%, transparent);
   transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
@@ -146,13 +146,13 @@
 }
 
 .player-card--turn {
-  background: rgba(239, 193, 101, 0.1);
-  box-shadow: 0 0 0 1px rgba(239, 193, 101, 0.4);
+  background: color-mix(in srgb, var(--gold-400) 10%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold-400) 40%, transparent);
 }
 
 .player-card--mine .player-name::after {
   content: ' · 내 좌석';
-  color: var(--neon-cyan);
+  color: var(--mine-text);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -189,8 +189,8 @@
 
 .player-head--locate:hover,
 .player-head--locate:focus-visible {
-  border-color: rgba(239, 193, 101, 0.45);
-  background: rgba(239, 193, 101, 0.1);
+  border-color: color-mix(in srgb, var(--gold-400) 45%, transparent);
+  background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
 .player-locate-icon {
@@ -232,7 +232,7 @@
   position: absolute;
   inset: 0;
   background: var(--mark-color, var(--text-500));
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  border: 2px solid color-mix(in srgb, var(--text-100) 85%, transparent);
 }
 
 .player-mark--ruby {
@@ -261,7 +261,7 @@
 .player-mark[data-shape='hexagon']::before {
   clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
   border: 0;
-  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline: 2px solid color-mix(in srgb, var(--text-100) 85%, transparent);
 }
 
 .player-mark-label {
@@ -365,7 +365,7 @@
 }
 
 .log-line:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.025);
+  background: color-mix(in srgb, var(--text-100) 2.5%, transparent);
 }
 
 .log-icon {
@@ -383,7 +383,7 @@
 
 .log-line--turn {
   border-left: 2px solid var(--gold-500);
-  background: rgba(239, 193, 101, 0.1);
+  background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
 .log-line--turn .log-text {
@@ -396,28 +396,28 @@
 }
 
 .log-line--money-in .log-text {
-  color: #b6ecd2;
+  color: var(--ok-text);
 }
 
 .log-line--money-out .log-icon {
-  color: #ff9aa0;
+  color: var(--danger-text);
 }
 
 .log-line--special .log-icon {
-  color: var(--neon-violet);
+  color: var(--violet-text);
 }
 
 .log-line--special .log-text {
-  color: #ddd3ff;
+  color: var(--violet-text);
 }
 
 .log-line--alert {
-  background: rgba(240, 85, 95, 0.1);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .log-line--alert .log-icon,
 .log-line--alert .log-text {
-  color: #ffb3b8;
+  color: var(--danger-text);
 }
 
 .log-line--unknown .log-text {

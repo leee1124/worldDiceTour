@@ -12,8 +12,8 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   background:
-    radial-gradient(90% 120% at 88% 10%, rgba(216, 161, 58, 0.22), transparent 60%),
-    linear-gradient(140deg, rgba(20, 80, 106, 0.55), rgba(8, 21, 31, 0.9));
+    radial-gradient(90% 120% at 88% 10%, color-mix(in srgb, var(--gold-500) 22%, transparent), transparent 60%),
+    linear-gradient(140deg, color-mix(in srgb, var(--teal-600) 55%, transparent), color-mix(in srgb, var(--table-900) 90%, transparent));
   box-shadow: var(--shadow-lift);
 }
 
@@ -29,7 +29,7 @@
 .hero-title {
   margin: 0.35rem 0 0.6rem;
   font-size: clamp(2rem, 6.4vw, 3.4rem);
-  background: linear-gradient(100deg, var(--paper-100) 20%, var(--gold-300));
+  background: linear-gradient(100deg, var(--heading-strong) 20%, var(--gold-300));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -43,6 +43,16 @@
 
 .hero-lead strong {
   color: var(--gold-300);
+}
+
+/* 자리표시 문구와 테마 버튼을 한 줄에 — 오른쪽 위 장식 주사위와 겹치지 않도록 실제 레이아웃 공간을 쓴다. */
+.hero-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
 }
 
 .hero-dice {
@@ -99,14 +109,14 @@
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(3, 12, 20, 0.4);
+  background: color-mix(in srgb, var(--table-900) 40%, transparent);
 }
 
 .room-code {
   padding: 0.2rem 0.5rem;
-  border: 1px solid rgba(239, 193, 101, 0.4);
+  border: 1px solid color-mix(in srgb, var(--gold-400) 40%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(239, 193, 101, 0.12);
+  background: color-mix(in srgb, var(--gold-400) 12%, transparent);
   color: var(--gold-300);
   font-family: var(--font-num);
   font-size: 1.05rem;
@@ -145,7 +155,7 @@
   padding: clamp(1rem, 2.4vw, 1.6rem);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  background: linear-gradient(140deg, rgba(20, 80, 106, 0.4), rgba(8, 21, 31, 0.86));
+  background: linear-gradient(140deg, color-mix(in srgb, var(--teal-600) 40%, transparent), color-mix(in srgb, var(--table-900) 86%, transparent));
   box-shadow: var(--shadow-soft);
 }
 
@@ -175,7 +185,7 @@
   font-weight: 800;
   letter-spacing: 0.16em;
   line-height: 1;
-  background: linear-gradient(120deg, var(--gold-300), var(--paper-100));
+  background: linear-gradient(120deg, var(--gold-300), var(--heading-strong));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -191,10 +201,10 @@
 .lan-url code {
   display: inline-block;
   padding: 0.25rem 0.6rem;
-  border: 1px solid rgba(47, 243, 224, 0.35);
+  border: 1px solid color-mix(in srgb, var(--neon-cyan) 35%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(47, 243, 224, 0.1);
-  color: var(--neon-cyan);
+  background: color-mix(in srgb, var(--neon-cyan) 10%, transparent);
+  color: var(--mine-text);
   font-size: 0.98rem;
   word-break: break-all;
 }
@@ -239,12 +249,12 @@
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(3, 12, 20, 0.4);
+  background: color-mix(in srgb, var(--table-900) 40%, transparent);
 }
 
 .seat-row--mine {
-  border-color: rgba(47, 243, 224, 0.4);
-  background: rgba(47, 243, 224, 0.07);
+  border-color: color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+  background: color-mix(in srgb, var(--neon-cyan) 7%, transparent);
 }
 
 .seat-main {
@@ -269,12 +279,12 @@
 
 .online-dot--on {
   background: var(--ok);
-  box-shadow: 0 0 0 3px rgba(67, 196, 145, 0.22);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent);
 }
 
 .online-dot--off {
   background: var(--text-500);
-  box-shadow: 0 0 0 3px rgba(131, 153, 171, 0.14);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-500) 14%, transparent);
 }
 
 .seat-add {
@@ -309,7 +319,7 @@
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(3, 12, 20, 0.4);
+  background: color-mix(in srgb, var(--table-900) 40%, transparent);
 }
 
 @media (max-width: 30rem) {

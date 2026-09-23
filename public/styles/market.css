@@ -4,12 +4,35 @@
    ========================================================================== */
 
 :root {
-  /* 등락·손익 색. 색만으로 방향을 말하지 않는다(화살표·부호를 늘 함께 쓴다). */
-  --tick-up: #2fd39a;
-  --tick-down: #ff6b7a;
+  /* 등락·손익 색. 색만으로 방향을 말하지 않는다(화살표·부호를 늘 함께 쓴다).
+     라이트는 크림 카드 위에서도 또렷하도록 더 짙은 톤(종이 카드용 뉴스 칩과 같은 계열)을 쓴다. */
+  --tick-up: #0c7a55;
+  --tick-down: #b3242f;
   --tick-flat: var(--text-500);
 
-  /* 경기 국면 */
+  /* 경기 국면(배지 글자로도 쓰이므로 라이트에서 짙게) */
+  --cycle-expansion: #0a6142;
+  --cycle-overheat: #93540a;
+  --cycle-recession: #35519e;
+  --cycle-recovery: #095c66;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --tick-up: #2fd39a;
+    --tick-down: #ff6b7a;
+
+    --cycle-expansion: #35c98f;
+    --cycle-overheat: #ff9d3c;
+    --cycle-recession: #6f8fdc;
+    --cycle-recovery: #48c7d8;
+  }
+}
+
+:root[data-theme='dark'] {
+  --tick-up: #2fd39a;
+  --tick-down: #ff6b7a;
+
   --cycle-expansion: #35c98f;
   --cycle-overheat: #ff9d3c;
   --cycle-recession: #6f8fdc;
@@ -23,9 +46,9 @@
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.45rem;
-  border: 1px solid rgba(239, 193, 101, 0.22);
+  border: 1px solid color-mix(in srgb, var(--gold-400) 22%, transparent);
   border-radius: var(--radius-md);
-  background: linear-gradient(180deg, rgba(8, 24, 36, 0.92), rgba(6, 16, 25, 0.96));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--table-900) 92%, transparent), color-mix(in srgb, var(--table-900) 96%, transparent));
   text-align: left;
 }
 
@@ -60,7 +83,7 @@
 }
 
 .market-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text-100) 5%, transparent);
 }
 
 .market-toggle-main {
@@ -153,7 +176,7 @@
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
   color: var(--text-100);
   font: inherit;
   text-align: left;
@@ -162,7 +185,7 @@
 
 .market-news:hover {
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-100) 8%, transparent);
 }
 
 .market-news-main {
@@ -197,7 +220,7 @@
 .market-spectate {
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
-  background: rgba(47, 243, 224, 0.1);
+  background: color-mix(in srgb, var(--neon-cyan) 10%, transparent);
   color: var(--neon-cyan);
   font-size: 0.78rem;
   font-weight: 700;
@@ -230,7 +253,7 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--tick-flat);
   border-radius: var(--radius-sm);
-  background: rgba(3, 12, 20, 0.55);
+  background: color-mix(in srgb, var(--table-900) 55%, transparent);
   scroll-snap-align: start;
 }
 
@@ -244,7 +267,7 @@
 .instr-card--delisted {
   opacity: 0.6;
   border-left-color: var(--danger);
-  background: rgba(60, 10, 16, 0.5);
+  background: color-mix(in srgb, var(--notice-tint-danger) 55%, transparent);
 }
 
 .instr-head {
@@ -379,7 +402,7 @@
 }
 
 .instr-state {
-  color: #ffb3b8;
+  color: var(--danger-text);
   font-weight: 800;
 }
 
@@ -486,13 +509,13 @@
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-100) 3%, transparent);
   font-size: 0.74rem;
 }
 
 .queue-row--mine {
-  border-color: rgba(47, 243, 224, 0.4);
-  background: rgba(47, 243, 224, 0.07);
+  border-color: color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+  background: color-mix(in srgb, var(--neon-cyan) 7%, transparent);
 }
 
 .queue-seat {
@@ -562,7 +585,7 @@
 
 .trade-tab--on {
   border-color: var(--gold-400);
-  background: rgba(239, 193, 101, 0.16);
+  background: color-mix(in srgb, var(--gold-400) 16%, transparent);
   color: var(--gold-300);
 }
 
@@ -604,7 +627,7 @@
   padding: 0.35rem 0.45rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(3, 12, 20, 0.5);
+  background: color-mix(in srgb, var(--table-900) 50%, transparent);
   color: var(--text-100);
   font: inherit;
   text-align: left;
@@ -614,7 +637,7 @@
 
 .instr-chip--on {
   border-color: var(--gold-400);
-  background: rgba(239, 193, 101, 0.14);
+  background: color-mix(in srgb, var(--gold-400) 14%, transparent);
 }
 
 .instr-chip--off {
@@ -680,7 +703,7 @@
 
 .trade-side--on {
   border-color: var(--neon-cyan);
-  background: rgba(47, 243, 224, 0.14);
+  background: color-mix(in srgb, var(--neon-cyan) 14%, transparent);
   color: var(--neon-cyan);
 }
 
@@ -691,7 +714,7 @@
   padding: 0.45rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
 .trade-stepper-head {
@@ -748,7 +771,7 @@
   padding: 0 0.4rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: rgba(3, 12, 20, 0.6);
+  background: color-mix(in srgb, var(--table-900) 60%, transparent);
 }
 
 .trade-quantity-value {
@@ -777,8 +800,8 @@
 .trade-reason {
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
-  background: rgba(240, 85, 95, 0.14);
-  color: #ffb9be;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger-text);
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -801,7 +824,8 @@
   margin: 0 -1.1rem -1.1rem;
   padding: 0.5rem 1.1rem calc(0.6rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--line-strong);
-  background: #0b1a27;
+  /* 뒤 금액 줄이 비치면 안 되므로 반드시 불투명한 solid 색이어야 한다(테마별 모달 바탕과 같은 톤). */
+  background: var(--modal-bg-2);
   box-shadow: 0 -8px 18px rgba(4, 10, 16, 0.55);
 }
 
@@ -810,7 +834,7 @@
   border-color: transparent;
   background: linear-gradient(135deg, #3ad9c6, #1d9e97);
   color: #03201f;
-  box-shadow: 0 8px 18px rgba(47, 243, 224, 0.2);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--neon-cyan) 20%, transparent);
 }
 
 .btn--accent:hover:not(:disabled) {
@@ -922,7 +946,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
-  border: 1px solid rgba(239, 193, 101, 0.4);
+  border: 1px solid color-mix(in srgb, var(--gold-400) 40%, transparent);
   border-radius: var(--radius-lg);
   backface-visibility: hidden;
   box-shadow: var(--shadow-lift);
@@ -1056,7 +1080,7 @@
   padding: 1rem 1.6rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: linear-gradient(140deg, rgba(14, 34, 50, 0.97), rgba(7, 18, 28, 0.97));
+  background: linear-gradient(140deg, color-mix(in srgb, var(--table-900) 97%, transparent), color-mix(in srgb, var(--table-900) 97%, transparent));
   box-shadow: var(--shadow-lift);
   opacity: 0;
   transform: translateY(12px) scale(0.97);
@@ -1123,7 +1147,7 @@
   padding: 1.1rem 1.2rem;
   border: 2px solid var(--danger);
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, rgba(56, 10, 18, 0.97), rgba(24, 6, 10, 0.97));
+  background: linear-gradient(160deg, var(--notice-tint-danger), var(--modal-bg-2));
   box-shadow: var(--shadow-lift);
   opacity: 0;
   transform: scale(1.06);
@@ -1165,7 +1189,7 @@
 }
 
 .delist-wiped-row {
-  color: #ffb3b8;
+  color: var(--danger-text);
   font-size: 0.8rem;
   font-weight: 700;
 }
@@ -1213,7 +1237,7 @@
 
 .player-breakdown-toggle:hover {
   color: var(--text-300);
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text-100) 5%, transparent);
 }
 
 .player-breakdown {
@@ -1229,7 +1253,7 @@
   gap: 0.3rem;
   padding: 0.05rem 0.3rem;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--text-100) 3.5%, transparent);
   font-size: 0.72rem;
 }
 
@@ -1282,8 +1306,8 @@
 */
 .tool-row--finance {
   flex-wrap: wrap;
-  border-color: rgba(239, 193, 101, 0.35);
-  background: rgba(239, 193, 101, 0.07);
+  border-color: color-mix(in srgb, var(--gold-400) 35%, transparent);
+  background: color-mix(in srgb, var(--gold-400) 7%, transparent);
 }
 
 .tool-row--finance .tool-label {

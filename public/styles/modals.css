@@ -23,7 +23,7 @@
   padding: clamp(0.6rem, 2vw, 1.5rem);
   padding-top: calc(clamp(0.6rem, 2vw, 1.5rem) + env(safe-area-inset-top, 0px));
   padding-bottom: calc(clamp(0.6rem, 2vw, 1.5rem) + env(safe-area-inset-bottom, 0px));
-  background: rgba(3, 9, 15, 0.72);
+  background: color-mix(in srgb, var(--table-900) 72%, transparent);
   backdrop-filter: blur(5px);
 }
 
@@ -36,9 +36,9 @@
   /* 백드롭이 이미 안전 영역만큼 좁혀 두었으므로 여기서는 남은 높이를 다 쓴다. */
   max-height: min(100%, 48rem);
   overflow: hidden;
-  border: 1px solid rgba(239, 193, 101, 0.28);
+  border: 1px solid color-mix(in srgb, var(--gold-400) 28%, transparent);
   border-radius: var(--radius-xl);
-  background: linear-gradient(180deg, #102434, #0a1723 70%);
+  background: linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2) 70%);
   box-shadow: var(--shadow-lift);
   animation: modal-in 220ms cubic-bezier(0.2, 1.1, 0.4, 1);
 }
@@ -52,7 +52,7 @@
   gap: 0.6rem;
   padding: 1rem 1.1rem 0.7rem;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(120deg, rgba(239, 193, 101, 0.1), transparent 70%);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--gold-400) 10%, transparent), transparent 70%);
 }
 
 .modal-title {
@@ -114,8 +114,8 @@
 }
 
 .modal-notice--warn {
-  background: rgba(240, 85, 95, 0.14);
-  color: #ffb3b8;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger-text);
 }
 
 /*
@@ -133,13 +133,14 @@
   margin: 0.55rem calc(-1 * var(--modal-pad-x, 0px)) calc(-1 * var(--modal-pad-b, 0px));
   padding: 0.55rem var(--modal-pad-x, 0px);
   border-top: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(8, 21, 31, 0.86), rgba(8, 21, 31, 0.98) 55%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--table-900) 86%, transparent), color-mix(in srgb, var(--table-900) 98%, transparent) 55%);
   backdrop-filter: blur(6px);
 }
 
 /* 카지노 모달은 네온 톤이라 버튼 줄 배경도 어두운 자보라로 맞춘다. */
 .modal--neon .modal-actions {
   border-top-color: rgba(255, 61, 154, 0.32);
+  /* 카지노는 테마와 무관하게 늘 어두운 네온 방이다(고정 톤). */
   background: linear-gradient(180deg, rgba(10, 4, 20, 0.86), rgba(8, 4, 15, 0.98) 55%);
 }
 
@@ -201,7 +202,7 @@
   gap: 0.2rem 0.5rem;
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
 .money-row-label {
@@ -234,11 +235,11 @@
 }
 
 .money-row--out .money-row-value {
-  color: #ff9aa0;
+  color: var(--danger-text);
 }
 
 .money-row--in .money-row-value {
-  color: #7bf0b8;
+  color: var(--ok-text);
 }
 
 .money-row--gold .money-row-value {
@@ -249,9 +250,9 @@
 
 .city-summary {
   padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(239, 193, 101, 0.24);
+  border: 1px solid color-mix(in srgb, var(--gold-400) 24%, transparent);
   border-radius: var(--radius-md);
-  background: linear-gradient(160deg, rgba(248, 241, 228, 0.12), rgba(248, 241, 228, 0.03));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--paper-100) 12%, transparent), color-mix(in srgb, var(--paper-100) 3%, transparent));
 }
 
 .city-summary-head {
@@ -355,7 +356,7 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
   cursor: pointer;
   transition: border-color 140ms ease, background-color 140ms ease;
 }
@@ -366,7 +367,7 @@
 
 .check-row:has(.check-input:checked) {
   border-color: var(--gold-400);
-  background: rgba(239, 193, 101, 0.14);
+  background: color-mix(in srgb, var(--gold-400) 14%, transparent);
 }
 
 .check-row--static {
@@ -415,7 +416,7 @@
   gap: 0.3rem;
   padding: 0.6rem 0.7rem;
   border-radius: var(--radius-md);
-  background: rgba(239, 193, 101, 0.1);
+  background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
 .summary-row {
@@ -467,7 +468,7 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
   color: inherit;
   cursor: pointer;
   font-family: inherit;
@@ -476,7 +477,7 @@
 
 .candidate-row--on {
   border-color: var(--gold-400);
-  background: rgba(239, 193, 101, 0.16);
+  background: color-mix(in srgb, var(--gold-400) 16%, transparent);
 }
 
 .candidate-name {
@@ -519,7 +520,7 @@
   height: 1.6rem;
   background: repeating-linear-gradient(
     90deg,
-    rgba(47, 243, 224, 0.28) 0 0.8rem,
+    color-mix(in srgb, var(--neon-cyan) 28%, transparent) 0 0.8rem,
     transparent 0.8rem 1.6rem
   );
   mask-image: linear-gradient(180deg, transparent, #000);
@@ -531,12 +532,12 @@
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-100) 3%, transparent);
 }
 
 .liq-section--danger {
-  border-color: rgba(240, 85, 95, 0.35);
-  background: rgba(240, 85, 95, 0.07);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
 }
 
 .liq-title {
@@ -564,7 +565,7 @@
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
 .sell-name {
@@ -573,7 +574,7 @@
 }
 
 .sell-refund {
-  color: #7bf0b8;
+  color: var(--ok-text);
   font-family: var(--font-num);
   font-weight: 800;
 }
@@ -583,7 +584,7 @@
   padding: 0.7rem;
   border: 1px solid var(--danger);
   border-radius: var(--radius-md);
-  background: rgba(240, 85, 95, 0.12);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .confirm-text {
@@ -606,7 +607,7 @@
   gap: 0.5rem;
   padding: 0.7rem 0.8rem;
   border-radius: var(--radius-md);
-  background: rgba(47, 243, 224, 0.12);
+  background: color-mix(in srgb, var(--neon-cyan) 12%, transparent);
 }
 
 .travel-index {
@@ -665,8 +666,8 @@
 .modal--trophy {
   border-color: var(--gold-500);
   background:
-    radial-gradient(90% 60% at 50% 0%, rgba(239, 193, 101, 0.22), transparent 65%),
-    linear-gradient(180deg, #14263a, #0a1723 70%);
+    radial-gradient(90% 60% at 50% 0%, color-mix(in srgb, var(--gold-400) 22%, transparent), transparent 65%),
+    linear-gradient(180deg, var(--modal-bg-1), var(--modal-bg-2) 70%);
 }
 
 .ranking-list {
@@ -682,12 +683,12 @@
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
 .ranking-row--champion {
   border-color: var(--gold-400);
-  background: rgba(239, 193, 101, 0.16);
+  background: color-mix(in srgb, var(--gold-400) 16%, transparent);
 }
 
 .ranking-medal {
@@ -704,10 +705,10 @@
   color: var(--gold-300);
 }
 .ranking-medal--silver {
-  color: #d7dee6;
+  color: var(--medal-silver);
 }
 .ranking-medal--bronze {
-  color: #d99a5b;
+  color: var(--medal-bronze);
 }
 
 .ranking-main {
@@ -762,7 +763,7 @@
   align-items: center;
   justify-content: center;
   padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
-  background: rgba(3, 9, 15, 0.62);
+  background: color-mix(in srgb, var(--table-900) 62%, transparent);
   backdrop-filter: blur(3px);
   cursor: pointer;
   animation: notice-in 180ms ease-out;
@@ -804,7 +805,7 @@
   height: 3px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--text-100) 22%, transparent);
 }
 
 .notice-progress-fill {
@@ -840,7 +841,7 @@
   padding: 0.4rem 0.9rem;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  background: rgba(8, 21, 31, 0.95);
+  background: color-mix(in srgb, var(--table-900) 95%, transparent);
   box-shadow: var(--shadow-soft);
   cursor: pointer;
   transform: translateX(-50%);
@@ -868,7 +869,7 @@
   padding: 1rem 1.1rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, rgba(16, 36, 52, 0.97), rgba(10, 23, 35, 0.97));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--table-900) 97%, transparent), color-mix(in srgb, var(--table-900) 97%, transparent));
   box-shadow: var(--shadow-lift);
   text-align: center;
 }
@@ -898,33 +899,33 @@
 }
 
 .info-notice--plus {
-  border-color: rgba(67, 196, 145, 0.45);
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
 }
 
 .info-notice--plus .info-notice-amount {
-  color: #7bf0b8;
+  color: var(--ok-text);
 }
 
 .info-notice--minus,
 .info-notice--lose {
-  border-color: rgba(240, 85, 95, 0.45);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
 }
 
 .info-notice--minus .info-notice-amount {
-  color: #ff9aa0;
+  color: var(--danger-text);
 }
 
 .info-notice--win {
-  border-color: rgba(47, 243, 224, 0.45);
+  border-color: color-mix(in srgb, var(--neon-cyan) 45%, transparent);
 }
 
 .info-notice--lap {
-  border-color: rgba(86, 183, 232, 0.45);
+  border-color: color-mix(in srgb, var(--info) 45%, transparent);
 }
 
 .info-notice--jackpot {
-  border-color: rgba(239, 193, 101, 0.6);
-  background: linear-gradient(160deg, rgba(56, 42, 12, 0.97), rgba(10, 23, 35, 0.97));
+  border-color: color-mix(in srgb, var(--gold-400) 60%, transparent);
+  background: linear-gradient(160deg, var(--notice-tint-gold), var(--modal-bg-2));
 }
 
 .info-notice--jackpot .info-notice-amount {
@@ -963,7 +964,7 @@
 .ticket-face--back {
   border: 2px solid var(--gold-500);
   background:
-    repeating-linear-gradient(45deg, rgba(239, 193, 101, 0.16) 0 10px, transparent 10px 20px),
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--gold-400) 16%, transparent) 0 10px, transparent 10px 20px),
     linear-gradient(160deg, #123349, #0a1d2b);
   color: var(--gold-300);
 }
@@ -1002,7 +1003,7 @@
 .ticket-effect {
   padding: 0.2rem 0.7rem;
   border-radius: 999px;
-  background: rgba(20, 34, 45, 0.12);
+  background: color-mix(in srgb, var(--table-900) 12%, transparent);
   color: var(--ink-700);
   font-size: 0.78rem;
   font-weight: 700;
@@ -1014,20 +1015,20 @@
 .toll-notice {
   width: 100%;
   padding: 0.9rem 1rem;
-  border: 1px solid rgba(240, 85, 95, 0.45);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, rgba(56, 16, 22, 0.96), rgba(10, 23, 35, 0.96));
+  background: linear-gradient(160deg, var(--notice-tint-danger), var(--modal-bg-2));
   box-shadow: var(--shadow-lift);
   text-align: center;
 }
 
 .toll-notice--mine {
-  border-color: rgba(239, 193, 101, 0.5);
-  background: linear-gradient(160deg, rgba(56, 42, 12, 0.96), rgba(10, 23, 35, 0.96));
+  border-color: color-mix(in srgb, var(--gold-400) 50%, transparent);
+  background: linear-gradient(160deg, var(--notice-tint-gold), var(--modal-bg-2));
 }
 
 .toll-eyebrow {
-  color: #ff9aa0;
+  color: var(--danger-text);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.26em;
@@ -1054,7 +1055,7 @@
 .owned-position {
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text-100) 5%, transparent);
   color: var(--text-300);
   font-size: 0.82rem;
   font-weight: 600;
@@ -1083,7 +1084,7 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--owned-row-color, var(--gold-500));
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
   color: inherit;
   cursor: pointer;
   font-family: inherit;
@@ -1091,7 +1092,7 @@
 }
 
 .owned-row:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--text-100) 9%, transparent);
 }
 
 .owned-list--ruby {
@@ -1165,9 +1166,9 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;
-  border: 1px solid rgba(239, 193, 101, 0.3);
+  border: 1px solid color-mix(in srgb, var(--gold-400) 30%, transparent);
   border-radius: var(--radius-sm);
-  background: rgba(239, 193, 101, 0.1);
+  background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
 .owned-total-label {
@@ -1191,7 +1192,7 @@
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
 .build-status-row {
@@ -1276,7 +1277,7 @@
   border: 1px solid var(--line-strong);
   border-left: 3px solid var(--info);
   border-radius: 999px;
-  background: rgba(8, 21, 31, 0.96);
+  background: color-mix(in srgb, var(--table-900) 96%, transparent);
   box-shadow: var(--shadow-soft);
   cursor: pointer;
   pointer-events: auto;
@@ -1290,7 +1291,7 @@
 
 .opponent-toast--warn {
   border-left-color: var(--danger);
-  background: rgba(46, 14, 18, 0.96);
+  background: var(--notice-tint-danger);
 }
 
 .opponent-toast--good {

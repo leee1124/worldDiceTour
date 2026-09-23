@@ -220,7 +220,7 @@
 
 @keyframes cash-down {
   50% {
-    color: #ff9aa0;
+    color: var(--danger);
     transform: translateY(3px);
   }
 }

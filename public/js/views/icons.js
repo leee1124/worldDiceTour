@@ -174,6 +174,49 @@ export function closeIcon() {
   ]);
 }
 
+/** 라이트 테마: 해(테두리만, 얇은 선). `market` 국면 아이콘의 해와 달리 버튼 안에 작게 들어간다. */
+export function themeLightIcon() {
+  return icon([
+    svg('circle', { cx: 8, cy: 8, r: 3, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
+    strokeLine(8, 1.4, 8, 3),
+    strokeLine(8, 13, 8, 14.6),
+    strokeLine(1.4, 8, 3, 8),
+    strokeLine(13, 8, 14.6, 8),
+    strokeLine(3.4, 3.4, 4.5, 4.5),
+    strokeLine(11.5, 11.5, 12.6, 12.6),
+    strokeLine(12.6, 3.4, 11.5, 4.5),
+    strokeLine(4.5, 11.5, 3.4, 12.6),
+  ]);
+}
+
+/** 다크 테마: 초승달. */
+export function themeDarkIcon() {
+  return icon([
+    fillPath('M13.2 9.8 A5.6 5.6 0 1 1 6.2 2.8 A4.6 4.6 0 0 0 13.2 9.8 Z'),
+  ]);
+}
+
+/** 자동 테마: 반은 해, 반은 달을 뜻하는 원(왼쪽 채움 · 오른쪽 테두리만). */
+export function themeAutoIcon() {
+  return icon([
+    svg('path', { d: 'M8 1.6 A6.4 6.4 0 0 0 8 14.4 Z', fill: 'currentColor' }),
+    svg('circle', { cx: 8, cy: 8, r: 6.4, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
+  ]);
+}
+
+/** 테마 선택(자동/라이트/다크) → 글리프. */
+const THEME_CHOICE_ICONS = Object.freeze({
+  auto: themeAutoIcon,
+  light: themeLightIcon,
+  dark: themeDarkIcon,
+});
+
+/** @param {string} choice `domain/themePreference.js`의 선택값(auto/light/dark) */
+export function themeChoiceIcon(choice) {
+  const build = THEME_CHOICE_ICONS[choice] ?? themeAutoIcon;
+  return build();
+}
+
 /** 돋보기(찾기·확대). `playersView`의 "가진 도시 찾기" 버튼과 같은 그림을 쓴다. */
 export function magnifierIcon() {
   return icon([
