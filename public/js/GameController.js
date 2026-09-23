@@ -147,7 +147,6 @@ export function createGameController({ appRoot, overlayRoot }) {
     onLeaveGame: () => leaveGameScreen(),
     onResumeControl: (seatId) => void setAutopilot(seatId, false),
     onOpenTrade: () => openTradeSheet(),
-    marketView,
   });
   const playersView = createPlayersView({
     onSetAutopilot: (seatId, enabled) => void setAutopilot(seatId, enabled),
@@ -173,6 +172,7 @@ export function createGameController({ appRoot, overlayRoot }) {
   const gameView = createGameView({
     boardView,
     centerView,
+    marketView,
     playersView,
     logView,
     statusStrip,

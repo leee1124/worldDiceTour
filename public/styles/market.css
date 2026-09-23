@@ -1331,33 +1331,20 @@
 }
 
 /*
-  넓은 화면: 종목 카드를 한 줄에 펼친다(가로 스크롤 없이 5종목이 모두 보인다).
-  두 줄로 접히면 중앙 코어가 길어져 라운드·차례 안내가 스크롤 밖으로 밀려난다 —
-  그래서 최소 폭을 좁게 잡아 **한 줄을 유지**한다.
+  넓은 화면(U19): 패널은 옆 칸(약 19~23rem 폭)에 있다. 그 폭에 5장을 가로로 늘어놓으면 3+2로 접히므로
+  **한 줄에 한 종목**의 세로 목록으로 편다(가로 스크롤 없음, 이름·가격·등락·스파크라인이 한 줄에).
 */
 @media (min-width: 68.01rem) {
   .market-rail {
     grid-auto-flow: row;
     grid-auto-columns: auto;
-    grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     overflow-x: visible;
-  }
-
-  /* 칸이 좁아진 만큼 이름·업종과 가격·등락을 세로로 쌓는다(가로로 넘치지 않게). */
-  .instr-head,
-  .instr-figures {
-    flex-direction: column;
-    /* stretch여야 이름이 칸 폭을 채우고 말줄임(…)이 걸린다 — flex-start면 글자 폭대로 넘친다. */
-    align-items: stretch;
-    gap: 0;
-  }
-
-  .instr-price {
-    font-size: 0.88rem;
+    scroll-snap-type: none;
   }
 
   .instr-card {
-    padding: 0.4rem 0.4rem;
+    padding: 0.4rem 0.5rem;
   }
 }
 
