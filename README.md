@@ -8,7 +8,10 @@
 
 상세 규칙·설계: [docs/SPEC.md](docs/SPEC.md) · 클라이언트용 API 계약: [docs/API.md](docs/API.md)
 
-- 클라이언트도 **빌드 없는 Vanilla JS(ES Modules) + CSS**뿐이다. 외부 폰트·이미지·CDN 없이 CSS와 이모지, 인라인 SVG로만 그린다.
+- 클라이언트도 **빌드 없는 Vanilla JS(ES Modules) + CSS**뿐이다. 외부 폰트·이미지·CDN 없이 CSS와 인라인 SVG로만 그린다(이모지는 쓰지 않는다).
+- **서드파티 아이콘**: 일부 범용 아이콘(깃발·비행기·해/달·자물쇠 등)은 [Lucide](https://lucide.dev)(ISC/MIT)의
+  SVG를 저장소에 받아 `scripts/buildIcons.js`로 데이터화한 것이다. CDN 없이 오프라인으로 동작하며,
+  라이선스 전문은 [`third_party/lucide/LICENSE`](third_party/lucide/LICENSE)에 있다.
 
 앞으로의 계획은 [docs/ROADMAP.md](docs/ROADMAP.md)를 참고.
 
