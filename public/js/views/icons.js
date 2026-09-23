@@ -6,15 +6,53 @@
  * 모두 `width/height: 1em`이라 부모의 `font-size`만 바꾸면 칸·버튼 크기에 맞춰 함께 커진다.
  *
  * 이모지 폰트에 기대지 않으므로 OS·브라우저가 달라도 항상 같은 모양으로 보인다.
+ *
+ * **두 가지 출처가 섞여 있다**:
+ * - 주사위 눈·건물 배지(별장/빌딩/호텔)·슬롯 심볼·섬 등 게임 고유 도안은 이 파일에 직접
+ *   16x16 좌표로 손으로 그렸다(아래 `icon()` + `strokePath` 등 헬퍼).
+ * - 깃발·비행기·돋보기·해/달·자물쇠 같은 범용 글리프는 서드파티 아이콘 세트
+ *   [Lucide](https://lucide.dev)(ISC/MIT, `public/vendor/lucide/LICENSE`)에서 가져온
+ *   벡터 데이터(`iconPaths.js`, `scripts/buildIcons.js`로 생성)를 `libraryIcon()`으로 그린다.
+ *   CSP가 `innerHTML`을 막기 때문에 마크업이 아니라 데이터로 받아 `dom.js`의 `svg()`로 조립한다.
  */
 
 import { el, svg } from '../dom.js';
+import { LUCIDE_ICONS } from './iconPaths.js';
 
 const VIEWBOX = '0 0 16 16';
 
-/** 공통 SVG 캔버스. */
+/** 공통 SVG 캔버스(게임 고유 손그림, 16x16 좌표계). */
 function icon(children, { fill = 'none' } = {}) {
   return svg('svg', { viewBox: VIEWBOX, width: '1em', height: '1em', fill, 'aria-hidden': 'true', focusable: 'false' }, children);
+}
+
+/**
+ * Lucide 벡터 데이터(`iconPaths.js`)로 아이콘을 그린다.
+ * 색은 항상 이 최상위 `<svg>`의 `currentColor`를 자식이 물려받는다(자식 엘리먼트에는
+ * stroke/fill을 따로 넣지 않는다 — 원본 lucide SVG와 같은 상속 구조).
+ */
+function libraryIcon(name) {
+  const data = LUCIDE_ICONS[name];
+  if (!data) {
+    throw new Error(`알 수 없는 lucide 아이콘: ${name}`);
+  }
+  const children = data.children.map((child) => svg(child.tag, child.attrs));
+  return svg(
+    'svg',
+    {
+      viewBox: data.viewBox,
+      width: '1em',
+      height: '1em',
+      fill: 'none',
+      stroke: 'currentColor',
+      'stroke-width': 2,
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+      'aria-hidden': 'true',
+      focusable: 'false',
+    },
+    children,
+  );
 }
 
 function strokePath(d, extra = {}) {
@@ -37,12 +75,9 @@ function strokeRect(x, y, width, height, extra = {}) {
   return svg('rect', { x, y, width, height, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none', ...extra });
 }
 
-/** 출발 칸: 깃발. */
+/** 출발 칸: 깃발(Lucide `flag`). */
 export function flagIcon() {
-  return icon([
-    strokeLine(3, 1.5, 3, 14.5, { 'stroke-width': 1.4 }),
-    fillPath('M3.4 2 L11.5 4.2 L3.4 6.4 Z'),
-  ]);
+  return libraryIcon('flag');
 }
 
 /** 조난 섬 · 휴양지 배경의 야자수(모래섬 위). */
@@ -77,15 +112,9 @@ export function diceIcon() {
   ]);
 }
 
-/** 공항: 종이비행기 실루엣. */
+/** 공항: 비행기(Lucide `plane`). */
 export function planeIcon() {
-  return icon([
-    strokeLine(8, 1.5, 8, 10, { 'stroke-width': 1.4 }),
-    strokeLine(8, 4.3, 2, 8.3, { 'stroke-width': 1.3 }),
-    strokeLine(8, 4.3, 14, 8.3, { 'stroke-width': 1.3 }),
-    strokeLine(8, 10, 5.6, 13, { 'stroke-width': 1.3 }),
-    strokeLine(8, 10, 10.4, 13, { 'stroke-width': 1.3 }),
-  ]);
+  return libraryIcon('plane');
 }
 
 /** 별장(VILLA): 작은 집. */
@@ -131,77 +160,44 @@ export function starIcon() {
   );
 }
 
-/** 행운 티켓: 절취선이 있는 표. */
+/** 행운 티켓: 절취선이 있는 표(Lucide `ticket`). */
 export function ticketIcon() {
-  return icon([
-    strokeRect(1.6, 4.2, 12.8, 7.6, { rx: 1.4 }),
-    strokeLine(8, 4.6, 8, 11.4, { 'stroke-width': 1, 'stroke-dasharray': '1.5 1.4' }),
-    dot(4.6, 8, 0.6),
-  ]);
+  return libraryIcon('ticket');
 }
 
-/** 세관/세금: 승인 도장(원 + 체크). */
+/** 세관/세금: 승인 도장(Lucide `stamp`). */
 export function customsIcon() {
-  return icon([
-    svg('circle', { cx: 8, cy: 8, r: 5.6, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
-    strokePath('M5.4 8.2 L7.1 10 L10.8 5.8', { 'stroke-width': 1.4 }),
-  ]);
+  return libraryIcon('stamp');
 }
 
-/** 자리표시자 위치 핀(알 수 없는 칸 종류). */
+/** 자리표시자 위치 핀(알 수 없는 칸 종류, Lucide `map-pin`). */
 export function pinIcon() {
-  return icon([
-    strokePath('M8 1.6 C11 1.6 13 3.9 13 6.6 C13 10.4 8 14.4 8 14.4 C8 14.4 3 10.4 3 6.6 C3 3.9 5 1.6 8 1.6 Z', { 'stroke-width': 1.2 }),
-    dot(8, 6.6, 1.9),
-  ]);
+  return libraryIcon('map-pin');
 }
 
-/** 잠긴 건설 칸(아직 바퀴가 모자람): 자물쇠. */
+/** 잠긴 건설 칸(아직 바퀴가 모자람): 자물쇠(Lucide `lock`). */
 export function lockIcon() {
-  return icon([
-    strokePath('M5.2 7 V5.2 A2.8 2.8 0 0 1 10.8 5.2 V7', { 'stroke-width': 1.4 }),
-    strokeRect(4, 7, 8, 6.4, { rx: 1.2 }),
-    dot(8, 9.6, 0.85),
-    svg('rect', { x: 7.6, y: 10.1, width: 0.8, height: 1.9, fill: 'currentColor' }),
-  ]);
+  return libraryIcon('lock');
 }
 
-/** 닫기(X). */
+/** 닫기(Lucide `x`). */
 export function closeIcon() {
-  return icon([
-    strokeLine(4, 4, 12, 12, { 'stroke-width': 1.6 }),
-    strokeLine(12, 4, 4, 12, { 'stroke-width': 1.6 }),
-  ]);
+  return libraryIcon('x');
 }
 
-/** 라이트 테마: 해(테두리만, 얇은 선). `market` 국면 아이콘의 해와 달리 버튼 안에 작게 들어간다. */
+/** 라이트 테마: 해(Lucide `sun`). `market` 국면 아이콘의 해와 같은 그림이다. */
 export function themeLightIcon() {
-  return icon([
-    svg('circle', { cx: 8, cy: 8, r: 3, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
-    strokeLine(8, 1.4, 8, 3),
-    strokeLine(8, 13, 8, 14.6),
-    strokeLine(1.4, 8, 3, 8),
-    strokeLine(13, 8, 14.6, 8),
-    strokeLine(3.4, 3.4, 4.5, 4.5),
-    strokeLine(11.5, 11.5, 12.6, 12.6),
-    strokeLine(12.6, 3.4, 11.5, 4.5),
-    strokeLine(4.5, 11.5, 3.4, 12.6),
-  ]);
+  return libraryIcon('sun');
 }
 
-/** 다크 테마: 초승달. */
+/** 다크 테마: 초승달(Lucide `moon`). */
 export function themeDarkIcon() {
-  return icon([
-    fillPath('M13.2 9.8 A5.6 5.6 0 1 1 6.2 2.8 A4.6 4.6 0 0 0 13.2 9.8 Z'),
-  ]);
+  return libraryIcon('moon');
 }
 
-/** 자동 테마: 반은 해, 반은 달을 뜻하는 원(왼쪽 채움 · 오른쪽 테두리만). */
+/** 자동 테마: 해+달을 뜻하는 글리프(Lucide `sun-moon`). */
 export function themeAutoIcon() {
-  return icon([
-    svg('path', { d: 'M8 1.6 A6.4 6.4 0 0 0 8 14.4 Z', fill: 'currentColor' }),
-    svg('circle', { cx: 8, cy: 8, r: 6.4, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
-  ]);
+  return libraryIcon('sun-moon');
 }
 
 /** 테마 선택(자동/라이트/다크) → 글리프. */
@@ -217,21 +213,14 @@ export function themeChoiceIcon(choice) {
   return build();
 }
 
-/** 돋보기(찾기·확대). `playersView`의 "가진 도시 찾기" 버튼과 같은 그림을 쓴다. */
+/** 돋보기(찾기·확대, Lucide `search`). `playersView`의 "가진 도시 찾기" 버튼과 같은 그림을 쓴다. */
 export function magnifierIcon() {
-  return icon([
-    svg('circle', { cx: 7, cy: 7, r: 4.4, stroke: 'currentColor', 'stroke-width': 1.6 }),
-    strokeLine(10.4, 10.4, 14, 14, { 'stroke-width': 1.8 }),
-  ]);
+  return libraryIcon('search');
 }
 
-/** 하이로우세븐: 과녁. */
+/** 하이로우세븐: 과녁(Lucide `target`). */
 export function targetIcon() {
-  return icon([
-    svg('circle', { cx: 8, cy: 8, r: 6, stroke: 'currentColor', 'stroke-width': 1.2, fill: 'none' }),
-    svg('circle', { cx: 8, cy: 8, r: 3.6, stroke: 'currentColor', 'stroke-width': 1.2, fill: 'none' }),
-    dot(8, 8, 1.2),
-  ]);
+  return libraryIcon('target');
 }
 
 /** 슬롯머신(탭 아이콘 · 릴 자리표시자). */
@@ -345,105 +334,54 @@ export function landmarkBadge() {
  * 위와 같은 규칙이다 — 1em 정사각, 선 굵기 1.3, `currentColor`.
  */
 
-/** 주식·시세: 오른쪽 위로 꺾여 오르는 꺾은선. */
+/** 주식·시세: 오른쪽 위로 꺾여 오르는 꺾은선(Lucide `trending-up`). */
 export function chartIcon() {
-  return icon([
-    strokePath('M2.5 13.5 V2.5', { 'stroke-width': 1.2 }),
-    strokePath('M2.5 13.5 H13.5', { 'stroke-width': 1.2 }),
-    strokePath('M4.2 11 L7 8 L9.2 9.6 L13 5.2'),
-    strokePath('M10.4 5.2 H13 V7.8'),
-  ]);
+  return libraryIcon('trending-up');
 }
 
-/** 예금·은행·기준금리: 기둥 세 개가 선 신전. */
+/** 예금·은행·기준금리: 신전 건물(Lucide `landmark`). */
 export function bankIcon() {
-  return icon([
-    strokePath('M2.4 6.2 L8 3 L13.6 6.2'),
-    strokeLine(2.6, 13.4, 13.4, 13.4, { 'stroke-width': 1.4 }),
-    strokeLine(4.6, 7.6, 4.6, 12, { 'stroke-width': 1.2 }),
-    strokeLine(8, 7.6, 8, 12, { 'stroke-width': 1.2 }),
-    strokeLine(11.4, 7.6, 11.4, 12, { 'stroke-width': 1.2 }),
-  ]);
+  return libraryIcon('landmark');
 }
 
-/** 경제 뉴스: 접힌 신문. */
+/** 경제 뉴스: 신문(Lucide `newspaper`). */
 export function newsIcon() {
-  return icon([
-    strokeRect(2.2, 3.4, 9.4, 9.2, { rx: 1 }),
-    strokePath('M11.6 5.8 H13.8 V11.2 A1.4 1.4 0 0 1 11.6 12.6'),
-    strokeLine(4.2, 6.2, 9.6, 6.2, { 'stroke-width': 1.1 }),
-    strokeLine(4.2, 8.2, 9.6, 8.2, { 'stroke-width': 1.1 }),
-    strokeLine(4.2, 10.2, 7.8, 10.2, { 'stroke-width': 1.1 }),
-  ]);
+  return libraryIcon('newspaper');
 }
 
-/** 예약 주문: 영수증. */
+/** 예약 주문: 영수증(Lucide `receipt`). */
 export function receiptIcon() {
-  return icon([
-    strokePath('M3.6 2.6 H12.4 V13.8 L10.6 12.6 L8 13.8 L5.4 12.6 L3.6 13.8 Z'),
-    strokeLine(5.8, 5.8, 10.2, 5.8, { 'stroke-width': 1.1 }),
-    strokeLine(5.8, 8.2, 10.2, 8.2, { 'stroke-width': 1.1 }),
-  ]);
+  return libraryIcon('receipt');
 }
 
-/** 거래 창구: 서로 반대로 도는 두 화살표(사고팔기). */
+/** 거래 창구: 서로 반대로 도는 두 화살표(사고팔기, Lucide `arrow-left-right`). */
 export function exchangeIcon() {
-  return icon([
-    strokePath('M3 6 H11.4'),
-    strokePath('M9.4 3.8 L11.8 6 L9.4 8.2'),
-    strokePath('M13 10 H4.6'),
-    strokePath('M6.6 7.8 L4.2 10 L6.6 12.2'),
-  ]);
+  return libraryIcon('arrow-left-right');
 }
 
-/** 설명·도움말: 물음표. */
+/** 설명·도움말: 물음표(Lucide `circle-help`). */
 export function questionIcon() {
-  return icon([
-    svg('circle', { cx: 8, cy: 8, r: 6, stroke: 'currentColor', 'stroke-width': 1.2, fill: 'none' }),
-    strokePath('M6.2 6.2 A1.9 1.9 0 1 1 8 8.6 V9.6', { 'stroke-width': 1.3 }),
-    dot(8, 11.6, 0.85),
-  ]);
+  return libraryIcon('circle-help');
 }
 
-/** 호황: 해. */
+/** 호황: 해(Lucide `sun`). 테마 버튼의 해와 같은 그림을 쓴다. */
 export function sunIcon() {
-  return icon([
-    svg('circle', { cx: 8, cy: 8, r: 3.2, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
-    strokeLine(8, 1.6, 8, 3.2),
-    strokeLine(8, 12.8, 8, 14.4),
-    strokeLine(1.6, 8, 3.2, 8),
-    strokeLine(12.8, 8, 14.4, 8),
-    strokeLine(3.6, 3.6, 4.7, 4.7),
-    strokeLine(11.3, 11.3, 12.4, 12.4),
-    strokeLine(12.4, 3.6, 11.3, 4.7),
-    strokeLine(4.7, 11.3, 3.6, 12.4),
-  ]);
+  return libraryIcon('sun');
 }
 
-/** 과열: 불꽃. */
+/** 과열: 불꽃(Lucide `flame`). */
 export function flameIcon() {
-  return icon([
-    strokePath('M8 1.8 C9.6 4.6 12.2 5.8 12.2 9.2 A4.2 4.2 0 0 1 3.8 9.2 C3.8 7 5 6.2 5.8 4.8 C6.6 6.2 7.2 6.4 7.6 5.6 C8 4.8 7.6 3.4 8 1.8 Z'),
-  ]);
+  return libraryIcon('flame');
 }
 
-/** 침체: 비구름. */
+/** 침체: 비구름(Lucide `cloud-rain`). */
 export function rainIcon() {
-  return icon([
-    strokePath('M4.6 9.4 A2.6 2.6 0 0 1 5 4.3 A3.4 3.4 0 0 1 11.4 5.3 A2.2 2.2 0 0 1 11.2 9.4 Z'),
-    strokeLine(5.6, 11.2, 5, 13.4, { 'stroke-width': 1.2 }),
-    strokeLine(8, 11.2, 7.4, 13.4, { 'stroke-width': 1.2 }),
-    strokeLine(10.4, 11.2, 9.8, 13.4, { 'stroke-width': 1.2 }),
-  ]);
+  return libraryIcon('cloud-rain');
 }
 
-/** 회복: 새싹. */
+/** 회복: 새싹(Lucide `sprout`). */
 export function sproutIcon() {
-  return icon([
-    strokePath('M8 13.6 V7.4'),
-    strokePath('M8 8.2 C8 5.6 6.2 4.2 3.8 4.2 C3.8 6.8 5.6 8.2 8 8.2 Z'),
-    strokePath('M8 7.6 C8 5.4 9.6 4.2 11.8 4.2 C11.8 6.4 10.2 7.6 8 7.6 Z'),
-  ]);
+  return libraryIcon('sprout');
 }
 
 /** 경기 국면(EXPANSION/OVERHEAT/RECESSION/RECOVERY) → 글리프. */
