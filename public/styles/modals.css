@@ -1289,7 +1289,12 @@
   white-space: nowrap;
 }
 
-/* 모달이 열려 있으면 알림 줄은 잠시 비켜난다(모달 제목을 덮지 않게). */
-body.modal-open .opponent-strip {
+/*
+  모달이 열려 있으면 알림 줄은 잠시 비켜난다(모달 제목을 덮지 않게).
+  흐려진 알림이 탭을 가로채면 "버튼이 안 눌린다"가 되므로 입력도 함께 끊는다.
+*/
+body.modal-open .opponent-strip,
+body.modal-open .opponent-toast {
   opacity: 0.35;
+  pointer-events: none;
 }
