@@ -21,7 +21,7 @@ export function playTollNotice({ payerName, ownerName, spaceName, amount, mine =
     mine,
     fastForward,
     variant: 'toll',
-    line: `💸 ${spaceName} 통행료 ${formatWon(amount)} · ${payerName} → ${ownerName}`,
+    line: `${spaceName} 통행료 ${formatWon(amount)} · ${payerName} → ${ownerName}`,
     card: () =>
       el('div', { class: ['toll-notice', mine ? 'toll-notice--mine' : null] }, [
         el('span', { class: 'toll-eyebrow', text: '통행료' }),

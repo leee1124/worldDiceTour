@@ -27,11 +27,10 @@ export function playTicketCard({ playerName, text, effect, mine = false, fastFor
     mine,
     fastForward,
     variant: 'ticket',
-    line: `🎫 ${playerName} · ${text}`,
+    line: `${playerName} · 행운 티켓 — ${text}`,
     card: () => {
       card = el('div', { class: 'ticket-card' }, [
         el('div', { class: 'ticket-face ticket-face--back', 'aria-hidden': 'true' }, [
-          el('span', { class: 'ticket-back-mark', text: '🎫' }),
           el('span', { class: 'ticket-back-title', text: '행운 티켓' }),
         ]),
         el('div', { class: 'ticket-face ticket-face--front' }, [

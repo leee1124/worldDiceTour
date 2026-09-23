@@ -1,5 +1,5 @@
 /**
- * "○○의 도시" 시트. 플레이어 카드의 🔎를 누르면 열린다.
+ * "○○의 도시" 시트. 플레이어 카드의 돋보기 버튼을 누르면 열린다.
  *
  * 오너 요청: 돋보기는 상대방 **말의 위치**가 아니라 상대방이 **가진 도시**를 찾는 도구다.
  * 그래서 이 시트는 소유 목록(이름 · 건물 배지 · 현재 통행료)과 합계를 보여 주고,
@@ -79,7 +79,7 @@ export function ownedCitiesSheetSpec({
 }) {
   return {
     id: OWNED_CITIES_SHEET_ID,
-    title: `🔎 ${holdings.ownerName ?? '플레이어'}의 도시`,
+    title: `${holdings.ownerName ?? '플레이어'}의 도시`,
     subtitle: holdings.empty
       ? '아직 가진 도시가 없습니다.'
       : `${holdings.count}곳 · 통행료 합계 ${formatWon(holdings.totalToll)}`,

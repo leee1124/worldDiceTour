@@ -3,7 +3,7 @@
  * 호스트 도구(오프라인 좌석 자동 진행 전환)와 자기 좌석의 "직접 플레이로 복귀"도 여기서 제공한다.
  */
 
-import { button, clear, el, setText, toggleClass } from '../dom.js';
+import { button, clear, el, setText, svg, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
 import { lapLabel } from '../domain/buildRules.js';
 import { playerCellLabel } from '../domain/locationLabel.js';
@@ -59,7 +59,13 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
           location,
           holdings,
         ]),
-        el('span', { class: 'player-locate-icon', 'aria-hidden': 'true', text: '🔎' }),
+        // 돋보기 아이콘은 이모지 대신 인라인 SVG로 그린다(이미지 에셋 없이, 글꼴에 좌우되지 않게).
+        el('span', { class: 'player-locate-icon', 'aria-hidden': 'true' }, [
+          svg('svg', { viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none' }, [
+            svg('circle', { cx: '7', cy: '7', r: '4.4', stroke: 'currentColor', 'stroke-width': '1.6' }),
+            svg('path', { d: 'M10.4 10.4 L14 14', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round' }),
+          ]),
+        ]),
       ],
     );
 

@@ -33,7 +33,7 @@ const CORNER_ART = Object.freeze({
 const SPOTLIGHT_MS = 1200;
 /** 플레이어 카드를 눌러 말을 찾을 때 강조하는 시간. */
 const FIND_MS = 2000;
-/** 🔎로 한 좌석의 도시를 모두 강조하는 시간. */
+/** 돋보기 버튼으로 한 좌석의 도시를 모두 강조하는 시간. */
 export const OWNED_HIGHLIGHT_MS = 4000;
 
 function nameSizeClass(name) {
@@ -76,7 +76,7 @@ export function createBoardView({ onCellActivate }) {
   let boardBuilt = false;
   let travelMode = { active: false, forbidden: [], locked: false };
   let selectedIndex = null;
-  /** 🔎 소유 도시 강조 상태(칸 번호 + 해제 타이머). */
+  /** 소유 도시 강조 상태(칸 번호 + 해제 타이머). */
   let ownedFocus = { indexes: [], timer: null };
 
   function buildCell(space) {
@@ -524,7 +524,7 @@ export function createBoardView({ onCellActivate }) {
     },
 
     /**
-     * 🔎 한 좌석이 가진 칸을 **전부** 강조한다(나머지 칸은 흐리게).
+     * 한 좌석이 가진 칸을 **전부** 강조한다(나머지 칸은 흐리게).
      * 강조는 테두리·색이라 모션 축소에서도 그대로 보인다(움직이는 부분만 CSS가 끈다).
      *
      * @param {number[]} indexes 강조할 칸 번호
