@@ -1448,3 +1448,39 @@
   line-height: 1.35;
   word-break: keep-all;
 }
+
+/* ── 넓은 화면: 엠블럼 띠 + 아래쪽 코어(U19) ─────────────────────────── */
+
+/*
+  코어가 보드 안쪽 9×9를 통째로 덮으면 엠블럼("WORLD · DICE TOUR")이 항상 가려진다(오너 지적).
+  시장 패널을 옆 칸으로 옮겨 코어를 가볍게 만든 뒤, 안쪽 위 띠(약 16cqi)는 엠블럼에 주고
+  코어는 그 아래(29cqi)에 둔다. 나침반은 자리를 많이 차지해 넓은 화면에서는 뺀다.
+*/
+@media (min-width: 68.01rem) {
+  .board-emblem {
+    justify-content: flex-start;
+    padding-top: 2cqi;
+  }
+
+  .emblem-ring {
+    padding: 1.6cqi 4cqi;
+    gap: 0.4cqi;
+  }
+
+  .emblem-title {
+    font-size: 1.9cqi;
+  }
+
+  .emblem-dice {
+    font-size: 3.6cqi;
+  }
+
+  .emblem-compass {
+    display: none;
+  }
+
+  .board-core {
+    /* 엠블럼 띠(약 16cqi)와 2~3cqi 여유. 코어 높이는 62cqi — 내용이 넘치면 overflow:auto가 받는다. */
+    top: 29cqi;
+  }
+}
