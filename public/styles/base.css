@@ -224,6 +224,66 @@
   --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.32);
 }
 
+/* ── 다크 섬(보드 · 상황판 · 카지노 · 행운 티켓 뒷면 · 통행료 삽화) ──────────
+   이 칸들은 실제 게임판·카드처럼 배경 자체가 항상 짙다(테마와 무관). 그런데 안의 글자는
+   --text-*/--gold-*/--neon-cyan 같은 "테마를 따라가는" 토큰을 그대로 쓴다 — 그래서 라이트
+   테마에서 그 토큰이 밝은 배경용(짙은 색)으로 바뀌면 짙은 배경 위에 짙은 글자가 놓여
+   거의 안 보이게 된다(예: 코드리뷰에서 지적된 board-core 1.19:1, die-num 2.53:1 등).
+   해결: 이 칸들 스코프 안에서만 다크 테마와 **완전히 같은 값**으로 토큰을 다시 고정한다.
+   주의: 위 `:root[data-theme='dark']` 블록 값을 바꾸면 여기도 반드시 함께 맞출 것
+   (달라지면 다크 테마인데 이 칸만 다른 색이 되는 회귀가 생긴다). */
+.board,
+.board-core,
+.status-strip,
+.modal--neon,
+.ticket-face--back,
+.news-face--back,
+.island-art {
+  color: var(--text-100);
+
+  --text-100: #ecf3f9;
+  --text-300: #b9c8d6;
+  --text-500: #8399ab;
+
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.08);
+
+  --gold-300: #f7d894;
+  --gold-400: #efc165;
+  --gold-500: #d8a13a;
+  --gold-700: #8e6317;
+
+  --neon-cyan: #2ff3e0;
+
+  --danger: #f0555f;
+  --warn: #eaa53c;
+  --ok: #43c491;
+  --info: #56b7e8;
+
+  --danger-text: #ff9aa0;
+  --ok-text: #7bf0b8;
+  --warn-text: #f5cd8c;
+  --info-text: #56b7e8;
+  --mine-text: #2ff3e0;
+  --violet-text: #ddd3ff;
+
+  --card-bg-1: rgba(255, 255, 255, 0.07);
+  --card-bg-2: rgba(255, 255, 255, 0.02);
+  --input-bg: rgba(3, 12, 20, 0.55);
+  --toast-bg: rgba(10, 24, 36, 0.96);
+  --scrim: rgba(3, 9, 15, 0.72);
+  --modal-bg-1: #102434;
+  --modal-bg-2: #0a1723;
+  --heading-strong: var(--paper-100);
+  --notice-tint-gold: rgba(56, 42, 12, 0.97);
+  --notice-tint-danger: rgba(56, 16, 22, 0.96);
+
+  --shadow-lift: 0 18px 44px rgba(0, 0, 0, 0.5);
+  --shadow-soft: 0 6px 18px rgba(0, 0, 0, 0.32);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -387,6 +447,7 @@ kbd {
 }
 
 .btn:hover:not(:disabled) {
+  background: rgba(236, 243, 249, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 14%, transparent);
   transform: translateY(-1px);
 }
@@ -466,6 +527,7 @@ kbd {
 
 .btn--chip-on {
   border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.18); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 18%, transparent);
   color: var(--gold-300);
 }
@@ -566,30 +628,35 @@ kbd {
 
 .badge--gold {
   border-color: color-mix(in srgb, var(--gold-400) 50%, transparent);
+  background: rgba(239, 193, 101, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 16%, transparent);
   color: var(--gold-300);
 }
 
 .badge--mine {
   border-color: color-mix(in srgb, var(--neon-cyan) 45%, transparent);
+  background: rgba(47, 243, 224, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 14%, transparent);
   color: var(--mine-text);
 }
 
 .badge--warn {
   border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+  background: rgba(234, 165, 60, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--warn) 16%, transparent);
   color: var(--warn-text);
 }
 
 .badge--danger {
   border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  background: rgba(240, 85, 95, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--danger) 16%, transparent);
   color: var(--danger-text);
 }
 
 .badge--info {
   border-color: color-mix(in srgb, var(--info) 45%, transparent);
+  background: rgba(86, 183, 232, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--info) 14%, transparent);
   color: var(--info-text);
 }
@@ -611,6 +678,7 @@ kbd {
 
 .banner--warn {
   border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: rgba(234, 165, 60, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--warn) 14%, transparent);
   color: var(--warn-text);
 }
@@ -711,6 +779,7 @@ body.modal-open .toast-stack {
 .reserved-panel {
   border: 1px dashed color-mix(in srgb, var(--neon-violet) 45%, transparent);
   border-radius: var(--radius-md);
+  background: rgba(143, 108, 255, 0.08); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-violet) 8%, transparent);
 }
 
@@ -730,6 +799,7 @@ body.modal-open .toast-stack {
 .reserved-tag {
   padding: 0.05rem 0.4rem;
   border-radius: 999px;
+  background: rgba(143, 108, 255, 0.28); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-violet) 28%, transparent);
   font-size: 0.68rem;
 }
@@ -751,6 +821,7 @@ body.modal-open .toast-stack {
 .skeleton-bar {
   flex: 1;
   border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, rgba(143, 108, 255, 0.5), rgba(143, 108, 255, 0.1)); /* color-mix 미지원 대체값 */
   background: linear-gradient(180deg, color-mix(in srgb, var(--neon-violet) 50%, transparent), color-mix(in srgb, var(--neon-violet) 10%, transparent));
 }
 
@@ -767,5 +838,6 @@ body.modal-open .toast-stack {
 .tool-row--reserved {
   border-style: dashed;
   border-color: color-mix(in srgb, var(--neon-violet) 40%, transparent);
+  background: rgba(143, 108, 255, 0.07); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-violet) 7%, transparent);
 }

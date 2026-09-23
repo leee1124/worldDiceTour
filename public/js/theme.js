@@ -26,7 +26,7 @@ function readStoredChoice() {
   try {
     return normalizeChoice(window.localStorage.getItem(STORAGE_KEY));
   } catch (error) {
-    console.error('[theme] 저장된 테마를 읽지 못했습니다', error.name);
+    console.error('[theme] 저장된 테마를 읽지 못했습니다', error.name, error.message);
     return 'auto';
   }
 }
@@ -35,7 +35,7 @@ function writeStoredChoice(choice) {
   try {
     window.localStorage.setItem(STORAGE_KEY, choice);
   } catch (error) {
-    console.error('[theme] 테마를 저장하지 못했습니다', error.name);
+    console.error('[theme] 테마를 저장하지 못했습니다', error.name, error.message);
   }
 }
 
@@ -43,8 +43,23 @@ function systemPrefersDark() {
   try {
     return Boolean(mediaQuery?.matches ?? window.matchMedia?.(DARK_QUERY).matches);
   } catch (error) {
-    console.error('[theme] 시스템 다크 모드 여부를 확인하지 못했습니다', error.name);
+    console.error('[theme] 시스템 다크 모드 여부를 확인하지 못했습니다', error.name, error.message);
     return false;
+  }
+}
+
+/**
+ * 시스템 다크 선호 변화를 구독한다. 최신 브라우저는 `addEventListener`를 쓰지만,
+ * 오래된 Safari(<14)의 `MediaQueryList`는 `addListener`(비표준, deprecated)만 있다.
+ */
+function subscribeMediaQueryChange(mql, handler) {
+  if (!mql) {
+    return;
+  }
+  if (typeof mql.addEventListener === 'function') {
+    mql.addEventListener('change', handler);
+  } else if (typeof mql.addListener === 'function') {
+    mql.addListener(handler);
   }
 }
 
@@ -80,14 +95,14 @@ function applyToDocument() {
       meta.setAttribute('content', resolved);
     }
   } catch (error) {
-    console.error('[theme] color-scheme meta를 갱신하지 못했습니다', error.name);
+    console.error('[theme] color-scheme meta를 갱신하지 못했습니다', error.name, error.message);
   }
 
   for (const listener of listeners) {
     try {
       listener({ choice: currentChoice, resolved });
     } catch (error) {
-      console.error('[theme] 구독자 콜백에서 오류가 났습니다', error.name);
+      console.error('[theme] 구독자 콜백에서 오류가 났습니다', error.name, error.message);
     }
   }
 }
@@ -119,12 +134,12 @@ export function initTheme() {
   currentChoice = readStoredChoice();
   try {
     mediaQuery = window.matchMedia?.(DARK_QUERY) ?? null;
-    mediaQuery?.addEventListener?.('change', () => {
+    subscribeMediaQueryChange(mediaQuery, () => {
       // auto일 때만 시스템 변화가 실제로 화면에 영향을 준다 — 그래도 재계산해서 알려 준다.
       applyToDocument();
     });
   } catch (error) {
-    console.error('[theme] 시스템 다크 모드 변화를 구독하지 못했습니다', error.name);
+    console.error('[theme] 시스템 다크 모드 변화를 구독하지 못했습니다', error.name, error.message);
   }
   applyToDocument();
 }

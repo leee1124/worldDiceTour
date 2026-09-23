@@ -75,7 +75,7 @@ export function createGameView({
         statusNode,
       ]),
       el('div', { class: 'topbar-right' }, [
-        createThemeToggleButton({ extraClass: 'topbar-theme' }).element,
+        createThemeToggleButton().element,
         connectionNode,
         retryButton,
       ]),

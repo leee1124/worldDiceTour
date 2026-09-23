@@ -1262,7 +1262,8 @@
   margin-top: 0.6rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(236, 243, 249, 0.035); /* color-mix 미지원 대체값 */
+  background: color-mix(in srgb, var(--text-100) 3.5%, transparent);
 }
 
 .legend-summary {
@@ -1321,7 +1322,7 @@
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  border: 2px solid color-mix(in srgb, var(--text-100) 85%, transparent);
   background: var(--legend-color, var(--text-500));
 }
 
@@ -1351,7 +1352,7 @@
 .legend-owner[data-shape='hexagon'] {
   clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
   border: 0;
-  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline: 2px solid color-mix(in srgb, var(--text-100) 85%, transparent);
 }
 
 .legend-note {

@@ -48,6 +48,7 @@
   padding: 0.45rem;
   border: 1px solid color-mix(in srgb, var(--gold-400) 22%, transparent);
   border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(8, 21, 31, 0.92), rgba(8, 21, 31, 0.96)); /* color-mix 미지원 대체값 */
   background: linear-gradient(180deg, color-mix(in srgb, var(--table-900) 92%, transparent), color-mix(in srgb, var(--table-900) 96%, transparent));
   text-align: left;
 }
@@ -83,6 +84,7 @@
 }
 
 .market-toggle:hover {
+  background: rgba(236, 243, 249, 0.05); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 5%, transparent);
 }
 
@@ -128,21 +130,25 @@
 
 .cycle-badge[data-tone='expansion'] {
   border-color: color-mix(in srgb, var(--cycle-expansion) 55%, transparent);
+  background: rgba(53, 201, 143, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--cycle-expansion) 16%, transparent);
   color: var(--cycle-expansion);
 }
 .cycle-badge[data-tone='overheat'] {
   border-color: color-mix(in srgb, var(--cycle-overheat) 55%, transparent);
+  background: rgba(255, 157, 60, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--cycle-overheat) 16%, transparent);
   color: var(--cycle-overheat);
 }
 .cycle-badge[data-tone='recession'] {
   border-color: color-mix(in srgb, var(--cycle-recession) 55%, transparent);
+  background: rgba(111, 143, 220, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--cycle-recession) 16%, transparent);
   color: var(--cycle-recession);
 }
 .cycle-badge[data-tone='recovery'] {
   border-color: color-mix(in srgb, var(--cycle-recovery) 55%, transparent);
+  background: rgba(72, 199, 216, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--cycle-recovery) 16%, transparent);
   color: var(--cycle-recovery);
 }
@@ -176,6 +182,7 @@
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
   color: var(--text-100);
   font: inherit;
@@ -185,6 +192,7 @@
 
 .market-news:hover {
   border-color: var(--line-strong);
+  background: rgba(236, 243, 249, 0.08); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 8%, transparent);
 }
 
@@ -220,8 +228,9 @@
 .market-spectate {
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
+  background: rgba(47, 243, 224, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 10%, transparent);
-  color: var(--neon-cyan);
+  color: var(--mine-text);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -253,6 +262,7 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--tick-flat);
   border-radius: var(--radius-sm);
+  background: rgba(8, 21, 31, 0.55); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 55%, transparent);
   scroll-snap-align: start;
 }
@@ -267,6 +277,7 @@
 .instr-card--delisted {
   opacity: 0.6;
   border-left-color: var(--danger);
+  background: rgba(56, 16, 22, 0.528); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--notice-tint-danger) 55%, transparent);
 }
 
@@ -509,12 +520,14 @@
   padding: 0.25rem 0.4rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.03); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 3%, transparent);
   font-size: 0.74rem;
 }
 
 .queue-row--mine {
   border-color: color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+  background: rgba(47, 243, 224, 0.07); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 7%, transparent);
 }
 
@@ -585,6 +598,7 @@
 
 .trade-tab--on {
   border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 16%, transparent);
   color: var(--gold-300);
 }
@@ -627,6 +641,7 @@
   padding: 0.35rem 0.45rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  background: rgba(8, 21, 31, 0.5); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 50%, transparent);
   color: var(--text-100);
   font: inherit;
@@ -637,6 +652,7 @@
 
 .instr-chip--on {
   border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 14%, transparent);
 }
 
@@ -703,8 +719,9 @@
 
 .trade-side--on {
   border-color: var(--neon-cyan);
+  background: rgba(47, 243, 224, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 14%, transparent);
-  color: var(--neon-cyan);
+  color: var(--mine-text);
 }
 
 .trade-stepper {
@@ -714,6 +731,7 @@
   padding: 0.45rem 0.5rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
@@ -771,6 +789,7 @@
   padding: 0 0.4rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
+  background: rgba(8, 21, 31, 0.6); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 60%, transparent);
 }
 
@@ -800,6 +819,7 @@
 .trade-reason {
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
+  background: rgba(240, 85, 95, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger-text);
   font-size: 0.8rem;
@@ -1080,6 +1100,7 @@
   padding: 1rem 1.6rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
+  background: linear-gradient(140deg, rgba(8, 21, 31, 0.97), rgba(8, 21, 31, 0.97)); /* color-mix 미지원 대체값 */
   background: linear-gradient(140deg, color-mix(in srgb, var(--table-900) 97%, transparent), color-mix(in srgb, var(--table-900) 97%, transparent));
   box-shadow: var(--shadow-lift);
   opacity: 0;
@@ -1237,6 +1258,7 @@
 
 .player-breakdown-toggle:hover {
   color: var(--text-300);
+  background: rgba(236, 243, 249, 0.05); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 5%, transparent);
 }
 
@@ -1253,6 +1275,7 @@
   gap: 0.3rem;
   padding: 0.05rem 0.3rem;
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.035); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 3.5%, transparent);
   font-size: 0.72rem;
 }
@@ -1307,6 +1330,7 @@
 .tool-row--finance {
   flex-wrap: wrap;
   border-color: color-mix(in srgb, var(--gold-400) 35%, transparent);
+  background: rgba(239, 193, 101, 0.07); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 7%, transparent);
 }
 

@@ -3,7 +3,7 @@
  * 같은 조각을 쓴다 — 아이콘만 다른 작은 버튼 하나면 된다(문구가 아니라 아이콘 + 배지).
  */
 
-import { button, el, setText } from '../dom.js';
+import { button, el } from '../dom.js';
 import { cycleTheme, onThemeChange, themeChoice } from '../theme.js';
 import { themeChoiceIcon } from './icons.js';
 
@@ -18,25 +18,25 @@ export function createThemeToggleButton({ extraClass } = {}) {
   const iconSlot = el('span', { class: 'theme-toggle-icon', 'aria-hidden': 'true' }, [
     themeChoiceIcon(themeChoice()),
   ]);
-  const labelNode = el('span', { class: 'visually-hidden' });
 
   const element = button(
     {
       class: ['btn', 'btn--quiet', 'theme-toggle', extraClass],
-      'aria-label': '테마: 자동/라이트/다크',
       on: {
         click: () => {
           cycleTheme();
         },
       },
     },
-    [iconSlot, labelNode],
+    [iconSlot],
   );
 
+  // aria-label은 정적 문구를 두면 접근성 이름 계산에서 늘 이 값이 이긴다(내부 텍스트는 무시됨).
+  // 그래서 현재 상태를 매번 aria-label 자체에 담아 갱신한다("한 번 탭하면 바뀐다"는 것도 함께 안내).
   function render(choice) {
     const next = choice ?? themeChoice();
     iconSlot.replaceChildren(themeChoiceIcon(next));
-    setText(labelNode, `현재 테마: ${CHOICE_LABELS[next] ?? '자동'}`);
+    element.setAttribute('aria-label', `테마: 자동/라이트/다크 (현재 ${CHOICE_LABELS[next] ?? '자동'}, 탭하면 다음으로)`);
     element.title = `테마: ${CHOICE_LABELS[next] ?? '자동'} (탭하면 바뀝니다)`;
   }
 

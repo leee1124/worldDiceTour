@@ -12,6 +12,7 @@
   padding: 0.5rem 0.85rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, rgba(20, 80, 106, 0.3), rgba(8, 21, 31, 0.8)); /* color-mix 미지원 대체값 */
   background: linear-gradient(120deg, color-mix(in srgb, var(--teal-600) 30%, transparent), color-mix(in srgb, var(--table-900) 80%, transparent));
 }
 
@@ -128,6 +129,7 @@
   border: 1px solid var(--line);
   border-left: 4px solid var(--slot-color, var(--text-500));
   border-radius: var(--radius-md);
+  background: rgba(8, 21, 31, 0.45); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 45%, transparent);
   transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
@@ -146,6 +148,7 @@
 }
 
 .player-card--turn {
+  background: rgba(239, 193, 101, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 10%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold-400) 40%, transparent);
 }
@@ -190,6 +193,7 @@
 .player-head--locate:hover,
 .player-head--locate:focus-visible {
   border-color: color-mix(in srgb, var(--gold-400) 45%, transparent);
+  background: rgba(239, 193, 101, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
@@ -365,6 +369,7 @@
 }
 
 .log-line:nth-child(odd) {
+  background: rgba(236, 243, 249, 0.025); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 2.5%, transparent);
 }
 
@@ -383,6 +388,7 @@
 
 .log-line--turn {
   border-left: 2px solid var(--gold-500);
+  background: rgba(239, 193, 101, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
@@ -412,6 +418,7 @@
 }
 
 .log-line--alert {
+  background: rgba(240, 85, 95, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 

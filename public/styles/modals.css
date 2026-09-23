@@ -23,7 +23,9 @@
   padding: clamp(0.6rem, 2vw, 1.5rem);
   padding-top: calc(clamp(0.6rem, 2vw, 1.5rem) + env(safe-area-inset-top, 0px));
   padding-bottom: calc(clamp(0.6rem, 2vw, 1.5rem) + env(safe-area-inset-bottom, 0px));
-  background: color-mix(in srgb, var(--table-900) 72%, transparent);
+  /* --scrim은 이 백드롭 전용 토큰(다크 0.72 알파 값과 정확히 같다). color-mix 없이 순수
+     커스텀 프로퍼티라 별도 대체값이 필요 없다(오래된 엔진도 커스텀 프로퍼티는 지원한다). */
+  background: var(--scrim);
   backdrop-filter: blur(5px);
 }
 
@@ -52,6 +54,7 @@
   gap: 0.6rem;
   padding: 1rem 1.1rem 0.7rem;
   border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, rgba(239, 193, 101, 0.1), transparent 70%); /* color-mix 미지원 대체값 */
   background: linear-gradient(120deg, color-mix(in srgb, var(--gold-400) 10%, transparent), transparent 70%);
 }
 
@@ -114,6 +117,7 @@
 }
 
 .modal-notice--warn {
+  background: rgba(240, 85, 95, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger-text);
 }
@@ -133,6 +137,7 @@
   margin: 0.55rem calc(-1 * var(--modal-pad-x, 0px)) calc(-1 * var(--modal-pad-b, 0px));
   padding: 0.55rem var(--modal-pad-x, 0px);
   border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(8, 21, 31, 0.86), rgba(8, 21, 31, 0.98) 55%); /* color-mix 미지원 대체값 */
   background: linear-gradient(180deg, color-mix(in srgb, var(--table-900) 86%, transparent), color-mix(in srgb, var(--table-900) 98%, transparent) 55%);
   backdrop-filter: blur(6px);
 }
@@ -202,6 +207,7 @@
   gap: 0.2rem 0.5rem;
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
@@ -252,6 +258,7 @@
   padding: 0.7rem 0.8rem;
   border: 1px solid color-mix(in srgb, var(--gold-400) 24%, transparent);
   border-radius: var(--radius-md);
+  background: linear-gradient(160deg, rgba(248, 241, 228, 0.12), rgba(248, 241, 228, 0.03)); /* color-mix 미지원 대체값 */
   background: linear-gradient(160deg, color-mix(in srgb, var(--paper-100) 12%, transparent), color-mix(in srgb, var(--paper-100) 3%, transparent));
 }
 
@@ -356,6 +363,7 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
   cursor: pointer;
   transition: border-color 140ms ease, background-color 140ms ease;
@@ -367,6 +375,7 @@
 
 .check-row:has(.check-input:checked) {
   border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.14); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 14%, transparent);
 }
 
@@ -416,6 +425,7 @@
   gap: 0.3rem;
   padding: 0.6rem 0.7rem;
   border-radius: var(--radius-md);
+  background: rgba(239, 193, 101, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
@@ -468,6 +478,7 @@
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
   color: inherit;
   cursor: pointer;
@@ -477,6 +488,7 @@
 
 .candidate-row--on {
   border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 16%, transparent);
 }
 
@@ -532,11 +544,13 @@
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(236, 243, 249, 0.03); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 3%, transparent);
 }
 
 .liq-section--danger {
   border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: rgba(240, 85, 95, 0.07); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--danger) 7%, transparent);
 }
 
@@ -565,6 +579,7 @@
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
@@ -584,6 +599,7 @@
   padding: 0.7rem;
   border: 1px solid var(--danger);
   border-radius: var(--radius-md);
+  background: rgba(240, 85, 95, 0.12); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
@@ -607,11 +623,12 @@
   gap: 0.5rem;
   padding: 0.7rem 0.8rem;
   border-radius: var(--radius-md);
+  background: rgba(47, 243, 224, 0.12); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 12%, transparent);
 }
 
 .travel-index {
-  color: var(--neon-cyan);
+  color: var(--mine-text);
   font-family: var(--font-num);
   font-weight: 800;
 }
@@ -683,11 +700,13 @@
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
 .ranking-row--champion {
   border-color: var(--gold-400);
+  background: rgba(239, 193, 101, 0.16); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 16%, transparent);
 }
 
@@ -763,6 +782,7 @@
   align-items: center;
   justify-content: center;
   padding: calc(1rem + env(safe-area-inset-top, 0px)) 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  background: rgba(8, 21, 31, 0.62); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 62%, transparent);
   backdrop-filter: blur(3px);
   cursor: pointer;
@@ -805,6 +825,7 @@
   height: 3px;
   overflow: hidden;
   border-radius: 999px;
+  background: rgba(236, 243, 249, 0.22); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 22%, transparent);
 }
 
@@ -841,6 +862,7 @@
   padding: 0.4rem 0.9rem;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
+  background: rgba(8, 21, 31, 0.95); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 95%, transparent);
   box-shadow: var(--shadow-soft);
   cursor: pointer;
@@ -869,6 +891,7 @@
   padding: 1rem 1.1rem;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, rgba(8, 21, 31, 0.97), rgba(8, 21, 31, 0.97)); /* color-mix 미지원 대체값 */
   background: linear-gradient(160deg, color-mix(in srgb, var(--table-900) 97%, transparent), color-mix(in srgb, var(--table-900) 97%, transparent));
   box-shadow: var(--shadow-lift);
   text-align: center;
@@ -1003,6 +1026,7 @@
 .ticket-effect {
   padding: 0.2rem 0.7rem;
   border-radius: 999px;
+  background: rgba(8, 21, 31, 0.12); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 12%, transparent);
   color: var(--ink-700);
   font-size: 0.78rem;
@@ -1055,6 +1079,7 @@
 .owned-position {
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.05); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 5%, transparent);
   color: var(--text-300);
   font-size: 0.82rem;
@@ -1084,6 +1109,7 @@
   border: 1px solid var(--line);
   border-left: 3px solid var(--owned-row-color, var(--gold-500));
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
   color: inherit;
   cursor: pointer;
@@ -1092,6 +1118,7 @@
 }
 
 .owned-row:hover {
+  background: rgba(236, 243, 249, 0.09); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 9%, transparent);
 }
 
@@ -1168,6 +1195,7 @@
   padding: 0.45rem 0.6rem;
   border: 1px solid color-mix(in srgb, var(--gold-400) 30%, transparent);
   border-radius: var(--radius-sm);
+  background: rgba(239, 193, 101, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 10%, transparent);
 }
 
@@ -1192,6 +1220,7 @@
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
+  background: rgba(236, 243, 249, 0.04); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--text-100) 4%, transparent);
 }
 
@@ -1277,6 +1306,7 @@
   border: 1px solid var(--line-strong);
   border-left: 3px solid var(--info);
   border-radius: 999px;
+  background: rgba(8, 21, 31, 0.96); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 96%, transparent);
   box-shadow: var(--shadow-soft);
   cursor: pointer;

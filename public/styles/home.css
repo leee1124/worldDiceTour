@@ -109,6 +109,7 @@
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(8, 21, 31, 0.4); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 40%, transparent);
 }
 
@@ -116,6 +117,7 @@
   padding: 0.2rem 0.5rem;
   border: 1px solid color-mix(in srgb, var(--gold-400) 40%, transparent);
   border-radius: var(--radius-sm);
+  background: rgba(239, 193, 101, 0.12); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--gold-400) 12%, transparent);
   color: var(--gold-300);
   font-family: var(--font-num);
@@ -155,6 +157,7 @@
   padding: clamp(1rem, 2.4vw, 1.6rem);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
+  background: linear-gradient(140deg, rgba(20, 80, 106, 0.4), rgba(8, 21, 31, 0.86)); /* color-mix 미지원 대체값 */
   background: linear-gradient(140deg, color-mix(in srgb, var(--teal-600) 40%, transparent), color-mix(in srgb, var(--table-900) 86%, transparent));
   box-shadow: var(--shadow-soft);
 }
@@ -203,6 +206,7 @@
   padding: 0.25rem 0.6rem;
   border: 1px solid color-mix(in srgb, var(--neon-cyan) 35%, transparent);
   border-radius: var(--radius-sm);
+  background: rgba(47, 243, 224, 0.1); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 10%, transparent);
   color: var(--mine-text);
   font-size: 0.98rem;
@@ -249,11 +253,13 @@
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(8, 21, 31, 0.4); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 40%, transparent);
 }
 
 .seat-row--mine {
   border-color: color-mix(in srgb, var(--neon-cyan) 40%, transparent);
+  background: rgba(47, 243, 224, 0.07); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--neon-cyan) 7%, transparent);
 }
 
@@ -319,6 +325,7 @@
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: rgba(8, 21, 31, 0.4); /* color-mix 미지원 대체값 */
   background: color-mix(in srgb, var(--table-900) 40%, transparent);
 }
 

@@ -141,7 +141,7 @@ export function createHomeView({ onCreateRoom, onJoinRoom, onReconnect, onForget
     el('header', { class: 'home-hero' }, [
       el('div', { class: 'hero-top' }, [
         el('p', { class: 'hero-eyebrow', text: 'WORLD DICE TOUR' }),
-        createThemeToggleButton({ extraClass: 'home-hero-theme' }).element,
+        createThemeToggleButton().element,
       ]),
       el('h1', { class: 'hero-title' }, ['월드 다이스 투어']),
       el('p', { class: 'hero-lead' }, [
