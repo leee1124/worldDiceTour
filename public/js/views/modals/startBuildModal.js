@@ -3,7 +3,7 @@
  * pending: `{candidates: [{index, name, price, options, lockedOptions}]}`
  *
  * 내 도시 하나를 고르고, 그 도시에서 지을 건물 조합을 고른다.
- * 바퀴가 모자라 아직 못 짓는 건물은 잠긴 행(🔒)으로만 보여 준다.
+ * 바퀴가 모자라 아직 못 짓는 건물은 잠긴 행(자물쇠 아이콘)으로만 보여 준다.
  */
 
 import { button, clear, el, replaceChildren, setText, toggleClass } from '../../dom.js';
@@ -100,7 +100,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, locked =
         el('p', { class: 'modal-help', text: LAP_RULE_TEXT }),
         el('p', {
           class: 'modal-help',
-          text: '랜드마크가 완성된 도시와, 이번 바퀴에 지을 것이 없는 도시는 후보에 나오지 않습니다.',
+          text: '관광명소가 완성된 도시와, 이번 바퀴에 지을 것이 없는 도시는 후보에 나오지 않습니다.',
         }),
         list,
         pickerSlot,

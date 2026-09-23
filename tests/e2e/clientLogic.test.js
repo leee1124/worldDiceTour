@@ -440,7 +440,7 @@ test('건설 미리보기: 건설 후 통행료가 서버의 계산과 일치한
   }
 });
 
-test('건설 미리보기: 랜드마크 통행료는 가격의 3.5배로 고정된다', () => {
+test('건설 미리보기: 관광명소 통행료는 가격의 3.5배로 고정된다', () => {
   // Given 3종을 모두 지은 도시
   const price = 200_000;
   const landmarkCity = new City({
@@ -453,7 +453,7 @@ test('건설 미리보기: 랜드마크 통행료는 가격의 3.5배로 고정�
     landmark: true,
   });
 
-  // When 랜드마크 업그레이드를 고르면
+  // When 관광명소 업그레이드를 고르면
   // Then 서버와 같은 고정 배율이 나온다
   assert.equal(
     predictToll({ price, buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: false, selected: ['LANDMARK'] }),
@@ -476,8 +476,8 @@ test('건설 미리보기: 정가 기준 건설비가 서버 도메인과 같다
   assert.equal(buildCostOf(undefined, 'VILLA'), 0);
 });
 
-test('건설 미리보기: 랜드마크는 단독 선택만 허용한다', () => {
-  // Given 랜드마크만 제안된 건설 기회
+test('건설 미리보기: 관광명소는 단독 선택만 허용한다', () => {
+  // Given 관광명소만 제안된 건설 기회
   const landmarkOnly = [{ type: BUILDING_TYPES.LANDMARK, cost: 200_000 }];
   // When 다른 건물과 함께 고르면
   // Then 유효하지 않다고 알려준다
@@ -512,7 +512,7 @@ test('건설 미리보기: 바퀴로 잠긴 건물은 잠긴 행으로 만들어
   ]);
 });
 
-test('건설 미리보기: 랜드마크 기회와 잠긴 것이 없는 기회에는 잠긴 행이 없다', () => {
+test('건설 미리보기: 관광명소 기회와 잠긴 것이 없는 기회에는 잠긴 행이 없다', () => {
   // Given
   const landmarkOffer = { options: [{ type: 'LANDMARK', cost: 70_000 }], lockedOptions: [] };
   const openOffer = {

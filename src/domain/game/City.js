@@ -6,7 +6,7 @@ import { SPACE_KINDS } from './data/board.js';
 // (새 코드는 `./buildings.js`에서 직접 가져올 것 — 이 재수출은 하위호환용이다.)
 export { BASIC_BUILDINGS, BUILDING_TYPES };
 
-/** 건설비 = 가격 × (10분의 n). 별장 0.3 / 빌딩 0.6 / 호텔 0.9 / 랜드마크 1.0 */
+/** 건설비 = 가격 × (10분의 n). 별장 0.3 / 빌딩 0.6 / 호텔 0.9 / 관광명소 1.0 */
 const BUILD_COST_TENTHS = Object.freeze({
   [BUILDING_TYPES.VILLA]: 3,
   [BUILDING_TYPES.BUILDING]: 6,
@@ -14,7 +14,7 @@ const BUILD_COST_TENTHS = Object.freeze({
   [BUILDING_TYPES.LANDMARK]: 10,
 });
 
-/** 통행료 배율(10분의 n). 땅만 0.1에 건물별 배율을 더하고, 랜드마크는 3.5 고정. */
+/** 통행료 배율(10분의 n). 땅만 0.1에 건물별 배율을 더하고, 관광명소는 3.5 고정. */
 const LAND_TOLL_TENTHS = 1;
 const TOLL_TENTHS = Object.freeze({
   [BUILDING_TYPES.VILLA]: 3,
@@ -135,8 +135,8 @@ export class City {
   /**
    * 이번 건설 기회에 지을 수 있는 건물 목록.
    * 건설자의 바퀴 수에 따라 열린 건물만 제안한다(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴부터 호텔).
-   * 3종을 이미 모두 가진 경우에만 랜드마크를 제안한다(같은 기회에 3종+랜드마크는 불가).
-   * 랜드마크는 바퀴로 막지 않는다 — 인수로 넘겨받은 건물이 섞여 3종이 채워지면 바퀴와 무관하게 제안된다(D23).
+   * 3종을 이미 모두 가진 경우에만 관광명소를 제안한다(같은 기회에 3종+관광명소는 불가).
+   * 관광명소는 바퀴로 막지 않는다 — 인수로 넘겨받은 건물이 섞여 3종이 채워지면 바퀴와 무관하게 제안된다(D23).
    * @param {{lap:number}} builder 건설자의 바퀴 수(빠뜨리면 규칙 우회가 되므로 필수)
    */
   buildableTypes({ lap } = {}) {
@@ -278,7 +278,7 @@ export class City {
     return this.invested();
   }
 
-  /** 지어진 건물 수(랜드마크 포함). */
+  /** 지어진 건물 수(관광명소 포함). */
   buildingCount() {
     return this.buildings.length + (this.#landmark ? 1 : 0);
   }

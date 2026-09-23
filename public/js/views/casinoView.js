@@ -11,19 +11,21 @@ import { button, clear, el, replaceChildren, setText, toggleClass } from '../dom
 import { formatWon } from '../format.js';
 import { canBet, clampBet, quickChips, stepBet } from '../domain/betRules.js';
 import { casinoChoiceLabel, casinoGameLabel } from '../domain/labels.js';
+import { SLOT_SYMBOL_KIND_LIST, slotSymbolKind } from '../domain/slotSymbols.js';
 import { DURATIONS, prefersReducedMotion, scaled, wait } from '../animation/timing.js';
 import { flashScreen } from '../animation/effects.js';
 import { createDie } from './diceView.js';
+import { diceIcon, slotMachineIcon, slotSymbolIcon, targetIcon } from './icons.js';
 
 export const CASINO_MODAL_ID = 'casino';
 
-/** 릴이 도는 동안 보여 줄 심볼(연출 전용 — 판정과 무관). */
-const REEL_SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣'];
+/** 릴이 도는 동안 보여 줄 심볼 종류(연출 전용 — 판정과 무관. 서버 이모지가 아니라 화면 종류를 돌린다). */
+const REEL_SPIN_KINDS = SLOT_SYMBOL_KIND_LIST;
 
 const GAMES = [
-  { id: 'ODD_EVEN', icon: '🎲', choices: ['ODD', 'EVEN'], payouts: '맞히면 ×2' },
-  { id: 'HIGH_LOW_SEVEN', icon: '🎯', choices: ['LOW', 'HIGH', 'SEVEN'], payouts: '로우·하이 ×2 · 세븐 ×5' },
-  { id: 'SLOT', icon: '🎰', choices: [], payouts: '3개 일치 ×10 · 2개 일치 ×1.5 · 7️⃣7️⃣7️⃣ 잭팟' },
+  { id: 'ODD_EVEN', buildIcon: diceIcon, choices: ['ODD', 'EVEN'], payouts: '맞히면 ×2' },
+  { id: 'HIGH_LOW_SEVEN', buildIcon: targetIcon, choices: ['LOW', 'HIGH', 'SEVEN'], payouts: '로우·하이 ×2 · 세븐 ×5' },
+  { id: 'SLOT', buildIcon: slotMachineIcon, choices: [], payouts: '3개 일치 ×10 · 2개 일치 ×1.5 · 세븐 3개 잭팟' },
 ];
 
 const CHOICE_HINTS = Object.freeze({
@@ -35,8 +37,19 @@ const CHOICE_HINTS = Object.freeze({
 });
 
 function createReel() {
-  const symbol = el('span', { class: 'reel-symbol', text: '🎰' });
+  const symbol = el('span', { class: 'reel-symbol' }, [slotMachineIcon()]);
   return { element: el('div', { class: 'reel' }, [symbol]), symbol };
+}
+
+/** 릴 얼굴을 한 종류(`slotSymbols.js`가 아는 CHERRY/LEMON/...)로 바꿔 그린다. */
+function setReelSymbol(reel, kind) {
+  clear(reel.symbol);
+  reel.symbol.appendChild(slotSymbolIcon(kind));
+}
+
+/** 서버가 보낸 심볼(이모지 id)을 화면 종류로 바꿔 릴에 고정한다. 모르는 값이면 자리표시자로 둔다. */
+function setReelFromServerSymbol(reel, serverSymbol) {
+  setReelSymbol(reel, serverSymbol ? slotSymbolKind(serverSymbol) : null);
 }
 
 /** 카지노 주사위도 보드와 같은 컴포넌트를 쓴다(눈 + 숫자 배지가 함께 보인다). */
@@ -72,7 +85,7 @@ export function createCasinoView({ onBet, onLeave }) {
         on: { click: () => selectGame(game.id) },
       },
       [
-        el('span', { class: 'tab-icon', 'aria-hidden': 'true', text: game.icon }),
+        el('span', { class: 'tab-icon', 'aria-hidden': 'true' }, [game.buildIcon()]),
         el('span', { class: 'tab-label', text: casinoGameLabel(game.id) }),
       ],
     ),
@@ -273,7 +286,7 @@ export function createCasinoView({ onBet, onLeave }) {
     const duration = scaled(DURATIONS.reel);
     if (prefersReducedMotion()) {
       for (const [index, reel] of reels.entries()) {
-        setText(reel.symbol, symbols[index] ?? '❔');
+        setReelFromServerSymbol(reel, symbols[index]);
       }
       spinning = false;
       renderBet();
@@ -284,7 +297,7 @@ export function createCasinoView({ onBet, onLeave }) {
     }
     const tickers = reels.map((reel) =>
       window.setInterval(() => {
-        setText(reel.symbol, REEL_SYMBOLS[Math.floor(Math.random() * REEL_SYMBOLS.length)]);
+        setReelSymbol(reel, REEL_SPIN_KINDS[Math.floor(Math.random() * REEL_SPIN_KINDS.length)]);
       }, 70),
     );
     // 릴은 왼쪽부터 차례로 멈추고, 멈출 때는 서버가 보내 준 심볼로 고정한다.
@@ -293,7 +306,7 @@ export function createCasinoView({ onBet, onLeave }) {
       window.clearInterval(tickers[index]);
       reel.element.classList.remove('reel--spinning');
       reel.element.classList.add('reel--stopped');
-      setText(reel.symbol, symbols[index] ?? '❔');
+      setReelFromServerSymbol(reel, symbols[index]);
       window.setTimeout(() => reel.element.classList.remove('reel--stopped'), 240);
     }
     spinning = false;
@@ -328,7 +341,7 @@ export function createCasinoView({ onBet, onLeave }) {
     const win = Boolean(event.win);
     const jackpot = event.jackpotWon > 0;
     replaceChildren(bannerNode, [
-      el('span', { class: 'banner-title', text: jackpot ? '🎉 잭팟 당첨!' : win ? '적중!' : '아쉽네요' }),
+      el('span', { class: 'banner-title', text: jackpot ? '잭팟 당첨!' : win ? '적중!' : '아쉽네요' }),
       el('span', {
         class: 'banner-amount',
         text: win ? `+${formatWon(event.payout)}` : `−${formatWon(event.bet)}`,
@@ -388,7 +401,7 @@ export function createCasinoView({ onBet, onLeave }) {
 export function casinoModalSpec({ casinoView, playerName }) {
   return {
     id: CASINO_MODAL_ID,
-    title: '🎰 라스베이거스 카지노',
+    title: '라스베이거스 카지노',
     subtitle: `${playerName} · 한 방문에 최대 3판`,
     dismissible: false,
     variant: 'neon',

@@ -83,7 +83,7 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
       assert.deepEqual(types(events), [EVENT_TYPES.BUILT]);
     });
 
-    it('랜드마크를 지으면 LANDMARK_BUILT가 함께 발생한다', () => {
+    it('관광명소를 지으면 LANDMARK_BUILT가 함께 발생한다', () => {
       // Given
       const { trade, board, byId } = build({
         cities: [{ index: 1, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: false }],
@@ -165,7 +165,7 @@ describe('CityTrade(도시 매입·건설·인수 규칙)', () => {
       assert.equal(intents[0].affectsLedger, true);
     });
 
-    it('랜드마크 도시는 인수할 수 없다', () => {
+    it('관광명소 도시는 인수할 수 없다', () => {
       // Given
       const { trade, board, byId } = build({
         cities: [{ index: 1, ownerId: 's2', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: true }],

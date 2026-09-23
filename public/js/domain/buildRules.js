@@ -9,7 +9,7 @@
 export const LANDMARK = 'LANDMARK';
 export const BASIC_BUILDINGS = Object.freeze(['VILLA', 'BUILDING', 'HOTEL']);
 
-/** 통행료 배율(10분의 n). 땅만 0.1 + 건물별 가산, 랜드마크는 3.5 고정. */
+/** 통행료 배율(10분의 n). 땅만 0.1 + 건물별 가산, 관광명소는 3.5 고정. */
 const LAND_TOLL_TENTHS = 1;
 const TOLL_TENTHS = Object.freeze({ VILLA: 3, BUILDING: 6, HOTEL: 10 });
 const LANDMARK_TOLL_TENTHS = 35;
@@ -40,7 +40,7 @@ export function predictToll({ price, buildings = [], landmark = false, selected 
   return Math.floor((base * tenths) / 10);
 }
 
-/** 건설비 배율(10분의 n). 별장 0.3 / 빌딩 0.6 / 호텔 0.9 / 랜드마크 1.0 */
+/** 건설비 배율(10분의 n). 별장 0.3 / 빌딩 0.6 / 호텔 0.9 / 관광명소 1.0 */
 const BUILD_COST_TENTHS = Object.freeze({ VILLA: 3, BUILDING: 6, HOTEL: 9, LANDMARK: 10 });
 
 /** 정가 기준 건설비(서버가 옵션을 주지 않는 화면 — 칸 상세 시트 — 에서만 쓴다). */
@@ -88,7 +88,7 @@ function toRow(option, inLockedList) {
 /**
  * 건설 기회의 선택지를 모달 행 목록으로 바꾼다.
  * 서버가 준 `options`(고를 수 있는 것)와 `lockedOptions`(바퀴가 모자란 것)를 합쳐
- * 별장 · 빌딩 · 호텔 · 랜드마크 순서로 정렬한다.
+ * 별장 · 빌딩 · 호텔 · 관광명소 순서로 정렬한다.
  * @param {{options?: Array<object>, lockedOptions?: Array<object>}} [pending]
  * @returns {Array<{type:string, cost:number, locked:boolean, unlockLap:number, notice:string}>}
  */
@@ -101,14 +101,14 @@ export function buildRows(pending) {
     .sort((a, b) => ROW_ORDER.indexOf(a.type) - ROW_ORDER.indexOf(b.type));
 }
 
-/** 이 건설 기회가 랜드마크 업그레이드 전용인지. */
+/** 이 건설 기회가 관광명소 업그레이드 전용인지. */
 export function isLandmarkOffer(options) {
   const types = toArray(options).map((option) => option.type);
   return types.length === 1 && types[0] === LANDMARK;
 }
 
 /**
- * 고른 조합이 서버 규칙(옵션 안의 값, 중복 불가, 랜드마크는 단독)에 맞는지.
+ * 고른 조합이 서버 규칙(옵션 안의 값, 중복 불가, 관광명소는 단독)에 맞는지.
  * @returns {{ok: boolean, reason: string}}
  */
 export function validateSelection(selected, options) {
@@ -126,7 +126,7 @@ export function validateSelection(selected, options) {
     }
   }
   if (chosen.includes(LANDMARK) && chosen.length > 1) {
-    return { ok: false, reason: '랜드마크는 단독으로만 지을 수 있습니다.' };
+    return { ok: false, reason: '관광명소는 단독으로만 지을 수 있습니다.' };
   }
   return { ok: true, reason: '' };
 }

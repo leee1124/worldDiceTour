@@ -18,7 +18,7 @@ function badge(text, tone) {
 export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} }) {
   const listNode = el('div', { class: 'player-list' });
   const element = el('section', { class: 'panel panel--players' }, [
-    el('h2', { class: 'panel-title' }, ['👥 플레이어']),
+    el('h2', { class: 'panel-title' }, ['플레이어']),
     listNode,
   ]);
 
@@ -90,15 +90,15 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
     // 지을 수 있는 건물이 바퀴 수로 정해지므로(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔) 함께 보여 준다.
     // 탈락한 좌석에는 더 이상 의미가 없어 달지 않는다.
     if (player.eliminated) {
-      node.appendChild(badge('💀 파산', 'danger'));
+      node.appendChild(badge('파산', 'danger'));
     } else {
-      node.appendChild(badge(`🔄 ${lapLabel(player.lap)}`, 'muted'));
+      node.appendChild(badge(lapLabel(player.lap), 'muted'));
     }
     if (isMySeat(state, player.seatId)) {
       node.appendChild(badge('이 기기', 'mine'));
     }
     if (seat?.kind === 'COMPUTER') {
-      node.appendChild(badge('🤖 컴퓨터', 'muted'));
+      node.appendChild(badge('컴퓨터', 'muted'));
     }
     if (seat?.autopilot) {
       node.appendChild(badge('자동 진행', 'warn'));
@@ -107,10 +107,10 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
       node.appendChild(badge('오프라인', 'muted'));
     }
     if (player.islandRemainingTurns > 0) {
-      node.appendChild(badge(`🏝 조난 ${player.islandRemainingTurns}턴`, 'danger'));
+      node.appendChild(badge(`조난 ${player.islandRemainingTurns}턴`, 'danger'));
     }
     if (player.airportPending) {
-      node.appendChild(badge('✈️ 이동권', 'info'));
+      node.appendChild(badge('이동권', 'info'));
     }
     if (player.loanDebt > 0) {
       node.appendChild(badge(`대출 중 · 채무 ${formatWon(player.loanDebt)}`, 'warn'));

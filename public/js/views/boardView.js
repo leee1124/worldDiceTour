@@ -13,20 +13,21 @@
 import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatCompactWon, formatWon } from '../format.js';
 import { cornerOf, gridArea, groupOf, sideOf } from '../domain/boardLayout.js';
-import { boardCellShortName, buildingLabel, spaceKindIcon, spaceKindLabel } from '../domain/labels.js';
+import { boardCellShortName, buildingLabel, spaceKindLabel } from '../domain/labels.js';
 import { buildingSlotView } from '../domain/buildingSlots.js';
 import { MOVE_TIMING } from '../domain/movePlan.js';
 import { fanOutTokens } from '../domain/tokenLayout.js';
 import { isMySeat, slotOf } from '../store.js';
 import { centerOf } from '../animation/effects.js';
 import { DURATIONS, nextFrame, prefersReducedMotion, scaled, wait } from '../animation/timing.js';
+import { diceIcon, landmarkBadge, spaceKindIcon } from './icons.js';
 
-/** 모서리 칸의 큰 장식(이모지 + 문구). 이미지 에셋 없이 CSS/이모지만 사용한다. */
+/** 모서리 칸의 큰 장식(SVG 글리프 + 문구). 이미지 에셋 없이 인라인 SVG만 쓴다. */
 const CORNER_ART = Object.freeze({
-  START: { emoji: '🚩', caption: '출발', note: '월급 200,000원' },
-  ISLAND: { emoji: '🏝', caption: '조난 섬', note: '최대 3턴' },
-  CASINO: { emoji: '🎰', caption: '카지노', note: '최대 3판' },
-  AIRPORT: { emoji: '✈️', caption: '공항', note: '다음 턴 이동' },
+  START: { caption: '출발', note: '월급 200,000원' },
+  ISLAND: { caption: '조난 섬', note: '최대 3턴' },
+  CASINO: { caption: '카지노', note: '최대 3판' },
+  AIRPORT: { caption: '공항', note: '다음 턴 이동' },
 });
 
 /** 도착한 칸을 비추는 시간. */
@@ -55,7 +56,7 @@ export function createBoardView({ onCellActivate }) {
   const emblem = el('div', { class: 'board-emblem', 'aria-hidden': 'true' }, [
     el('div', { class: 'emblem-ring' }, [
       el('span', { class: 'emblem-title', text: 'WORLD' }),
-      el('span', { class: 'emblem-dice', text: '🎲' }),
+      el('span', { class: 'emblem-dice' }, [diceIcon()]),
       el('span', { class: 'emblem-title', text: 'DICE TOUR' }),
     ]),
     el('div', { class: 'emblem-compass' }, [
@@ -92,12 +93,12 @@ export function createBoardView({ onCellActivate }) {
 
     const body = corner
       ? el('span', { class: 'cell-body cell-body--corner' }, [
-          el('span', { class: 'corner-emoji', 'aria-hidden': 'true', text: CORNER_ART[corner].emoji }),
+          el('span', { class: 'corner-icon', 'aria-hidden': 'true' }, [spaceKindIcon(corner)]),
           el('span', { class: ['cell-name', 'cell-name--corner'], text: shortName }),
           el('span', { class: 'corner-note', text: CORNER_ART[corner].note }),
         ])
       : el('span', { class: 'cell-body' }, [
-          el('span', { class: 'cell-kind', 'aria-hidden': 'true', text: spaceKindIcon(space.kind) }),
+          el('span', { class: 'cell-kind', 'aria-hidden': 'true' }, [spaceKindIcon(space.kind)]),
           name,
           hint,
           builds,
@@ -171,7 +172,7 @@ export function createBoardView({ onCellActivate }) {
       const ownerName = state.view.players.find((player) => player.seatId === space.ownerId)?.name ?? '다른 플레이어';
       parts.push(`소유 ${ownerName}`, `통행료 ${formatWon(space.toll)}`);
       if (space.landmark) {
-        parts.push('랜드마크');
+        parts.push('관광명소');
       } else {
         const view = buildingSlotView(space);
         const built = view.slots.filter((item) => item.built);
@@ -197,12 +198,7 @@ export function createBoardView({ onCellActivate }) {
     clear(node);
     const view = buildingSlotView(space);
     if (view.landmark) {
-      node.appendChild(
-        el('span', { class: 'build-landmark' }, [
-          el('span', { class: 'build-landmark-star', text: '★' }),
-          el('span', { class: 'build-landmark-text', text: '랜드마크' }),
-        ]),
-      );
+      node.appendChild(landmarkBadge());
       return;
     }
     if (view.slots.length === 0) {

@@ -1,6 +1,6 @@
 import { DomainError } from '../shared/DomainError.js';
 
-/** 건물 종류. 별장/빌딩/호텔은 서로 독립적이며, 랜드마크는 3종을 모두 지은 뒤의 최종 업그레이드다. */
+/** 건물 종류. 별장/빌딩/호텔은 서로 독립적이며, 관광명소는 3종을 모두 지은 뒤의 최종 업그레이드다. */
 export const BUILDING_TYPES = Object.freeze({
   VILLA: 'VILLA',
   BUILDING: 'BUILDING',
@@ -20,7 +20,7 @@ export const FIRST_LAP = 1;
 
 /**
  * 건물이 열리는 바퀴. 1바퀴 별장 → 2바퀴 빌딩 → 3바퀴부터 호텔(명세 4장).
- * 랜드마크는 바퀴가 아니라 "3종 완성" 조건으로만 열리므로 표에 없다.
+ * 관광명소는 바퀴가 아니라 "3종 완성" 조건으로만 열리므로 표에 없다.
  */
 const UNLOCK_LAP = Object.freeze({
   [BUILDING_TYPES.VILLA]: 1,
@@ -41,7 +41,7 @@ export class BuildingUnlocks {
     return lap;
   }
 
-  /** 이 건물이 열리는 바퀴(랜드마크처럼 바퀴로 막지 않는 건물은 첫 바퀴). */
+  /** 이 건물이 열리는 바퀴(관광명소처럼 바퀴로 막지 않는 건물은 첫 바퀴). */
   static unlockLapOf(type) {
     return UNLOCK_LAP[type] ?? FIRST_LAP;
   }

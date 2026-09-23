@@ -57,16 +57,16 @@ test('내 도시 목록: 개수와 통행료 합계(통행료 총력)를 함께 
   assert.equal(holdings.totalToll, 552_000);
 });
 
-test('내 도시 목록: 랜드마크는 말로, 지은 건물은 별·빌·호 배지로 보여 준다(이모지 없이)', () => {
-  // Given 랜드마크(9번)와 별장만 지은 도시(1번)
+test('내 도시 목록: 관광명소는 말로, 지은 건물은 별·빌·호 배지로 보여 준다(이모지 없이)', () => {
+  // Given 관광명소(9번)와 별장만 지은 도시(1번)
   // When
   const items = ownedCitiesOf({ board: board(), seatId: 's1' }).items;
   const jeju = items.find((item) => item.index === 1);
   const newYork = items.find((item) => item.index === 9);
 
-  // Then 랜드마크는 말로 적고, 별장만 지은 곳은 "별"만 채워져 있다
+  // Then 관광명소는 말로 적고, 별장만 지은 곳은 "별"만 채워져 있다
   assert.equal(newYork.landmark, true);
-  assert.equal(newYork.buildingText, '랜드마크');
+  assert.equal(newYork.buildingText, '관광명소');
   assert.equal(jeju.landmark, false);
   assert.equal(jeju.buildingText, '별');
   assert.deepEqual(jeju.slots.filter((slot) => slot.built).map((slot) => slot.short), ['별']);

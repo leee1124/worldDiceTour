@@ -4,9 +4,10 @@
 
 import { el } from '../../dom.js';
 import { formatWon } from '../../format.js';
-import { BUILDING_ORDER, buildingIcon, buildingLabel, spaceKindIcon, spaceKindLabel } from '../../domain/labels.js';
+import { BUILDING_ORDER, buildingLabel, spaceKindLabel } from '../../domain/labels.js';
 import { buildingSlotView } from '../../domain/buildingSlots.js';
 import { CELL_GROUPS, cornerOf, groupOf } from '../../domain/boardLayout.js';
+import { buildingTypeIcon, landmarkBadge, spaceKindIcon } from '../icons.js';
 import { citySummary, infoRow, moneyRow } from './parts.js';
 
 /** 건물 3종을 "지음 / 아직 안 지음"으로 빠짐없이 보여 준다(보드 배지와 같은 표를 쓴다). */
@@ -14,10 +15,7 @@ function buildingStatusList(space) {
   const view = buildingSlotView(space);
   if (view.landmark) {
     return el('div', { class: 'build-status build-status--landmark' }, [
-      el('span', { class: 'build-landmark' }, [
-        el('span', { class: 'build-landmark-star', text: '★' }),
-        el('span', { class: 'build-landmark-text', text: '랜드마크' }),
-      ]),
+      landmarkBadge(),
       el('span', { class: 'build-status-note', text: '별장·빌딩·호텔을 모두 대신하는 최종 단계입니다.' }),
     ]);
   }
@@ -69,7 +67,7 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
     render: () =>
       el('div', { class: 'modal-stack' }, [
         el('div', { class: 'sheet-hero' }, [
-          el('span', { class: 'sheet-emoji', 'aria-hidden': 'true', text: spaceKindIcon(space.kind) }),
+          el('span', { class: 'sheet-icon', 'aria-hidden': 'true' }, [spaceKindIcon(space.kind)]),
           groupLabel ? el('span', { class: ['sheet-group', `sheet-group--${group}`], text: groupLabel }) : null,
         ]),
         ownable
@@ -95,14 +93,14 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
         space.acquisitionPrice !== null && space.acquisitionPrice !== undefined
           ? moneyRow('인수 가격', space.acquisitionPrice, { note: '투자액 × 2 · 현금만' })
           : ownable && space.ownerId
-            ? infoRow('인수', space.landmark ? '랜드마크는 인수 불가' : '휴양지는 인수 불가')
+            ? infoRow('인수', space.landmark ? '관광명소는 인수 불가' : '휴양지는 인수 불가')
             : null,
         remaining.length > 0
           ? el('div', { class: 'sheet-remaining' }, [
               el('p', { class: 'effect-title', text: '지을 수 있는 건물' }),
               el('div', { class: 'check-list check-list--static' }, remaining.map((type) =>
                 el('div', { class: 'check-row check-row--static' }, [
-                  el('span', { class: 'check-icon', 'aria-hidden': 'true', text: buildingIcon(type) }),
+                  el('span', { class: 'check-icon', 'aria-hidden': 'true' }, [buildingTypeIcon(type)]),
                   el('span', { class: 'check-label', text: buildingLabel(type) }),
                   el('span', { class: 'check-cost', text: formatWon(buildingCosts?.[type] ?? 0) }),
                 ]),
@@ -110,7 +108,7 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
             ])
           : null,
         isCity && space.buildings?.length === 3 && !space.landmark
-          ? el('p', { class: 'modal-help', text: '3종을 모두 갖췄습니다. 다음 건설 기회에 랜드마크로 업그레이드할 수 있습니다.' })
+          ? el('p', { class: 'modal-help', text: '3종을 모두 갖췄습니다. 다음 건설 기회에 관광명소로 업그레이드할 수 있습니다.' })
           : null,
         corner || KIND_NOTES[space.kind]
           ? el('p', { class: 'modal-help', text: KIND_NOTES[space.kind] ?? '' })

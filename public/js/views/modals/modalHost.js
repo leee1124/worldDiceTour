@@ -9,6 +9,7 @@
  */
 
 import { button, el, focusableWithin, replaceChildren, setText } from '../../dom.js';
+import { closeIcon } from '../icons.js';
 
 export function createModalHost(root) {
   /** @type {Array<{spec: object, backdrop: HTMLElement, body: HTMLElement, restoreFocus: Element|null}>} */
@@ -94,7 +95,7 @@ export function createModalHost(root) {
           spec.dismissible
             ? button(
                 { class: 'modal-close', 'aria-label': '닫기', on: { click: () => close(spec.id) } },
-                '✕',
+                [closeIcon()],
               )
             : null,
         ]),

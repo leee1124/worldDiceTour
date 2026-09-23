@@ -31,7 +31,7 @@ export function ownedIndexesOf(board, seatId) {
 /** 한 칸의 건물 상태를 한 줄 글자로. 도시가 아니면 종류 이름을 쓴다. */
 function buildingTextOf(space, slots, landmark) {
   if (landmark) {
-    return '랜드마크';
+    return '관광명소';
   }
   if (slots.length === 0) {
     // 휴양지처럼 건설할 수 없는 칸은 "건물 없음"이라고 하면 오해를 준다.

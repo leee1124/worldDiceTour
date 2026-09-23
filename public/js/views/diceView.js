@@ -76,7 +76,7 @@ export function createDie(label) {
 export function createDicePair({ labels = ['주사위 1', '주사위 2'], variant = null } = {}) {
   const dice = labels.map((label) => createDie(label));
   const sumNode = el('span', { class: 'dice-sum', text: '' });
-  const doubleNode = el('span', { class: 'dice-double', text: '✨ 더블!' });
+  const doubleNode = el('span', { class: 'dice-double', text: '더블!' });
   setHidden(doubleNode, true);
 
   const element = el(

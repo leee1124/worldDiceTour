@@ -6,7 +6,7 @@
  */
 
 /** 현재 위치 줄의 접두어. */
-export const LOCATION_PREFIX = '📍 현재 위치';
+export const LOCATION_PREFIX = '현재 위치';
 
 /** 칸 이름을 모를 때 쓰는 자리표시자(빈 줄로 두면 자리가 흔들린다). */
 const UNKNOWN_PLACE = '—';

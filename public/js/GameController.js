@@ -114,7 +114,7 @@ export function createGameController({ appRoot, overlayRoot }) {
   });
   const playersView = createPlayersView({
     onSetAutopilot: (seatId, enabled) => void setAutopilot(seatId, enabled),
-    // 카드의 🔎는 그 사람이 **가진 도시**를 보드에서 찾아 준다(말의 위치는 시트의 보조 줄로).
+    // 카드의 돋보기 버튼은 그 사람이 **가진 도시**를 보드에서 찾아 준다(말의 위치는 시트의 보조 줄로).
     onShowHoldings: (seatId) => showOwnedCities(seatId),
   });
   const logView = createLogView();
@@ -160,7 +160,7 @@ export function createGameController({ appRoot, overlayRoot }) {
   }
 
   /**
-   * 🔎 한 좌석이 가진 도시를 보드에서 모두 강조하고 목록 시트를 연다.
+   * 한 좌석이 가진 도시를 보드에서 모두 강조하고 목록 시트를 연다.
    * (말의 위치는 시트 안의 "현재 위치" 줄로만 남긴다 — 오너 요청.)
    */
   function showOwnedCities(seatId) {

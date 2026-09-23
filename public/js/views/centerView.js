@@ -14,6 +14,7 @@ import { countTo, DURATIONS } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
 import { isMySeatOnAutopilot, isMyTurn, seatNameOf, slotOf, spaceOf } from '../store.js';
 import { createDicePair } from './diceView.js';
+import { diceIcon } from './icons.js';
 
 /** 페이즈별 "결정 창 열기" 버튼 문구. */
 const DECISION_LABELS = Object.freeze({
@@ -30,7 +31,7 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
   const roundNode = el('span', { class: 'core-stat-value' });
   const jackpotNode = el('span', { class: 'core-stat-value core-stat-value--gold' });
   const jackpotBox = el('div', { class: 'core-stat core-stat--jackpot' }, [
-    el('span', { class: 'core-stat-label', text: '🎰 잭팟' }),
+    el('span', { class: 'core-stat-label', text: '잭팟' }),
     jackpotNode,
   ]);
 
@@ -66,7 +67,7 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
     actionsNode,
     el('details', { class: 'reserved-panel' }, [
       el('summary', { class: 'reserved-summary' }, [
-        el('span', { text: '📈 증권거래소' }),
+        el('span', { text: '증권거래소' }),
         el('span', { class: 'reserved-tag', text: '준비 중' }),
       ]),
       el('div', { class: 'reserved-body' }, [
@@ -97,7 +98,7 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
 
     if (view.isOver) {
       actionsNode.appendChild(
-        button({ class: 'btn btn--primary btn--block', on: { click: () => onShowRankings() } }, '🏆 최종 순위 보기'),
+        button({ class: 'btn btn--primary btn--block', on: { click: () => onShowRankings() } }, '최종 순위 보기'),
       );
       actionsNode.appendChild(
         button({ class: 'btn btn--quiet btn--block', on: { click: () => onLeaveGame() } }, '나가기'),
@@ -139,7 +140,7 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
           'aria-busy': locked ? 'true' : undefined,
           on: { click: () => onRoll() },
         },
-        ['🎲 주사위 굴리기', el('kbd', { class: 'btn-kbd', text: 'Space' })],
+        [diceIcon(), ' 주사위 굴리기', el('kbd', { class: 'btn-kbd', text: 'Space' })],
       );
       actionsNode.appendChild(rollButton);
     } else if (view.phase === 'AWAIT_TRAVEL') {
