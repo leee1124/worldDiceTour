@@ -3,7 +3,7 @@
  * pending: `{index, name, options:[{type,cost}], lockedOptions:[{type,cost,unlockLap}], buildings, landmark}`
  *
  * - 별장/빌딩/호텔은 원하는 조합을 한 번에 고른다(합계 비용 · 건설 후 통행료 미리보기).
- * - 바퀴가 모자라 아직 못 짓는 건물은 `lockedOptions`로 와서 잠긴 행(🔒)으로만 보여 준다.
+ * - 바퀴가 모자라 아직 못 짓는 건물은 `lockedOptions`로 와서 잠긴 행(자물쇠 아이콘)으로만 보여 준다.
  * - 3종을 이미 가진 기회라면 서버가 `LANDMARK` 하나만 제안한다 → 랜드마크 업그레이드 화면.
  */
 
@@ -17,7 +17,8 @@ import {
   predictToll,
   validateSelection,
 } from '../../domain/buildRules.js';
-import { buildingIcon, buildingLabel } from '../../domain/labels.js';
+import { buildingLabel } from '../../domain/labels.js';
+import { buildingTypeIcon, lockIcon } from '../icons.js';
 import { actionRow, citySummary, moneyRow, noticeLine, primaryButton, quietButton } from './parts.js';
 
 export const BUILD_MODAL_ID = 'build';
@@ -52,11 +53,9 @@ export function createBuildingPicker({
       },
       [
         input,
-        el('span', {
-          class: 'check-icon',
-          'aria-hidden': 'true',
-          text: row.locked ? '🔒' : buildingIcon(row.type),
-        }),
+        el('span', { class: 'check-icon', 'aria-hidden': 'true' }, [
+          row.locked ? lockIcon() : buildingTypeIcon(row.type),
+        ]),
         el('span', { class: 'check-label', text: buildingLabel(row.type) }),
         row.locked ? el('span', { class: 'check-note', text: row.notice }) : null,
         el('span', { class: 'check-cost', text: formatWon(row.cost) }),

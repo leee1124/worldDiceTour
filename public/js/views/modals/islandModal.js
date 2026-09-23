@@ -4,6 +4,7 @@
 
 import { el } from '../../dom.js';
 import { formatWon } from '../../format.js';
+import { islandIcon } from '../icons.js';
 import { actionRow, infoRow, moneyRow, noticeLine, primaryButton, quietButton } from './parts.js';
 
 export const ISLAND_MODAL_ID = 'island';
@@ -11,14 +12,14 @@ export const ISLAND_MODAL_ID = 'island';
 export function islandModalSpec({ pending, cash, locked = false, onPay, onRoll }) {
   return {
     id: ISLAND_MODAL_ID,
-    title: '🏝 조난 섬',
+    title: '조난 섬',
     subtitle: '구조비를 내고 정상 진행하거나, 더블을 노려 탈출합니다.',
     dismissible: false,
     render: () =>
       el('div', { class: 'modal-stack modal-stack--island' }, [
         el('div', { class: 'island-art', 'aria-hidden': 'true' }, [
           el('span', { class: 'island-wave' }),
-          el('span', { class: 'island-palm', text: '🏝' }),
+          el('span', { class: 'island-icon' }, [islandIcon()]),
         ]),
         infoRow('남은 조난 턴', `${pending.remainingTurns}턴`),
         moneyRow('구조비', pending.fee, { tone: 'out' }),
@@ -37,7 +38,7 @@ export function islandModalSpec({ pending, cash, locked = false, onPay, onRoll }
             busy: locked,
             focusKey: 'island-pay',
           }),
-          quietButton('🎲 주사위로 탈출 시도', { onClick: onRoll, busy: locked, focusKey: 'island-roll' }),
+          quietButton('주사위로 탈출 시도', { onClick: onRoll, busy: locked, focusKey: 'island-roll' }),
         ]),
       ]),
   };

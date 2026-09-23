@@ -13,21 +13,10 @@ export const BUILDING_LABELS = Object.freeze({
   LANDMARK: '랜드마크',
 });
 
-export const BUILDING_ICONS = Object.freeze({
-  VILLA: '🏡',
-  BUILDING: '🏢',
-  HOTEL: '🏨',
-  LANDMARK: '🗼',
-});
-
 export const BUILDING_ORDER = Object.freeze(['VILLA', 'BUILDING', 'HOTEL']);
 
 export function buildingLabel(type) {
   return lookup(BUILDING_LABELS, type);
-}
-
-export function buildingIcon(type) {
-  return lookup(BUILDING_ICONS, type, '🏗');
 }
 
 /** 칸 종류. */
@@ -42,23 +31,8 @@ export const SPACE_KIND_LABELS = Object.freeze({
   AIRPORT: '세계일주 공항',
 });
 
-export const SPACE_KIND_ICONS = Object.freeze({
-  START: '🚩',
-  CITY: '🏙',
-  RESORT: '🌴',
-  TICKET: '🎫',
-  TAX: '🛃',
-  ISLAND: '🏝',
-  CASINO: '🎰',
-  AIRPORT: '✈️',
-});
-
 export function spaceKindLabel(kind) {
   return lookup(SPACE_KIND_LABELS, kind);
-}
-
-export function spaceKindIcon(kind) {
-  return lookup(SPACE_KIND_ICONS, kind, '📍');
 }
 
 /** 페이즈별 안내 문구. title은 현재 해야 할 일, hint는 보조 설명. */

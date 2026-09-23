@@ -11,6 +11,7 @@
 
 import { button, el } from '../../dom.js';
 import { formatWon } from '../../format.js';
+import { landmarkBadge } from '../icons.js';
 import { quietButton } from './parts.js';
 
 export const OWNED_CITIES_SHEET_ID = 'owned-cities';
@@ -18,10 +19,7 @@ export const OWNED_CITIES_SHEET_ID = 'owned-cities';
 /** 목록 한 줄의 건물 배지(보드 칸·모달과 같은 배지 언어). */
 function buildBadges(item) {
   if (item.landmark) {
-    return el('span', { class: 'build-landmark' }, [
-      el('span', { class: 'build-landmark-star', text: '★' }),
-      el('span', { class: 'build-landmark-text', text: '랜드마크' }),
-    ]);
+    return landmarkBadge();
   }
   if (item.slots.length === 0) {
     return el('span', { class: 'owned-row-kind', text: item.kindLabel });
@@ -107,7 +105,7 @@ export function ownedCitiesSheetSpec({
               el('span', { class: 'owned-total-label', text: '통행료 총력' }),
               el('span', { class: 'owned-total-value', text: formatWon(holdings.totalToll) }),
             ]),
-        // 정보 시트에도 눈에 보이는 닫기 수단을 둔다(머리의 ✕만으로는 폰에서 놓치기 쉽다).
+        // 정보 시트에도 눈에 보이는 닫기 수단을 둔다(머리의 닫기 버튼만으로는 폰에서 놓치기 쉽다).
         el('div', { class: 'modal-actions' }, [
           quietButton('닫기', { onClick: onClose, focusKey: 'owned-close' }),
         ]),

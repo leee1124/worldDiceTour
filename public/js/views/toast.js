@@ -3,6 +3,7 @@
  */
 
 import { button, el } from '../dom.js';
+import { closeIcon } from './icons.js';
 
 const LIFETIME_MS = 4200;
 const MAX_VISIBLE = 3;
@@ -32,7 +33,7 @@ export function createToastHost(root) {
           title ? el('strong', { class: 'toast-title', text: title }) : null,
           el('span', { class: 'toast-message', text: message }),
         ]),
-        button({ class: 'toast-close', 'aria-label': '알림 닫기', on: { click: () => dismiss(toast) } }, '✕'),
+        button({ class: 'toast-close', 'aria-label': '알림 닫기', on: { click: () => dismiss(toast) } }, [closeIcon()]),
       ],
     );
     stack.appendChild(toast);

@@ -17,7 +17,7 @@ export function travelConfirmSpec({ space, ownerName, locked = false, onConfirm,
 
   return {
     id: TRAVEL_MODAL_ID,
-    title: '✈️ 이 칸으로 이동할까요?',
+    title: '이 칸으로 이동할까요?',
     subtitle: '앞 방향으로 이동하므로 출발 칸을 지나면 월급을 받습니다.',
     dismissible: true,
     render: () =>

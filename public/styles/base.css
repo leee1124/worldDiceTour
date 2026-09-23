@@ -532,6 +532,9 @@ body.modal-open .toast-stack {
 }
 
 .toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 28px;
   min-height: 28px;
   border: 0;

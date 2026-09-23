@@ -5,6 +5,7 @@
  */
 
 import { button, clear, el, replaceChildren, setText } from '../dom.js';
+import { diceIcon } from './icons.js';
 
 /** 서버 `NAME_PATTERN`과 같은 규칙(src/server/validation.js). */
 const NAME_PATTERN = /^[가-힣a-zA-Z0-9 ]{1,10}$/;
@@ -86,7 +87,7 @@ export function createHomeView({ onCreateRoom, onJoinRoom, onReconnect, onForget
   const roomListNode = el('div', { class: 'room-list' });
   const savedListNode = el('div', { class: 'saved-list' });
   const savedCard = el('section', { class: 'card card--saved' }, [
-    el('h2', { class: 'card-title' }, ['📱 이 기기에 저장된 방']),
+    el('h2', { class: 'card-title' }, ['이 기기에 저장된 방']),
     el('p', { class: 'card-note', text: '좌석 토큰이 이 브라우저에 남아 있어 자리를 그대로 되찾습니다.' }),
     savedListNode,
   ]);
@@ -145,26 +146,26 @@ export function createHomeView({ onCreateRoom, onJoinRoom, onReconnect, onForget
         ' 세 가지 선택만 있습니다.',
       ]),
       el('div', { class: 'hero-dice', 'aria-hidden': 'true' }, [
-        el('span', { class: 'hero-die hero-die--a', text: '🎲' }),
-        el('span', { class: 'hero-die hero-die--b', text: '🎲' }),
+        el('span', { class: 'hero-die hero-die--a' }, [diceIcon()]),
+        el('span', { class: 'hero-die hero-die--b' }, [diceIcon()]),
       ]),
     ]),
     el('div', { class: 'home-grid' }, [
       el('section', { class: 'card card--create' }, [
-        el('h2', { class: 'card-title' }, ['🚩 방 만들기']),
+        el('h2', { class: 'card-title' }, ['방 만들기']),
         el('p', { class: 'card-note', text: '방을 만든 좌석이 호스트가 됩니다.' }),
         create.wrapper,
         createButton,
       ]),
       el('section', { class: 'card card--join' }, [
-        el('h2', { class: 'card-title' }, ['🎫 코드로 참가']),
+        el('h2', { class: 'card-title' }, ['코드로 참가']),
         el('p', { class: 'card-note', text: '호스트에게 받은 4자리 코드를 입력하세요.' }),
         joinCode.wrapper,
         joinName.wrapper,
         joinButton,
       ]),
       el('section', { class: 'card card--rooms' }, [
-        el('h2', { class: 'card-title' }, ['🌐 같은 네트워크의 방']),
+        el('h2', { class: 'card-title' }, ['같은 네트워크의 방']),
         el('p', { class: 'card-note', text: '대기실이고 자리가 남은 방만 보입니다. 3초마다 새로 고쳐집니다.' }),
         roomListNode,
       ]),

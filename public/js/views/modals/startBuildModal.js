@@ -3,7 +3,7 @@
  * pending: `{candidates: [{index, name, price, options, lockedOptions}]}`
  *
  * 내 도시 하나를 고르고, 그 도시에서 지을 건물 조합을 고른다.
- * 바퀴가 모자라 아직 못 짓는 건물은 잠긴 행(🔒)으로만 보여 준다.
+ * 바퀴가 모자라 아직 못 짓는 건물은 잠긴 행(자물쇠 아이콘)으로만 보여 준다.
  */
 
 import { button, clear, el, replaceChildren, setText, toggleClass } from '../../dom.js';

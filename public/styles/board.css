@@ -406,7 +406,7 @@
   gap: 0.12em;
 }
 
-.corner-emoji {
+.corner-icon {
   font-size: 2em;
   line-height: 1;
   filter: drop-shadow(0 0.1em 0.25em rgba(0, 0, 0, 0.6));

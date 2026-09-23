@@ -65,7 +65,7 @@ export function createLobbyView({
         codeNode,
       ]),
       el('div', { class: 'lobby-invite' }, [
-        el('h2', { class: 'card-title' }, ['📡 다른 기기에서 이 주소로 접속']),
+        el('h2', { class: 'card-title' }, ['다른 기기에서 이 주소로 접속']),
         urlListNode,
         el('p', { class: 'card-note', text: '같은 와이파이에 연결한 뒤 브라우저 주소창에 그대로 입력하세요.' }),
       ]),
@@ -74,7 +74,7 @@ export function createLobbyView({
     el('div', { class: 'lobby-grid' }, [
       el('section', { class: 'card card--seats' }, [
         el('div', { class: 'card-head' }, [
-          el('h2', { class: 'card-title' }, ['🪑 좌석']),
+          el('h2', { class: 'card-title' }, ['좌석']),
           seatCountNode,
         ]),
         seatListNode,
@@ -85,7 +85,7 @@ export function createLobbyView({
         ]),
       ]),
       el('section', { class: 'card card--host' }, [
-        el('h2', { class: 'card-title' }, ['🛠 호스트 도구']),
+        el('h2', { class: 'card-title' }, ['호스트 도구']),
         hostToolsNode,
         startHintNode,
       ]),
@@ -109,10 +109,10 @@ export function createLobbyView({
   function seatBadges(state, seat) {
     const badges = [];
     if (seat.isHost) {
-      badges.push({ text: '👑 호스트', tone: 'gold' });
+      badges.push({ text: '호스트', tone: 'gold' });
     }
     if (seat.kind === 'COMPUTER') {
-      badges.push({ text: '🤖 컴퓨터', tone: 'muted' });
+      badges.push({ text: '컴퓨터', tone: 'muted' });
     }
     if (isMySeat(state, seat.id)) {
       badges.push({ text: '이 기기', tone: 'mine' });

@@ -11,6 +11,7 @@ import { currentLocationLabel } from '../domain/locationLabel.js';
 import { remainingTurnsOf } from '../domain/turnOrder.js';
 import { isMySeat, seatNameOf, slotOf, spaceOf } from '../store.js';
 import { createDicePair } from './diceView.js';
+import { magnifierIcon } from './icons.js';
 
 export function createStatusStrip({ onFindMe, onToggleZoom }) {
   const chip = el('span', { class: 'strip-chip', 'aria-hidden': 'true' });
@@ -24,9 +25,10 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
 
   const findButton = button(
     { class: 'btn btn--primary btn--small strip-btn', on: { click: () => onFindMe() } },
-    '🔎 내 위치',
+    [magnifierIcon(), ' 내 위치'],
   );
   let zoomed = false;
+  const zoomLabelNode = el('span', { text: '확대' });
   const zoomButton = button(
     {
       class: 'btn btn--quiet btn--small strip-btn',
@@ -35,12 +37,12 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
         click: () => {
           zoomed = !zoomed;
           zoomButton.setAttribute('aria-pressed', String(zoomed));
-          setText(zoomButton, zoomed ? '🔍 축소' : '🔍 확대');
+          setText(zoomLabelNode, zoomed ? '축소' : '확대');
           onToggleZoom(zoomed);
         },
       },
     },
-    '🔍 확대',
+    [magnifierIcon(), zoomLabelNode],
   );
 
   const element = el('section', { class: 'status-strip', 'aria-label': '현재 상황' }, [

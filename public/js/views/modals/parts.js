@@ -6,6 +6,7 @@ import { button, el } from '../../dom.js';
 import { formatWon } from '../../format.js';
 import { spaceKindLabel } from '../../domain/labels.js';
 import { buildingSlotView } from '../../domain/buildingSlots.js';
+import { landmarkBadge } from '../icons.js';
 
 /** 라벨 + 금액 한 줄. */
 export function moneyRow(label, amount, { tone = '', note = '' } = {}) {
@@ -42,12 +43,7 @@ export function citySummary({
   const builds = !showBuildings
     ? []
     : view.landmark
-    ? [
-        el('span', { class: 'build-landmark' }, [
-          el('span', { class: 'build-landmark-star', text: '★' }),
-          el('span', { class: 'build-landmark-text', text: '랜드마크' }),
-        ]),
-      ]
+    ? [landmarkBadge()]
     : view.slots.map((slot) =>
         el(
           'span',

@@ -30,7 +30,7 @@ export function liquidationModalSpec({
 
   return {
     id: LIQUIDATION_MODAL_ID,
-    title: '⚠️ 지불 정리',
+    title: '지불 정리',
     subtitle: '현금이 부족합니다. 자산을 팔거나 대출로 메우세요.',
     dismissible: false,
     keepBody,
