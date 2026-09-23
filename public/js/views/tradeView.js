@@ -468,6 +468,12 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
         ? [
             figureRow('보유 · 평단', held.pnl.holdingText.replace('보유 ', '')),
             figureRow('평가손익', held.pnl.pnlText, { tone: held.pnl.tone === 'up' ? 'in' : held.pnl.tone === 'down' ? 'out' : '' }),
+            // 출발 칸을 지날 때 실제로 들어올 돈 — 배당이 "안 들어오는" 게 아니라 이만큼이라는 것을 미리 보여 준다.
+            figureRow(
+              '출발 통과 시 배당',
+              held.nextDividend > 0 ? `+${formatWon(held.nextDividend)} (1주 ${formatWon(held.dividendPerShare)})` : '없음',
+              { tone: held.nextDividend > 0 ? 'in' : '' },
+            ),
           ]
         : [];
     const rows = isStock

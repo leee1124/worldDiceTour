@@ -197,3 +197,18 @@ test('안내 시간표: 재생이 밀리면 시장 안내도 한 줄로 줄어�
   assert.equal(timing.mode, 'line');
   assert.equal(timing.readMs, LINE_READ_MS);
 });
+
+test('안내 시간표: 배당은 내 좌석이면 카드로 2초 이상, 남의 것은 한 줄로 줄인다(D48)', () => {
+  // Given 배당 안내 종류가 있다
+  assert.equal(NOTICE_KINDS.DIVIDEND, 'dividend');
+
+  // When 내 배당 / 남의 배당 시간표를 물어보면
+  const mine = noticeTiming({ kind: NOTICE_KINDS.DIVIDEND, mine: true });
+  const theirs = noticeTiming({ kind: NOTICE_KINDS.DIVIDEND, mine: false });
+
+  // Then 내 것은 카드(월급과 같은 급), 남의 것은 한 줄이라 컴퓨터 턴이 늘어지지 않는다
+  assert.equal(mine.mode, 'card');
+  assert.ok(mine.readMs >= 2000, `내 배당 카드가 너무 짧다: ${mine.readMs}ms`);
+  assert.equal(theirs.mode, 'line');
+  assert.equal(theirs.readMs, LINE_READ_MS);
+});

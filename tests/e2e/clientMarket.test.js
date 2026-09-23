@@ -47,6 +47,7 @@ import {
   queueRows,
 } from '../../public/js/domain/marketModel.js';
 import { TUTORIAL_CARDS, tutorialCard } from '../../public/js/domain/tutorialCards.js';
+import { dividendNoticeModel } from '../../public/js/domain/dividendNotice.js';
 
 /* ------------------------------------------------------------------ */
 /* 고정 입력 (docs/fixtures/marketView.sample.json 과 같은 모양)          */
@@ -915,4 +916,52 @@ test('한도 해제: 주문 검증은 건수·명목 한도를 사유로 거절�
   assert.equal(preview.reason, 'NONE');
   assert.equal(preview.notional, 2_560_000);
   assert.equal(preview.ordersLeftAfter, null, '한도가 없으면 남은 건수도 없다');
+});
+
+test('종목 카드: 출발 칸을 지날 때 받을 배당을 1주 금액과 합계로 알려 준다(D48)', () => {
+  // Given 한빛항공 12,800원 · 배당률 1.50% · 40주 보유
+  // When 카드 모델을 만들면
+  const card = instrumentCards(MARKET, 'seat-1')[0];
+
+  // Then 서버와 같은 규칙(1주 배당 = 내림(시세 × 배당률))으로 1주·합계를 계산한다
+  assert.equal(card.dividendPerShare, 192);
+  assert.equal(card.nextDividend, 7_680);
+  assert.ok(card.nextDividendText.includes('7,680'), card.nextDividendText);
+  assert.ok(card.nextDividendText.includes('192'), card.nextDividendText);
+  assert.ok(card.dividendDetailText.includes('1주 192원'), card.dividendDetailText);
+
+  // Then 보유가 없으면 합계는 0이고 문구는 1주 금액만 말한다
+  const notHeld = instrumentCards(MARKET, 'seat-9')[0];
+  assert.equal(notHeld.nextDividend, 0);
+  assert.equal(notHeld.nextDividendText, '');
+
+  // Then 무배당·상장폐지 종목은 "없음"이다
+  const delisted = instrumentCards({ ...MARKET, instruments: [ENT], rules: RULES }, 'seat-1')[0];
+  assert.equal(delisted.dividendPerShare, 0);
+  assert.equal(delisted.dividendDetailText, '없음');
+});
+
+test('배당 안내 묶음: 한 바퀴의 배당 여러 건을 카드 하나로 합친다(D48 리뷰 반영)', () => {
+  // Given 같은 좌석의 배당 2건
+  const events = [
+    { type: 'DIVIDEND_PAID', playerId: 'seat-1', instrumentId: 'AIR', name: '한빛항공', quantity: 40, perShare: 192, amount: 7_680 },
+    { type: 'DIVIDEND_PAID', playerId: 'seat-1', instrumentId: 'NRG', name: '청해에너지', quantity: 100, perShare: 700, amount: 70_000 },
+  ];
+
+  // When 안내 모델을 만들면
+  const notice = dividendNoticeModel(events, { nameOf: () => '하나' });
+
+  // Then 합계와 종목 수가 제목에, 종목별 내역이 설명에 담긴다
+  assert.equal(notice.total, 77_680);
+  assert.equal(notice.amount, '+77,680원');
+  assert.ok(notice.headline.includes('하나'), notice.headline);
+  assert.ok(notice.headline.includes('2종목'), notice.headline);
+  assert.ok(notice.note.includes('한빛항공 40주 +7,680원'), notice.note);
+  assert.ok(notice.note.includes('청해에너지 100주 +70,000원'), notice.note);
+
+  // Then 한 건이면 종목 이름과 주수가 제목에 바로 온다
+  const single = dividendNoticeModel([events[0]], { nameOf: () => '하나' });
+  assert.ok(single.headline.includes('한빛항공 40주'), single.headline);
+  assert.ok(single.note.includes('1주 192원'), single.note);
+  assert.equal(dividendNoticeModel([], { nameOf: () => '' }).total, 0);
 });
