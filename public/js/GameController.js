@@ -30,6 +30,7 @@ import { LOCATION_PREFIX, playerCellLabel } from './domain/locationLabel.js';
 import { EventPlaybackQueue } from './animation/EventQueue.js';
 import { createPlaybackEngine } from './animation/playback.js';
 import { createToastHost } from './views/toast.js';
+import { createOpponentToastHost } from './views/opponentToastHost.js';
 import { createHomeView } from './views/homeView.js';
 import { createLobbyView } from './views/lobbyView.js';
 import { createBoardView } from './views/boardView.js';
@@ -63,6 +64,8 @@ export function createGameController({ appRoot, overlayRoot }) {
   const store = createStore();
   const toast = createToastHost(overlayRoot);
   const modalHost = createModalHost(overlayRoot);
+  // 상대가 무엇을 했는지 한 줄로 알려 주는 줄(결정 모달보다 아래 층에 그린다).
+  const opponentToasts = createOpponentToastHost(overlayRoot);
   const queue = new EventPlaybackQueue();
 
   let roomCode = null;
@@ -226,6 +229,7 @@ export function createGameController({ appRoot, overlayRoot }) {
       store.patch({ view, locked: commandLock.locked });
     },
     isLocalSeat: (seatId) => isMySeat(store.state, seatId),
+    opponentToasts,
     onViewArrived: (view) => scheduleStaleModalSweep(view),
     onGameOver: (reason) => {
       gameOverReason = reason;
@@ -716,8 +720,9 @@ export function createGameController({ appRoot, overlayRoot }) {
     gameOverReason = null;
     commandLock.onResync();
     modalHost.closeAll();
-    // 화면을 떠날 때 떠 있던 안내 카드도 함께 걷어 낸다(다음 화면에 남아 입력을 막지 않게).
+    // 화면을 떠날 때 떠 있던 안내 카드·상대 알림도 함께 걷어 낸다(다음 화면에 남지 않게).
     clearNotices();
+    opponentToasts.clear();
     store.resetRoom();
     store.patch({ screen: SCREENS.HOME, savedRooms: storage.savedRooms(), connection: CONNECTION.IDLE, locked: false });
     startRoomListPolling();

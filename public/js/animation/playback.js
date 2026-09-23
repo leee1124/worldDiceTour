@@ -16,6 +16,7 @@ import { playTicketCard } from '../views/modals/ticketOverlay.js';
 import { playTollNotice } from '../views/modals/tollOverlay.js';
 import { playInfoNotice } from '../views/modals/noticeCard.js';
 import { NOTICE_KINDS } from '../domain/noticeTiming.js';
+import { opponentNoticeOf } from '../domain/opponentNotice.js';
 import { LAP_RULE_TEXT, lapLabel } from '../domain/buildRules.js';
 import { flashScreen, floatAmount, flyCoin } from './effects.js';
 import { DURATIONS, prefersReducedMotion, scaled, wait } from './timing.js';
@@ -33,12 +34,38 @@ export function createPlaybackEngine({
   nameOf,
   spaceNameOf,
   isLocalSeat = () => false,
+  /** 상대 행동 알림 줄(없으면 알리지 않는다). */
+  opponentToasts = null,
   onGameOver = () => {},
   /** 메시지가 도착한 즉시(연출 전에) 최신 뷰를 알린다 — 어긋난 결정 모달을 닫기 위한 안전망. */
   onViewArrived = () => {},
 }) {
   let running = false;
   const turnAnnouncer = createTurnAnnouncer();
+  /** 좌석별 마지막 주사위 눈. 도착 알림 한 줄에 "주사위 6+3 → 부에노스"로 합쳐 쓴다. */
+  const lastDice = new Map();
+
+  /**
+   * 상대(다른 좌석)가 한 일을 짧은 알림 한 줄로 띄운다.
+   * 문구·판단은 모두 `domain/opponentNotice.js`가 정한다(여기서는 전달만 한다).
+   */
+  function notifyOpponent(event) {
+    if (!opponentToasts) {
+      return;
+    }
+    if (event.type === 'DICE_ROLLED') {
+      lastDice.set(event.playerId, { die1: event.die1, die2: event.die2 });
+    }
+    const item = opponentNoticeOf(event, {
+      isLocalSeat,
+      nameOf,
+      spaceNameOf,
+      lastDiceOf: (seatId) => lastDice.get(seatId) ?? null,
+    });
+    if (item) {
+      opponentToasts.push(item);
+    }
+  }
 
   const logContext = { nameOf, spaceNameOf };
 
@@ -82,6 +109,9 @@ export function createPlaybackEngine({
   }
 
   async function playEvent(event) {
+    // 남의 좌석이 한 일은 연출과 별개로 한 줄 알림을 남긴다(로그만으로는 놓친다).
+    notifyOpponent(event);
+
     switch (event.type) {
       case 'TURN_STARTED': {
         // 컴퓨터/자동 진행끼리 주고받는 턴은 초당 한 번꼴로 온다 — 내 좌석 차례만 매번 알리고,
@@ -113,7 +143,7 @@ export function createPlaybackEngine({
           kind: NOTICE_KINDS.LAP,
           mine: isLocalSeat(event.playerId),
           tone: 'lap',
-          eyebrow: '🔄 새 바퀴',
+          eyebrow: '새 바퀴',
           headline: `${nameOf(event.playerId)} · ${lapLabel(event.lap)}`,
           note: LAP_RULE_TEXT,
         });
@@ -126,7 +156,7 @@ export function createPlaybackEngine({
             kind: NOTICE_KINDS.SALARY,
             mine: isLocalSeat(event.playerId),
             tone: 'plus',
-            eyebrow: '💰 월급',
+            eyebrow: '월급',
             headline: `${nameOf(event.playerId)} 월급 수령`,
             amount: formatSignedWon(event.amount),
           }),
@@ -215,7 +245,7 @@ export function createPlaybackEngine({
             kind: NOTICE_KINDS.ISLAND,
             mine: isLocalSeat(event.playerId),
             tone: 'minus',
-            eyebrow: '🏝 조난 섬',
+            eyebrow: '조난 섬',
             headline: `${nameOf(event.playerId)} 구조비 지불`,
             amount: formatSignedWon(-Math.abs(event.amount)),
             note: '같은 턴에 바로 주사위를 굴립니다.',
@@ -229,7 +259,7 @@ export function createPlaybackEngine({
           kind: NOTICE_KINDS.ISLAND,
           mine: isLocalSeat(event.playerId),
           tone: 'win',
-          eyebrow: '🏝 조난 탈출',
+          eyebrow: '조난 탈출',
           headline: `${nameOf(event.playerId)} 조난 섬을 벗어났습니다`,
           note: event.by === 'PAY' ? '구조비 지불' : '더블 성공',
         });
@@ -240,7 +270,7 @@ export function createPlaybackEngine({
           kind: NOTICE_KINDS.ISLAND,
           mine: isLocalSeat(event.playerId),
           tone: 'lose',
-          eyebrow: '🏝 탈출 실패',
+          eyebrow: '탈출 실패',
           headline: `${nameOf(event.playerId)} 더블이 나오지 않았습니다`,
           note: `남은 조난 ${event.remainingTurns}턴`,
         });
@@ -257,7 +287,7 @@ export function createPlaybackEngine({
               kind: NOTICE_KINDS.JACKPOT,
               mine: isLocalSeat(event.playerId),
               tone: 'jackpot',
-              eyebrow: '🎉 잭팟',
+              eyebrow: '잭팟',
               headline: `${nameOf(event.playerId)} 잭팟 당첨!`,
               amount: formatSignedWon(event.jackpotWon),
             }),
@@ -325,7 +355,7 @@ export function createPlaybackEngine({
           kind: NOTICE_KINDS.ISLAND,
           mine: isLocalSeat(event.playerId),
           fastForward: true,
-          eyebrow: '🏝 조난 탈출',
+          eyebrow: '조난 탈출',
           headline: nameOf(event.playerId),
         });
         break;
@@ -356,6 +386,8 @@ export function createPlaybackEngine({
             }
             // 연출은 버리지만 큰 사건은 한 줄 안내로 남긴다(정보를 버리지 않는다).
             noteWhileFastForward(event);
+            notifyOpponent(event);
+            opponentToasts?.keepLatestOnly();
             continue; // 그 밖의 연출은 버리고 최신 상태로 달려간다.
           }
           try {

@@ -1230,3 +1230,66 @@
   color: var(--text-500);
   font-size: 0.78rem;
 }
+
+/* ── 상대 행동 알림 줄 ──────────────────────────────────────── */
+
+/*
+  "상대방이 뭘 하는지 로그 말고 토스트로" — 화면 위쪽에 한 번에 하나씩 뜬다.
+  결정 모달(z-index 80)보다 **아래**라 모달 버튼을 절대 가리지 않고,
+  상황판(sticky, 화면 아래)과도 자리가 겹치지 않는다.
+*/
+.opponent-strip {
+  position: fixed;
+  top: calc(0.6rem + env(safe-area-inset-top, 0px));
+  left: 50%;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(30rem, calc(100vw - 1.5rem));
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.opponent-toast {
+  max-width: 100%;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--info);
+  border-radius: 999px;
+  background: rgba(8, 21, 31, 0.96);
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: notice-in 160ms ease-out;
+}
+
+.opponent-toast--leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.opponent-toast--warn {
+  border-left-color: var(--danger);
+  background: rgba(46, 14, 18, 0.96);
+}
+
+.opponent-toast--good {
+  border-left-color: var(--ok);
+}
+
+.opponent-toast-text {
+  display: block;
+  overflow: hidden;
+  color: var(--text-100);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 모달이 열려 있으면 알림 줄은 잠시 비켜난다(모달 제목을 덮지 않게). */
+body.modal-open .opponent-strip {
+  opacity: 0.35;
+}
