@@ -48,6 +48,7 @@
 | 32 | 동작 | 저장 파일이 `schemaVersion: 3`이 됐다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방은 자동 승급되며 **투자 모드는 `OFF`로 유지된다**(진행 중인 판에 기능이 끼어들지 않는다) |
 | 33 | 동작 | `rankings`와 `players[].totalAssets`가 주식 평가액·예금을 포함한다(단일 출처 `NetWorth`) | 종료 순위 모달의 총자산 내역도 28번의 `netWorth`로 분해해 보여 줄 수 있다 |
 | 34 | 동작 + **새 이벤트** | **행운 티켓이 22장이 됐다**: 잭팟 적립금을 받는 두 장이 추가됐다 — `T21 잭팟 당첨권`(전액)과 `T22 잭팟 나눔 행사`(절반, 내림). 새 효과 종류 `CLAIM_JACKPOT`(`share`: `100` \| `50`)과 새 이벤트 `JACKPOT_CLAIMED { playerId, amount, share, remaining }`. 적립금이 실제로 줄면 기존 `JACKPOT_CHANGED`가 뒤따르고, 적립금이 0원이면 `amount: 0`인 `JACKPOT_CLAIMED`만 발생한다(돈은 움직이지 않는다) | 티켓 카드 문구는 `TICKET_DRAWN.text`를 그대로 쓰면 된다(효과 라벨은 `effect.share`로 "전액/절반"을 구분할 수 있다). 로그/연출에 `JACKPOT_CLAIMED`를 추가할 것 — 모르는 이벤트는 무시해도 잭팟 숫자는 `view.jackpot`과 `JACKPOT_CHANGED`로 맞는다. `amount: 0`인 경우를 "당첨 연출"로 보여 주지 말 것 |
+| 35 | 가산 필드 | `PRICES_UPDATED.changes[]`에 `tickBp`와 `breakdown { newsBp, driftBp, nudgeBp, shockBp, reversionBp }`(모두 bp 정수, 합 = `tickBp`)가 실린다 | 뉴스 카드의 "+10%"는 확정 수익이 아니라 압력 하나다 — 화면은 이 분해로 "▲ +2.50% (뉴스 +10 · 회복 +1.5 · 운 -9)"를 보여 줄 수 있다. `reversionBp`는 기준가 0.5~2.5배 밖에서만 0이 아니다(SPEC D45). 없는 옛 이벤트는 등락만 표시하면 된다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 

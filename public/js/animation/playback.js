@@ -30,6 +30,7 @@ export function createPlaybackEngine({
   players,
   log,
   casino,
+  market = null,
   isCasinoOpen,
   announce,
   applyView,
@@ -325,7 +326,9 @@ export function createPlaybackEngine({
 
       case 'PRICES_UPDATED':
         // 시세 숫자는 큐가 비고 최신 뷰가 반영될 때 카운트업으로 움직인다(marketView).
-        // 여기서는 뉴스 카드와 시세 갱신이 "이어지는 두 장면"으로 읽히게 짧은 박자만 둔다.
+        // 여기서는 뉴스 카드와 시세 갱신이 "이어지는 두 장면"으로 읽히게 짧은 박자만 두고,
+        // 종목마다 "뉴스 +10%인데 실제는 +2.5%(운 −9)" 내역을 몇 초 보여 준다.
+        market?.showBreakdown?.(event.changes, { cyclePhase: event.cyclePhase });
         await wait(scaled(220));
         break;
 

@@ -258,6 +258,7 @@ export function createGameController({ appRoot, overlayRoot }) {
     players: playersView,
     log: logView,
     casino: casinoView,
+    market: marketView,
     isCasinoOpen: () => modalHost.isOpen(CASINO_MODAL_ID),
     announce: (text) => gameView.announce(text),
     applyView: (view) => {

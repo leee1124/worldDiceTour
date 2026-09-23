@@ -52,7 +52,7 @@
         "baseRateBp": 75,
         "prices": {
           "AIR": 9700,
-          "CON": 30900,
+          "CON": 24900,
           "HOT": 23700,
           "ENT": 5900,
           "NRG": 29100
@@ -132,7 +132,7 @@
           "AIR": 9900,
           "CON": 16600,
           "HOT": 20900,
-          "ENT": 17000,
+          "ENT": 15700,
           "NRG": 29400
         },
         "states": {
@@ -288,7 +288,7 @@
           "AIR": 31300,
           "CON": 18900,
           "HOT": 26700,
-          "ENT": 14600,
+          "ENT": 14500,
           "NRG": 27500
         },
         "states": {
@@ -476,8 +476,8 @@
       "isOver": true,
       "jackpot": 235361,
       "initialTotal": 12000000,
-      "netFromBank": -7676427,
-      "totalCash": 4088212,
+      "netFromBank": -7808527,
+      "totalCash": 3956112,
       "eventCount": 1364,
       "eventSequenceHash": "bbb638f07cff7839b4a26ff1bac513f6aa95108ff8e5f4417bb3cb90758211e7",
       "commandSequenceHash": "cac4a90c1b4637e912b40f6af08e3e8d27e20f0cb323ef11c59fae442a8584c3",
@@ -486,40 +486,40 @@
           "rank": 1,
           "playerId": "seat-1",
           "eliminated": false,
-          "cash": 2861623,
+          "cash": 2757123,
           "loanDebt": 0,
-          "totalAssets": 8568823
+          "totalAssets": 8464323
         },
         {
           "rank": 2,
           "playerId": "seat-4",
           "eliminated": false,
-          "cash": 640168,
+          "cash": 626818,
           "loanDebt": 0,
-          "totalAssets": 6989168
+          "totalAssets": 6735818
         },
         {
           "rank": 3,
           "playerId": "seat-3",
           "eliminated": false,
-          "cash": 313571,
+          "cash": 306971,
           "loanDebt": 0,
-          "totalAssets": 5580571
+          "totalAssets": 5333971
         },
         {
           "rank": 4,
           "playerId": "seat-2",
           "eliminated": false,
-          "cash": 272850,
+          "cash": 265200,
           "loanDebt": 0,
-          "totalAssets": 4455850
+          "totalAssets": 4208200
         }
       ],
       "market": {
         "cyclePhase": "RECOVERY",
         "baseRateBp": 75,
         "prices": {
-          "AIR": 22500,
+          "AIR": 20900,
           "CON": 14900,
           "HOT": 22200,
           "ENT": 13100,
@@ -1221,10 +1221,10 @@
         "cyclePhase": "OVERHEAT",
         "baseRateBp": 75,
         "prices": {
-          "AIR": 27400,
+          "AIR": 27300,
           "CON": 13600,
           "HOT": 33500,
-          "ENT": 24000,
+          "ENT": 21800,
           "NRG": 43700
         },
         "states": {

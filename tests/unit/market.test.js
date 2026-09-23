@@ -491,10 +491,15 @@ describe('Market — 라운드 틱(설계서 §2.3)', () => {
       holdings: { s1: { ENT: { qty: 80, avgCost: 6_000 } } },
     });
 
-    // When (침체 덱 6번째 = NR6 "구조조정": 전 종목 −500, drift −150 → 1,300 × (1 − 0.065) = 1,215.5
-    //        → 100원 단위 반올림 1,200 = 하한 = 상장폐지 임계이므로 폐지.
+    // When (침체 덱 6번째 = NR6 "구조조정": 전 종목 −500, drift −150, 그리고 D45 평균 회귀가 1,300원(기준가 22%)에서
+    //        +600으로 버틴다 → 이것만으로는 폐지되지 않으므로 ENT에 −900 충격을 주입한다:
+    //        합계 −500 −150 +600 −900 = −950 → 1,300 × 0.905 = 1,176.5 → 반올림 1,200 = 하한 = 상장폐지 임계.
     //        NR5는 D44로 카지노 +400인 방어 카드가 되어 더는 ENT를 떨어뜨리지 않는다.)
-    const first = market.roundTick({ round: 2, random: tickRandom({ newsPick: 5 }), players: [] });
+    const first = market.roundTick({
+      round: 2,
+      random: tickRandom({ newsPick: 5, shocks: [0, 0, 0, -900, 0] }),
+      players: [],
+    });
 
     // Then
     assert.deepEqual(find(first.events, MARKET_EVENT_TYPES.INSTRUMENT_DELISTED).payload, {
@@ -840,5 +845,67 @@ describe('Market — 스냅샷', () => {
     // Then
     assert.equal(market.toSnapshot().window, null);
     assert.equal(market.openSeatId, null);
+  });
+});
+
+describe('Market — 시세 변화의 분해(뉴스·추세·압력·운)', () => {
+  it('PRICES_UPDATED의 각 변화에 분해값이 실리고, 합이 tickBp와 같다', () => {
+    // Given (회복 국면, 회복 덱 5번째 = NV5: 엔터 +1000·호텔 +300, 충격은 종목마다 다르게)
+    const market = Market.restore({ ...freshMarket().toSnapshot(), cycle: { phase: 'RECOVERY', age: 1 } });
+
+    // When
+    const result = market.roundTick({
+      round: 2,
+      random: tickRandom({ newsPick: 4, shocks: [100, -200, 300, -900, 0] }),
+      players: [],
+    });
+
+    // Then
+    const changes = find(result.events, MARKET_EVENT_TYPES.PRICES_UPDATED).payload.changes;
+    for (const change of changes) {
+      const b = change.breakdown;
+      assert.ok(b, `${change.instrumentId}에 breakdown이 없다`);
+      assert.equal(b.newsBp + b.driftBp + b.nudgeBp + b.shockBp + b.reversionBp, change.tickBp, `${change.instrumentId} 합계`);
+      assert.equal(b.driftBp, 150, '회복 추세 = 설계 +100 + 균일 +50');
+    }
+    const ent = changes.find((change) => change.instrumentId === 'ENT');
+    assert.equal(ent.breakdown.newsBp, 1_000, 'NV5의 엔터 효과');
+    assert.equal(ent.breakdown.shockBp, -900, '주입한 충격');
+    assert.equal(ent.breakdown.nudgeBp, 0);
+    const air = changes.find((change) => change.instrumentId === 'AIR');
+    assert.equal(air.breakdown.newsBp, 0, 'NV5는 항공을 건드리지 않는다');
+  });
+});
+
+describe('Market — 바닥에 눌러붙은 종목은 되돌아온다(D45 평균 회귀)', () => {
+  it('기준가의 1/3(2,000원)에서 침체가 이어져도 10라운드 안에 회복하고 상장폐지되지 않는다', () => {
+    // Given — 오너의 43라운드 방에서 실제로 난 값: ENT 2,000원(기준가 6,000), 침체 국면
+    const market = Market.restore({
+      ...freshMarket().toSnapshot(),
+      cycle: { phase: 'RECESSION', age: 1 },
+      instruments: [
+        { id: 'AIR', price: 12_000, state: 'LISTED', series: [12_000] },
+        { id: 'CON', price: 8_000, state: 'LISTED', series: [8_000] },
+        { id: 'HOT', price: 15_000, state: 'LISTED', series: [15_000] },
+        { id: 'ENT', price: 2_000, state: 'LISTED', series: [2_000] },
+        { id: 'NRG', price: 20_000, state: 'LISTED', series: [20_000] },
+      ],
+    });
+
+    // When — 침체에 머문 채(국면 판정 실패) 충격 0으로 10라운드. 뉴스는 남은 더미의 첫 장(pick 0)을 뽑아
+    //        어떤 침체 카드가 오든 상관없이 "침체가 이어지는 상황"만 만든다(더미는 소진되면 스스로 재섞인다).
+    const prices = [];
+    for (let round = 2; round <= 11; round += 1) {
+      // 첫 라운드는 국면 나이가 1이라 국면 판정을 하지 않는다(난수를 안 뽑는다) — 그 뒤부터 100으로 침체 유지.
+      const cycleRoll = round === 2 ? null : 100;
+      market.roundTick({ round, random: tickRandom({ cycleRoll, newsPick: 0 }), players: [] });
+      prices.push(market.viewModel().instruments.find((item) => item.id === 'ENT').price);
+    }
+
+    // Then — 복원력(+600/라운드)이 침체 drift(−150)와 악재 카드(최대 −500)를 이기고 끌어올린다
+    const last = prices.at(-1);
+    assert.ok(last > 2_500, `10라운드 뒤 ENT ${last}원 — 회복하지 않았다: ${prices.join(' → ')}`);
+    assert.ok(prices.every((price) => price > 1_200), '상장폐지 선(1,200원) 아래로 내려가면 안 된다');
+    assert.ok(market.instrumentIds.includes('ENT'), '상장폐지되지 않았다');
   });
 });
