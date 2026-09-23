@@ -292,7 +292,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
             el('span', { class: 'instr-chip-price', text: formatWon(card.price) }),
             el('span', { class: 'instr-chip-change', dataset: { tone: card.change.tone }, text: card.change.text }),
             card.qty > 0
-              ? el('span', { class: 'instr-chip-qty', text: `보유 ${card.qty}주` })
+              ? el('span', { class: 'instr-chip-qty', text: card.pnl.holdingText })
               : el('span', { class: 'instr-chip-qty instr-chip-qty--none', text: card.delisted ? '상장폐지' : '보유 없음' }),
           ],
         ),
@@ -461,8 +461,18 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
   function renderPreview(preview) {
     const isStock = tab === 'STOCK';
     const buying = isStock ? side === 'BUY_STOCK' : depositSide === 'DEPOSIT';
+    const held = isStock ? selectedCard() : null;
+    // 보유 중인 종목이면 "내가 얼마에 샀나"를 주문 미리보기 맨 위에 둔다(팔지 말지 판단의 기준).
+    const holdingRows =
+      held && held.qty > 0
+        ? [
+            figureRow('보유 · 평단', held.pnl.holdingText.replace('보유 ', '')),
+            figureRow('평가손익', held.pnl.pnlText, { tone: held.pnl.tone === 'up' ? 'in' : held.pnl.tone === 'down' ? 'out' : '' }),
+          ]
+        : [];
     const rows = isStock
       ? [
+          ...holdingRows,
           figureRow('명목금액', formatWon(preview.notional)),
           figureRow('수수료', formatWon(preview.fee), { tone: 'out' }),
           figureRow(buying ? '총 지출' : '실 수령', formatWon(preview.total), {
