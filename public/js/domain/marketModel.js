@@ -185,6 +185,18 @@ export function queuedCountOf(market, seatId) {
 }
 
 /**
+ * 출발 칸을 지날 때 받을 배당. 서버(`Instrument.dividendPerShare`)와 같은 규칙이다:
+ * 1주 배당 = 내림(시세 × 배당률), 상장 종목만. 합계 = 1주 배당 × 보유 수량.
+ * 화면이 "배당이 안 들어온다"는 오해를 풀도록 **받기 전에** 얼마인지 보여 주기 위한 값이다.
+ */
+export function nextDividend({ price, dividendBp, delisted = false }, qty) {
+  const bp = toInt(dividendBp);
+  const perShare = !delisted && bp > 0 ? Math.floor((toInt(price) * bp) / 10_000) : 0;
+  const quantity = Math.max(0, toInt(qty));
+  return { perShare, amount: perShare * quantity };
+}
+
+/**
  * 종목 카드 모델. 이름·업종·시세·등락·보유·평가손익·배당·스파크라인·상장폐지를 한 번에 담는다.
  * @param {object|null} market
  * @param {string|null} seatId 보유·손익을 볼 좌석(없으면 보유 0)
@@ -203,6 +215,7 @@ export function instrumentCards(market, seatId) {
       const change = formatChangeBp(item.changeBp);
       const spark = sparklinePath(item.series, { width: 108, height: 34 });
       const dividendBp = toInt(item.dividendBp);
+      const dividend = nextDividend({ price: item.price, dividendBp, delisted }, pnl.qty);
       const sectorText =
         typeof item.sectorLabel === 'string' && item.sectorLabel.length > 0
           ? item.sectorLabel
@@ -223,6 +236,16 @@ export function instrumentCards(market, seatId) {
         tradable: !delisted,
         dividendBp,
         dividendText: dividendBp > 0 ? formatRateBp(dividendBp) : '없음',
+        // "1.50% · 1주 192원" — 비율만으로는 얼마 받는지 감이 안 온다.
+        dividendDetailText:
+          dividend.perShare > 0 ? `${formatRateBp(dividendBp)} · 1주 ${won(dividend.perShare)}` : '없음',
+        dividendPerShare: dividend.perShare,
+        nextDividend: dividend.amount,
+        // 보유 중일 때만: "출발 통과 시 +7,680원 (1주 192원 × 40주)"
+        nextDividendText:
+          dividend.amount > 0
+            ? `출발 통과 시 +${won(dividend.amount)} (1주 ${won(dividend.perShare)} × ${pnl.qty}주)`
+            : '',
         spark,
         sparkLabel: sparklineLabel({ name: item.name, series: item.series }),
         ariaLabel: `${item.name} ${sectorText} ${won(item.price)} ${change.label}${

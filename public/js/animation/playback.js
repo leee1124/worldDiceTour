@@ -18,6 +18,7 @@ import { playCycleBanner, playDelistingCard, playNewsCard } from '../views/modal
 import { orderKindLabel, rejectReasonLabel, tradingCloseReasonLabel } from '../domain/marketLabels.js';
 import { playInfoNotice } from '../views/modals/noticeCard.js';
 import { NOTICE_KINDS } from '../domain/noticeTiming.js';
+import { dividendNoticeModel } from '../domain/dividendNotice.js';
 import { opponentNoticeOf } from '../domain/opponentNotice.js';
 import { LAP_RULE_TEXT, lapLabel } from '../domain/buildRules.js';
 import { flashScreen, floatAmount, flyCoin } from './effects.js';
@@ -345,7 +346,30 @@ export function createPlaybackEngine({
         await floatAmount(cardPoint(event.playerId), `−${event.quantity}주`, { tone: 'minus' });
         break;
 
-      case 'DIVIDEND_PAID':
+      case 'DIVIDEND_PAID': {
+        // 월급과 같은 급으로 알린다. 금액 플로트만으로는 "배당이 안 들어온다"고 느꼈다(오너 피드백).
+        // 같은 좌석의 연속 배당(종목마다 한 건)은 **카드 하나**로 합친다 — 종목 수만큼 카드를 띄우면
+        // 내 차례가 종목 × 2.5초 동안 멈춘다.
+        const batch = [
+          event,
+          ...queue.shiftWhile((next) => next.type === 'DIVIDEND_PAID' && next.playerId === event.playerId),
+        ];
+        const notice = dividendNoticeModel(batch, { nameOf });
+        await Promise.all([
+          playMoneyIn(event.playerId, notice.total),
+          playInfoNotice({
+            kind: NOTICE_KINDS.DIVIDEND,
+            mine: isLocalSeat(event.playerId),
+            tone: 'plus',
+            eyebrow: '배당',
+            headline: notice.headline,
+            amount: notice.amount,
+            note: notice.note,
+          }),
+        ]);
+        break;
+      }
+
       case 'DEPOSIT_INTEREST_PAID':
         await playMoneyIn(event.playerId, event.amount);
         break;

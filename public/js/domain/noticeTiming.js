@@ -22,6 +22,8 @@ export const NOTICE_KINDS = Object.freeze({
   SALARY: 'salary',
   LAP: 'lap',
   JACKPOT: 'jackpot',
+  // 출발 칸 통과 배당(월급과 같은 순간). 내 것은 카드, 남의 것은 한 줄.
+  DIVIDEND: 'dividend',
   // 증권거래소 라운드 틱. 좌석이 없는 **전체 공지**라 언제나 `mine: false`로 온다.
   NEWS: 'news',
   CYCLE: 'cycle',
@@ -36,6 +38,7 @@ export const MIN_READ_MS = Object.freeze({
   salary: 2000,
   lap: 2000,
   jackpot: 2000,
+  dividend: 2000,
   // 시장 공지는 매 라운드 뜬다. 한 틱에 셋이 겹쳐도 6초를 넘지 않게 짧게 잡는다.
   news: 2000,
   cycle: 1600,
@@ -50,6 +53,7 @@ export const MINE_READ_MS = Object.freeze({
   salary: 2000,
   lap: 2000,
   jackpot: 2500,
+  dividend: 2500,
   // 시장 공지는 '내 일'이 될 수 없지만, 표를 비대칭으로 두지 않는다.
   news: 2000,
   cycle: 1600,
@@ -70,7 +74,7 @@ export const FAILSAFE_MAX_MS = 6000;
 export const DISMISS_HINT = '탭하면 닫힘';
 
 /** 남의 차례일 때는 한 줄로 줄이는 종류(컴퓨터 턴이 늘어지지 않게). */
-export const LINE_KINDS_WHEN_OTHERS = Object.freeze(['salary', 'lap']);
+export const LINE_KINDS_WHEN_OTHERS = Object.freeze(['salary', 'lap', 'dividend']);
 
 function readMsOf(kind, mine) {
   const table = mine ? MINE_READ_MS : MIN_READ_MS;

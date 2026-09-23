@@ -217,7 +217,11 @@ export function createMarketView({
       setHidden(entry.pnl, true);
     }
 
-    setText(entry.dividend, `배당 ${card.dividendText}`);
+    setText(
+      entry.dividend,
+      // 보유 중이면 "1주 N원"은 예상 배당 문구 안에 이미 있으므로 비율만 앞에 둔다(중복 방지).
+      card.nextDividend > 0 ? `배당 ${card.dividendText} · ${card.nextDividendText}` : `배당 ${card.dividendDetailText}`,
+    );
     setText(entry.state, card.delisted ? '상장폐지' : '');
     setHidden(entry.state, !card.delisted);
     toggleClass(entry.root, 'instr-card--delisted', card.delisted);

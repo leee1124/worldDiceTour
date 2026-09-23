@@ -81,6 +81,20 @@ export class EventPlaybackQueue {
     return this.#events.shift() ?? null;
   }
 
+  /**
+   * 앞에서부터 `predicate`를 만족하는 **연속** 이벤트를 모두 꺼낸다(첫 불일치에서 멈춘다).
+   * 같은 순간의 사건(한 바퀴의 배당 여러 건)을 안내 하나로 합치는 데 쓴다.
+   * @param {(event: object) => boolean} predicate
+   * @returns {object[]}
+   */
+  shiftWhile(predicate) {
+    const taken = [];
+    while (this.#events.length > 0 && predicate(this.#events[0])) {
+      taken.push(this.#events.shift());
+    }
+    return taken;
+  }
+
   /** 재접속 스냅샷: 쌓인 연출을 버리고 현재 상태부터 다시 시작한다. */
   reset(view) {
     this.#events.length = 0;

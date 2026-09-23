@@ -834,3 +834,28 @@ test('이벤트 큐: 다른 방으로 옮기면 이전 방의 버전 기억을 �
   assert.equal(queue.accept(message(1, 1)), true);
   assert.equal(queue.targetView.version, 1);
 });
+
+test('이벤트 큐: 앞에서부터 조건에 맞는 연속 이벤트를 한꺼번에 꺼낼 수 있다(배당 묶음 안내용)', () => {
+  // Given 배당 3건이 연달아 있고 그 뒤에 도착 이벤트가 있다
+  const queue = new EventPlaybackQueue();
+  queue.accept({
+    view: { version: 1 },
+    events: [
+      { type: 'DIVIDEND_PAID', playerId: 'seat-1', amount: 100 },
+      { type: 'DIVIDEND_PAID', playerId: 'seat-1', amount: 200 },
+      { type: 'DIVIDEND_PAID', playerId: 'seat-2', amount: 300 },
+      { type: 'LANDED', playerId: 'seat-1' },
+    ],
+  });
+  const first = queue.shift();
+
+  // When 같은 좌석의 배당만 이어서 꺼내면
+  const rest = queue.shiftWhile((event) => event.type === 'DIVIDEND_PAID' && event.playerId === first.playerId);
+
+  // Then 연속된 것만 나오고(다른 좌석에서 멈춤) 나머지는 그대로 남는다
+  assert.deepEqual(rest.map((event) => event.amount), [200]);
+  assert.equal(queue.size, 2);
+  assert.equal(queue.shift().playerId, 'seat-2');
+  assert.deepEqual(queue.shiftWhile(() => false), []);
+  assert.equal(queue.size, 1);
+});
