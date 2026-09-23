@@ -4,6 +4,7 @@
 
 import { button, el, setHidden, setText, toggleClass } from '../dom.js';
 import { CONNECTION, isHostSeatMine } from '../store.js';
+import { createThemeToggleButton } from './themeToggle.js';
 
 const CONNECTION_LABELS = Object.freeze({
   [CONNECTION.IDLE]: '연결 준비',
@@ -73,7 +74,11 @@ export function createGameView({
         codeNode,
         statusNode,
       ]),
-      el('div', { class: 'topbar-right' }, [connectionNode, retryButton]),
+      el('div', { class: 'topbar-right' }, [
+        createThemeToggleButton().element,
+        connectionNode,
+        retryButton,
+      ]),
     ]),
     stalledBanner,
     announcer,

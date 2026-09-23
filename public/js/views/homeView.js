@@ -6,6 +6,7 @@
 
 import { button, clear, el, replaceChildren, setText } from '../dom.js';
 import { diceIcon } from './icons.js';
+import { createThemeToggleButton } from './themeToggle.js';
 
 /** 서버 `NAME_PATTERN`과 같은 규칙(src/server/validation.js). */
 const NAME_PATTERN = /^[가-힣a-zA-Z0-9 ]{1,10}$/;
@@ -138,7 +139,10 @@ export function createHomeView({ onCreateRoom, onJoinRoom, onReconnect, onForget
 
   const element = el('div', { class: 'screen screen--home' }, [
     el('header', { class: 'home-hero' }, [
-      el('p', { class: 'hero-eyebrow', text: 'WORLD DICE TOUR' }),
+      el('div', { class: 'hero-top' }, [
+        el('p', { class: 'hero-eyebrow', text: 'WORLD DICE TOUR' }),
+        createThemeToggleButton().element,
+      ]),
       el('h1', { class: 'hero-title' }, ['월드 다이스 투어']),
       el('p', { class: 'hero-lead' }, [
         '같은 와이파이의 폰·태블릿·PC가 한 보드에 모여 세계를 한 바퀴 돕니다. 주사위와 카드 운, 그리고 ',
