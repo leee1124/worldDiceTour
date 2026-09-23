@@ -41,7 +41,7 @@ export const NEWS_CARDS = Object.freeze([
   ]),
   card('NE3', CYCLE_PHASES.EXPANSION, '연휴 특수, 객실 만실', '쉬는 날이 길어지면 숙박이 먼저 찹니다.', [
     sector(SECTORS.HOTEL, 600),
-    sector(SECTORS.ENTERTAINMENT, 300),
+    sector(SECTORS.ENTERTAINMENT, 200),
   ]),
   card('NE4', CYCLE_PHASES.EXPANSION, '전력 수요 최고치 경신', '공장이 많이 돌면 전기도 더 씁니다.', [
     sector(SECTORS.ENERGY, 500),
@@ -55,7 +55,7 @@ export const NEWS_CARDS = Object.freeze([
   card('NE6', CYCLE_PHASES.EXPANSION, '관광 박람회 대성황', '예약 결제액이 사상 최대를 찍었습니다.', [
     sector(SECTORS.HOTEL, 500),
     sector(SECTORS.AIRLINE, 300),
-    sector(SECTORS.ENTERTAINMENT, 200),
+    sector(SECTORS.ENTERTAINMENT, 100),
   ]),
 
   // ── 과열 OVERHEAT ───────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export const NEWS_CARDS = Object.freeze([
     sector(SECTORS.HOTEL, -400),
   ]),
   card('NO3', CYCLE_PHASES.OVERHEAT, '카지노 매출 사상 최대', '씀씀이가 커지면 오락 매출이 가장 먼저 뜁니다.', [
-    sector(SECTORS.ENTERTAINMENT, 1_500),
+    sector(SECTORS.ENTERTAINMENT, 1_000),
   ]),
   card('NO4', CYCLE_PHASES.OVERHEAT, '연료비 급등에 항공사 비명', '기름값은 항공사에겐 원가, 에너지회사엔 매출입니다.', [
     sector(SECTORS.AIRLINE, -800),
@@ -100,8 +100,8 @@ export const NEWS_CARDS = Object.freeze([
   card('NR4', CYCLE_PHASES.RECESSION, '전기 사용량 감소', '공장이 덜 돌면 전력 수요도 함께 줍니다.', [
     sector(SECTORS.ENERGY, -600),
   ]),
-  card('NR5', CYCLE_PHASES.RECESSION, '지갑 닫힌 주말', '오락비는 가장 먼저 줄고 가장 늦게 돌아옵니다.', [
-    sector(SECTORS.ENTERTAINMENT, -1_400),
+  card('NR5', CYCLE_PHASES.RECESSION, '불황에 붐비는 카지노', '지갑이 얇아질수록 한 방을 노리는 사람은 늘어납니다. 사행 산업은 불황에 버티는 편입니다.', [
+    sector(SECTORS.ENTERTAINMENT, 400),
     sector(SECTORS.HOTEL, -400),
   ]),
   card('NR6', CYCLE_PHASES.RECESSION, '구조조정 발표 잇따라', '기업이 비용을 깎으면 주가는 잠시 더 흔들립니다.', [
@@ -126,7 +126,7 @@ export const NEWS_CARDS = Object.freeze([
     sector(SECTORS.ENERGY, -300),
   ]),
   card('NV5', CYCLE_PHASES.RECOVERY, '주말 나들이 재개', '사람들이 다시 밖으로 나오기 시작했습니다.', [
-    sector(SECTORS.ENTERTAINMENT, 700),
+    sector(SECTORS.ENTERTAINMENT, 1_000),
     sector(SECTORS.HOTEL, 300),
   ]),
   card('NV6', CYCLE_PHASES.RECOVERY, '금리 동결, 지켜보기', '회복이 확실해질 때까지 기다리기로 했습니다.', [all(0)]),

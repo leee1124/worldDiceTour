@@ -491,9 +491,10 @@ describe('Market — 라운드 틱(설계서 §2.3)', () => {
       holdings: { s1: { ENT: { qty: 80, avgCost: 6_000 } } },
     });
 
-    // When (침체 덱 5번째 = NR5: 엔터 −1400, drift −150 → 1,300 × (1 − 0.155) = 1,098.5
-    //        → 100원 단위 반올림 1,100 → 하한 1,200에서 멈춘다. 하한 = 상장폐지 임계이므로 폐지)
-    const first = market.roundTick({ round: 2, random: tickRandom({ newsPick: 4 }), players: [] });
+    // When (침체 덱 6번째 = NR6 "구조조정": 전 종목 −500, drift −150 → 1,300 × (1 − 0.065) = 1,215.5
+    //        → 100원 단위 반올림 1,200 = 하한 = 상장폐지 임계이므로 폐지.
+    //        NR5는 D44로 카지노 +400인 방어 카드가 되어 더는 ENT를 떨어뜨리지 않는다.)
+    const first = market.roundTick({ round: 2, random: tickRandom({ newsPick: 5 }), players: [] });
 
     // Then
     assert.deepEqual(find(first.events, MARKET_EVENT_TYPES.INSTRUMENT_DELISTED).payload, {
