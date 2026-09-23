@@ -773,7 +773,8 @@
   flex-direction: column;
   align-items: center;
   gap: 0.55rem;
-  width: min(20rem, 82vw);
+  /* 20rem이면 배당 묶음·티켓 문구가 촘촘히 접혔다(오너 지적 "카드가 작아서 잘림") → 24rem. */
+  width: min(24rem, 90vw);
   max-height: 100%;
 }
 
@@ -836,10 +837,11 @@
   left: 50%;
   bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
   z-index: 64;
-  max-width: min(26rem, calc(100vw - 2rem));
-  padding: 0.4rem 0.9rem;
+  max-width: min(30rem, calc(100vw - 2rem));
+  padding: 0.45rem 1rem;
   border: 1px solid var(--line-strong);
-  border-radius: 999px;
+  /* 두 줄이 되면 알약 모양이 어색해 살짝 둥근 상자로 */
+  border-radius: 1.1rem;
   background: rgba(8, 21, 31, 0.95);
   box-shadow: var(--shadow-soft);
   cursor: pointer;
@@ -849,12 +851,14 @@
 
 .notice-line-text {
   display: block;
-  overflow: hidden;
   color: var(--text-100);
   font-size: 0.82rem;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  /* 한 줄 말줄임(…)은 "뭘 했는지"를 잘라 먹었다 — 줄바꿈으로 전부 보여 준다(단어 단위, 긴 토큰은 강제 개행). */
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 /* ── 금액·상태 안내 카드(조난 · 월급 · 바퀴 · 잭팟) ─────────── */
@@ -1272,10 +1276,10 @@
 
 .opponent-toast {
   max-width: 100%;
-  padding: 0.45rem 0.9rem;
+  padding: 0.5rem 1rem;
   border: 1px solid var(--line-strong);
   border-left: 3px solid var(--info);
-  border-radius: 999px;
+  border-radius: 1.1rem;
   background: rgba(8, 21, 31, 0.96);
   box-shadow: var(--shadow-soft);
   cursor: pointer;
@@ -1299,13 +1303,15 @@
 
 .opponent-toast-text {
   display: block;
-  overflow: hidden;
   color: var(--text-100);
   font-size: 0.82rem;
   font-weight: 700;
   line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 상대가 뭘 했는지가 잘리면 토스트의 의미가 없다 — 줄바꿈으로 전부 보여 준다. */
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 /*
