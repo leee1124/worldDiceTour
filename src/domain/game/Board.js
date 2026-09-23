@@ -98,7 +98,7 @@ export class Board {
     return this.ownedBy(playerId).filter((city) => !city.isResort).length;
   }
 
-  /** 보유 자산에 지어진 건물 수 합계(랜드마크 포함). */
+  /** 보유 자산에 지어진 건물 수 합계(관광명소 포함). */
   buildingCountOf(playerId) {
     return this.ownedBy(playerId).reduce((sum, city) => sum + city.buildingCount(), 0);
   }

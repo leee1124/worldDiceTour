@@ -11,25 +11,25 @@ const lookup = (table, key, fallback) => table[key] ?? fallback ?? String(key ??
 export const CYCLE_VIEWS = Object.freeze({
   EXPANSION: Object.freeze({
     label: '호황',
-    icon: '🌤',
+    icon: 'EXPANSION',
     tone: 'expansion',
     hint: '경기가 꾸준히 오르는 국면입니다. 대체로 오르지만 뉴스가 뒤집을 수 있습니다.',
   }),
   OVERHEAT: Object.freeze({
     label: '과열',
-    icon: '🔥',
+    icon: 'OVERHEAT',
     tone: 'overheat',
     hint: '많이 올랐고 흔들림도 큽니다. 다음 국면이 침체로 꺾이기 쉽습니다.',
   }),
   RECESSION: Object.freeze({
     label: '침체',
-    icon: '🌧',
+    icon: 'RECESSION',
     tone: 'recession',
     hint: '값이 내리는 국면입니다. 예금 이자가 상대적으로 든든해집니다.',
   }),
   RECOVERY: Object.freeze({
     label: '회복',
-    icon: '🌱',
+    icon: 'RECOVERY',
     tone: 'recovery',
     hint: '바닥을 지나 다시 오르기 시작하는 국면입니다.',
   }),
@@ -37,7 +37,7 @@ export const CYCLE_VIEWS = Object.freeze({
 
 const UNKNOWN_CYCLE = Object.freeze({
   label: '경기 국면',
-  icon: '📊',
+  icon: 'UNKNOWN',
   tone: 'expansion',
   hint: '서버가 알려 준 새 국면입니다.',
 });

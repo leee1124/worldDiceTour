@@ -66,7 +66,7 @@ describe('Game(건설 기회)', () => {
     assertMoneyConserved(game, '건설 후');
   });
 
-  it('3종을 모두 지은 다음 기회에만 랜드마크를 지을 수 있다', () => {
+  it('3종을 모두 지은 다음 기회에만 관광명소를 지을 수 있다', () => {
     // Given
     const game = buildGame({
       cities: [{ index: 3, ownerId: 's1', buildings: [VILLA, BUILDING, HOTEL] }],
@@ -83,7 +83,7 @@ describe('Game(건설 기회)', () => {
     assert.equal(game.playerById('s1').cash, STARTING_CASH - 70_000);
   });
 
-  it('3종을 완성하는 기회에서 랜드마크를 함께 요청하면 거부한다', () => {
+  it('3종을 완성하는 기회에서 관광명소를 함께 요청하면 거부한다', () => {
     // Given
     const game = buildGame({
       laps: { s1: 3 },
@@ -114,7 +114,7 @@ describe('Game(건설 기회)', () => {
     assert.equal(game.currentPlayerId, 's2');
   });
 
-  it('랜드마크까지 지은 내 도시에 도착하면 건설 기회가 없다', () => {
+  it('관광명소까지 지은 내 도시에 도착하면 건설 기회가 없다', () => {
     // Given
     const game = buildGame({
       cities: [{ index: 3, ownerId: 's1', buildings: [VILLA, BUILDING, HOTEL], landmark: true }],
@@ -333,7 +333,7 @@ describe('Game(바퀴별 건설 제한)', () => {
     assert.deepEqual(optionTypes(game.pendingDecision.options), [VILLA]);
   });
 
-  it('인수한 도시의 건물은 인수자의 바퀴와 무관하게 남고 랜드마크만 제안된다', () => {
+  it('인수한 도시의 건물은 인수자의 바퀴와 무관하게 남고 관광명소만 제안된다', () => {
     // Given (1바퀴 플레이어가 3종이 완성된 남의 도시를 인수한다)
     const game = buildGame({
       laps: { s1: 1 },
@@ -465,7 +465,7 @@ describe('Game(도시 인수)', () => {
       ...overrides,
     });
 
-  it('통행료를 낸 뒤 랜드마크가 없는 남의 도시를 인수할 수 있다', () => {
+  it('통행료를 낸 뒤 관광명소가 없는 남의 도시를 인수할 수 있다', () => {
     // Given
     const game = tollAndAcquire();
 
@@ -529,7 +529,7 @@ describe('Game(도시 인수)', () => {
     assert.equal(game.currentPlayerId, 's2');
   });
 
-  it('랜드마크 도시는 인수 제안을 하지 않는다', () => {
+  it('관광명소 도시는 인수 제안을 하지 않는다', () => {
     // Given
     const game = tollAndAcquire({
       cities: [{ index: 3, ownerId: 's2', buildings: [VILLA, BUILDING, HOTEL], landmark: true }],

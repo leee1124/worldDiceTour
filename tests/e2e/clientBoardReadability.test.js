@@ -1,6 +1,6 @@
 /**
  * 보드 가독성용 순수 뷰모델 테스트.
- * - 건물 배지 슬롯(별장·빌딩·호텔 3칸 + 랜드마크)
+ * - 건물 배지 슬롯(별장·빌딩·호텔 3칸 + 관광명소)
  * - 한 칸에 겹친 말(1~4개)의 부채꼴 배치
  * - "현재 위치" 문구 파생
  */
@@ -54,19 +54,18 @@ test('건물 배지: 지은 건물만 채워지고 한 글자 라벨(별·빌·�
     ],
   );
 
-  // And 각 슬롯은 아이콘과 전체 이름도 함께 가진다(색만으로 구분하지 않는다)
+  // And 각 슬롯은 전체 이름도 함께 가진다(색만으로 구분하지 않는다 — 그림은 뷰 레이어가 그린다)
   assert.equal(view.slots[0].label, '별장');
-  assert.ok(view.slots[0].icon.length > 0);
 });
 
-test('건물 배지: 랜드마크는 세 슬롯을 대신하는 전용 표시가 된다', () => {
-  // Given 랜드마크까지 올라간 도시
+test('건물 배지: 관광명소는 세 슬롯을 대신하는 전용 표시가 된다', () => {
+  // Given 관광명소까지 올라간 도시
   const space = { kind: 'CITY', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: true };
 
   // When 배지 뷰모델을 만들면
   const view = buildingSlotView(space);
 
-  // Then 슬롯 대신 랜드마크 표시를 쓰라고 알려 준다
+  // Then 슬롯 대신 관광명소 표시를 쓰라고 알려 준다
   assert.equal(view.landmark, true);
   assert.deepEqual(view.slots, []);
   assert.equal(view.builtCount, BUILDING_ORDER.length);
@@ -168,12 +167,12 @@ test('말 배치: 좌석 수보다 많아도(관전 확장 대비) 개수만큼 
 
 /* ── 현재 위치 문구 ─────────────────────────────────────────── */
 
-test('현재 위치: 칸 이름을 받으면 📍 접두어가 붙은 한 줄이 된다', () => {
+test('현재 위치: 칸 이름을 받으면 접두어가 붙은 한 줄이 된다', () => {
   // Given 현재 플레이어가 선 칸 이름
   // When 안내 문구를 만들면
   const text = currentLocationLabel('이스탄불');
 
-  // Then 📍 현재 위치: 이스탄불 형태가 된다
+  // Then "현재 위치: 이스탄불" 형태가 된다
   assert.equal(text, `${LOCATION_PREFIX}: 이스탄불`);
 });
 

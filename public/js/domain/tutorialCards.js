@@ -7,7 +7,6 @@
 export const TUTORIAL_CARDS = Object.freeze([
   Object.freeze({
     id: 'STOCK',
-    icon: '📈',
     title: '주식이란?',
     paragraphs: Object.freeze([
       '주식은 회사의 아주 작은 조각입니다. 그 회사가 잘되면 조각값이 오르고, 어려워지면 내려갑니다.',
@@ -22,7 +21,6 @@ export const TUTORIAL_CARDS = Object.freeze([
   }),
   Object.freeze({
     id: 'DEPOSIT',
-    icon: '🏦',
     title: '예금이란?',
     paragraphs: Object.freeze([
       '예금은 은행에 돈을 맡겨 두는 것입니다. 라운드가 넘어갈 때마다 기준금리만큼 이자가 붙습니다.',
@@ -37,7 +35,6 @@ export const TUTORIAL_CARDS = Object.freeze([
   }),
   Object.freeze({
     id: 'CYCLE',
-    icon: '🌤',
     title: '경기 사이클과 뉴스',
     paragraphs: Object.freeze([
       '경기는 호황 → 과열 → 침체 → 회복을 돕니다. 지금 어느 국면인지는 시장 패널 맨 위 배지가 말해 줍니다.',

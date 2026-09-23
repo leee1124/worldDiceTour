@@ -893,20 +893,14 @@
 
 /* ── 뉴스 카드 연출 ────────────────────────────────────────── */
 
-.news-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 95;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgba(3, 9, 15, 0.62);
-  backdrop-filter: blur(3px);
-}
-
-.news-overlay--leaving {
-  animation: news-out 180ms ease-in forwards;
+/*
+  뉴스·국면·상장폐지 연출은 안내 카드 창구(`.notice-overlay`, modals.css)를 지난다.
+  자리·배경·사라짐·페일세이프는 모두 그쪽이 맡으므로 여기서는 **카드 폭만** 넓힌다.
+*/
+.notice-overlay--news .notice-card,
+.notice-overlay--cycle .notice-card,
+.notice-overlay--delist .notice-card {
+  width: min(22rem, 86vw);
 }
 
 .news-card {
@@ -1333,12 +1327,6 @@
   100% {
     color: inherit;
     transform: none;
-  }
-}
-
-@keyframes news-out {
-  to {
-    opacity: 0;
   }
 }
 

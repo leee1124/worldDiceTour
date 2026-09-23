@@ -37,7 +37,7 @@ export function newsCardSpec({ market, onClose }) {
   const cycle = cycleView(market?.cycle);
   return {
     id: NEWS_MODAL_ID,
-    title: news ? '📰 오늘의 경제 뉴스' : '📰 경제 뉴스',
+    title: news ? '오늘의 경제 뉴스' : '경제 뉴스',
     subtitle: news && Number.isInteger(news.round) ? `${news.round}라운드` : '아직 뉴스가 없습니다',
     dismissible: true,
     variant: 'sheet',

@@ -13,6 +13,7 @@ import { formatRateBp } from '../domain/marketFormat.js';
 import { cycleView } from '../domain/marketLabels.js';
 import { instrumentCards, netWorthRows, nudgeRows, queueRows } from '../domain/marketModel.js';
 import { countTo } from '../animation/timing.js';
+import { chartIcon, cycleIcon, exchangeIcon, newsIcon, questionIcon, receiptIcon } from './icons.js';
 
 const PHONE_QUERY = '(max-width: 68rem)';
 
@@ -86,7 +87,7 @@ export function createMarketView({
     },
     [
       el('span', { class: 'market-toggle-main' }, [
-        el('span', { class: 'market-eyebrow', text: '📈 증권거래소' }),
+        el('span', { class: 'market-eyebrow' }, [chartIcon(), ' 증권거래소']),
         el('span', { class: 'market-head-line' }, [
           cycleBadge,
           cycleAge,
@@ -104,7 +105,7 @@ export function createMarketView({
   const newsButton = button(
     { class: 'market-news', on: { click: () => onOpenNews() } },
     [
-      el('span', { class: 'market-news-icon', 'aria-hidden': 'true', text: '📰' }),
+      el('span', { class: 'market-news-icon', 'aria-hidden': 'true' }, [newsIcon()]),
       el('span', { class: 'market-news-main' }, [newsRoundNode, newsHeadline]),
       el('span', { class: 'market-news-more', 'aria-hidden': 'true', text: '＋' }),
     ],
@@ -121,14 +122,17 @@ export function createMarketView({
   const mineNode = el('div', { class: 'market-mine' });
   const queueNode = el('div', { class: 'market-queue' });
 
-  const queueButton = button({ class: 'btn btn--ghost btn--small', on: { click: () => onOpenQueue() } }, '🧾 예약 주문');
+  const queueButton = button(
+    { class: 'btn btn--ghost btn--small', on: { click: () => onOpenQueue() } },
+    [receiptIcon(), ' 예약 주문'],
+  );
   const tutorialButton = button(
     { class: 'btn btn--quiet btn--small', on: { click: () => onOpenTutorial() } },
-    '❔ 주식·예금 설명',
+    [questionIcon(), ' 주식·예금 설명'],
   );
   const tradeButton = button(
     { class: 'btn btn--primary btn--small market-open-trade', on: { click: () => onOpenTrade() } },
-    '💱 거래 창구 열기',
+    [exchangeIcon(), ' 거래 창구 열기'],
   );
   const actionsNode = el('div', { class: 'market-actions' }, [tradeButton, queueButton, tutorialButton]);
 
@@ -335,7 +339,9 @@ export function createMarketView({
 
       const cycle = cycleView(market.cycle);
       element.dataset.cycle = cycle.tone;
-      setText(cycleBadge.querySelector('.cycle-icon'), cycle.icon);
+      const cycleIconSlot = cycleBadge.querySelector('.cycle-icon');
+      clear(cycleIconSlot);
+      cycleIconSlot.append(cycleIcon(cycle.icon));
       setText(cycleBadge.querySelector('.cycle-label'), cycle.label);
       cycleBadge.dataset.tone = cycle.tone;
       cycleBadge.setAttribute('title', cycle.hint);
@@ -363,7 +369,7 @@ export function createMarketView({
       const spectating = Boolean(context.tradingSeatName) && !context.canTrade;
       setHidden(spectateNode, !spectating);
       if (spectating) {
-        setText(spectateNode, `💱 ${context.tradingSeatName} 거래 중… 예약 주문은 지금도 담을 수 있습니다.`);
+        setText(spectateNode, `${context.tradingSeatName} 거래 중… 예약 주문은 지금도 담을 수 있습니다.`);
       }
     },
 

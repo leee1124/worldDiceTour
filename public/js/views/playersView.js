@@ -3,7 +3,7 @@
  * 호스트 도구(오프라인 좌석 자동 진행 전환)와 자기 좌석의 "직접 플레이로 복귀"도 여기서 제공한다.
  */
 
-import { button, clear, el, setHidden, setText, toggleClass } from '../dom.js';
+import { button, clear, el, setHidden, setText, svg, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
 import { lapLabel } from '../domain/buildRules.js';
 import { playerCellLabel } from '../domain/locationLabel.js';
@@ -28,10 +28,10 @@ function badge(text, tone) {
   return el('span', { class: ['badge', `badge--${tone}`], text });
 }
 
-export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) {
+export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} }) {
   const listNode = el('div', { class: 'player-list' });
   const element = el('section', { class: 'panel panel--players' }, [
-    el('h2', { class: 'panel-title' }, ['👥 플레이어']),
+    el('h2', { class: 'panel-title' }, ['플레이어']),
     listNode,
   ]);
 
@@ -53,14 +53,15 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
 
     const location = el('span', { class: 'player-location' });
 
-    // 카드 윗부분 전체가 "이 사람 어디 있지?" 버튼이다(키보드로도 누를 수 있다).
+    // 카드 윗부분 전체가 "이 사람 도시 어디 있지?" 버튼이다(키보드로도 누를 수 있다).
+    // 오너 요청: 돋보기는 말의 위치가 아니라 **그 사람이 가진 도시**를 찾는 도구다.
     const head = button(
       {
         class: 'player-head player-head--locate',
         // 버튼 이름은 "무엇을 하는지"까지 담는다(내용만으로는 이름·금액만 읽힌다).
-        'aria-label': `${player.name} · ${slot.shapeLabel} 모양 말 — 보드에서 위치 보기`,
-        title: `${player.name}의 말 위치 보기`,
-        on: { click: () => onFocusPlayer(player.seatId) },
+        'aria-label': `${player.name} · ${slot.shapeLabel} 모양 말 — 가진 도시 보드에서 찾기`,
+        title: `${player.name}의 도시 찾기`,
+        on: { click: () => onShowHoldings(player.seatId) },
       },
       [
         el('span', {
@@ -73,7 +74,13 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
           location,
           holdings,
         ]),
-        el('span', { class: 'player-locate-icon', 'aria-hidden': 'true', text: '🔎' }),
+        // 돋보기 아이콘은 이모지 대신 인라인 SVG로 그린다(이미지 에셋 없이, 글꼴에 좌우되지 않게).
+        el('span', { class: 'player-locate-icon', 'aria-hidden': 'true' }, [
+          svg('svg', { viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none' }, [
+            svg('circle', { cx: '7', cy: '7', r: '4.4', stroke: 'currentColor', 'stroke-width': '1.6' }),
+            svg('path', { d: 'M10.4 10.4 L14 14', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round' }),
+          ]),
+        ]),
       ],
     );
 
@@ -148,15 +155,15 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
     // 지을 수 있는 건물이 바퀴 수로 정해지므로(1바퀴 별장 / 2바퀴 빌딩 / 3바퀴 호텔) 함께 보여 준다.
     // 탈락한 좌석에는 더 이상 의미가 없어 달지 않는다.
     if (player.eliminated) {
-      node.appendChild(badge('💀 파산', 'danger'));
+      node.appendChild(badge('파산', 'danger'));
     } else {
-      node.appendChild(badge(`🔄 ${lapLabel(player.lap)}`, 'muted'));
+      node.appendChild(badge(lapLabel(player.lap), 'muted'));
     }
     if (isMySeat(state, player.seatId)) {
       node.appendChild(badge('이 기기', 'mine'));
     }
     if (seat?.kind === 'COMPUTER') {
-      node.appendChild(badge('🤖 컴퓨터', 'muted'));
+      node.appendChild(badge('컴퓨터', 'muted'));
     }
     if (seat?.autopilot) {
       node.appendChild(badge('자동 진행', 'warn'));
@@ -165,10 +172,10 @@ export function createPlayersView({ onSetAutopilot, onFocusPlayer = () => {} }) 
       node.appendChild(badge('오프라인', 'muted'));
     }
     if (player.islandRemainingTurns > 0) {
-      node.appendChild(badge(`🏝 조난 ${player.islandRemainingTurns}턴`, 'danger'));
+      node.appendChild(badge(`조난 ${player.islandRemainingTurns}턴`, 'danger'));
     }
     if (player.airportPending) {
-      node.appendChild(badge('✈️ 이동권', 'info'));
+      node.appendChild(badge('이동권', 'info'));
     }
     if (player.loanDebt > 0) {
       node.appendChild(badge(`대출 중 · 채무 ${formatWon(player.loanDebt)}`, 'warn'));

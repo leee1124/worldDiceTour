@@ -7,15 +7,15 @@ import { el } from '../dom.js';
 
 const MAX_LINES = 240;
 
-/** 줄 성격별 아이콘(이모지만 사용). */
+/** 줄 성격별 아이콘(이모지를 쓰지 않는 단순 기호 한 글자). */
 const KIND_ICONS = Object.freeze({
   turn: '▶',
   info: '·',
-  move: '👣',
+  move: '→',
   'money-in': '＋',
   'money-out': '－',
-  special: '✨',
-  alert: '⚠',
+  special: '◆',
+  alert: '!',
   unknown: '?',
 });
 
@@ -27,7 +27,7 @@ export function createLogView() {
     'aria-live': 'off',
   });
   const element = el('section', { class: 'panel panel--log' }, [
-    el('h2', { class: 'panel-title' }, ['📜 게임 로그']),
+    el('h2', { class: 'panel-title' }, ['게임 로그']),
     listNode,
   ]);
 

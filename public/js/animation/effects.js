@@ -25,8 +25,9 @@ export async function flyCoin(from, to, { label = '', tone = 'gold' } = {}) {
   if (!from || !to || prefersReducedMotion()) {
     return;
   }
+  // 동전 얼굴은 이모지 대신 CSS로 그린 원(₩ 표시)이다 — 폰트에 기대지 않는다.
   const coin = el('div', { class: ['fx-coin', `fx-coin--${tone}`] }, [
-    el('span', { class: 'fx-coin-face', text: '🪙' }),
+    el('span', { class: 'fx-coin-face', 'aria-hidden': 'true', text: '₩' }),
     label ? el('span', { class: 'fx-coin-label', text: label }) : null,
   ]);
   coin.style.transform = `translate3d(${from.x}px, ${from.y}px, 0)`;

@@ -21,7 +21,7 @@ export function tutorialModalSpec({ card, index, total, onNext, onSkip, onDismis
   const last = index >= total - 1;
   return {
     id: TUTORIAL_MODAL_ID,
-    title: `${card.icon} ${card.title}`,
+    title: card.title,
     subtitle: `처음 보는 사람을 위한 안내 · ${index + 1} / ${total}`,
     dismissible: true,
     variant: 'sheet',

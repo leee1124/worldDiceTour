@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "code": "JP4T",
+  "status": "PLAYING",
+  "hostSeatId": "seat-1",
+  "seatSequence": 2,
+  "createdAt": 1700000000000,
+  "updatedAt": 1700000600000,
+  "seats": [
+    {
+      "id": "seat-1",
+      "name": "하나",
+      "kind": "HUMAN",
+      "token": "1111111111111111111111111111111111111111111111111111111111111111",
+      "autopilot": false
+    },
+    {
+      "id": "seat-2",
+      "name": "두리",
+      "kind": "COMPUTER",
+      "token": "2222222222222222222222222222222222222222222222222222222222222222",
+      "autopilot": false
+    }
+  ],
+  "options": {
+    "roundLimit": 30,
+    "finance": {
+      "investmentMode": "OFF",
+      "financeSystem": "BASIC",
+      "tradeTimerSec": 0,
+      "scenario": "STANDARD"
+    }
+  },
+  "game": {
+    "version": 42,
+    "phase": "AWAIT_ROLL",
+    "turnIndex": 0,
+    "round": 4,
+    "options": {
+      "roundLimit": 30
+    },
+    "initialTotal": 6000000,
+    "players": [
+      {
+        "id": "seat-1",
+        "name": "하나",
+        "cash": 2880000,
+        "position": 4,
+        "eliminated": false,
+        "islandRemainingTurns": 0,
+        "airportPending": false,
+        "consecutiveDoubles": 0,
+        "lap": 2,
+        "loanUsed": false,
+        "loanDebt": 0
+      },
+      {
+        "id": "seat-2",
+        "name": "두리",
+        "cash": 2880000,
+        "position": 17,
+        "eliminated": false,
+        "islandRemainingTurns": 0,
+        "airportPending": false,
+        "consecutiveDoubles": 0,
+        "lap": 2,
+        "loanUsed": false,
+        "loanDebt": 0
+      }
+    ],
+    "board": [],
+    "deck": {
+      "drawPile": [
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T20"
+      ]
+    },
+    "casino": {
+      "jackpot": 240000
+    },
+    "ledger": {
+      "fromBank": 0,
+      "toBank": 0,
+      "byReason": {}
+    },
+    "turn": {
+      "rollWasDouble": false,
+      "casinoRoundsLeft": 0,
+      "buildIndex": null,
+      "acquireIndex": null,
+      "debt": null
+    }
+  }
+}

@@ -194,10 +194,16 @@
 }
 
 .player-locate-icon {
+  display: inline-flex;
   margin-left: auto;
   flex: 0 0 auto;
-  opacity: 0.6;
-  font-size: 0.9rem;
+  align-items: center;
+  color: var(--gold-300);
+  opacity: 0.75;
+}
+
+.player-head--locate:hover .player-locate-icon {
+  opacity: 1;
 }
 
 /* 이 사람이 지금 서 있는 칸. */

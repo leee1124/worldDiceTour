@@ -10,7 +10,8 @@ import { actionRow, primaryButton, quietButton } from './parts.js';
 
 export const GAME_OVER_MODAL_ID = 'game-over';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+/** 순위 1~3위의 메달 색(등수는 숫자로 그대로 보여 주고, 색만 금·은·동으로 구분한다). */
+const MEDAL_TONES = ['gold', 'silver', 'bronze'];
 
 /**
  * 총자산 내역 한 줄. `rankings`에는 내역이 없으므로(현금·채무만) `view.players`의
@@ -43,7 +44,7 @@ export function gameOverModalSpec({
 }) {
   return {
     id: GAME_OVER_MODAL_ID,
-    title: '🏆 최종 순위',
+    title: '최종 순위',
     subtitle: reason ? gameOverReasonLabel(reason) : '',
     dismissible: true,
     variant: 'trophy',
@@ -51,8 +52,13 @@ export function gameOverModalSpec({
       el('div', { class: 'modal-stack' }, [
         el('ol', { class: 'ranking-list' }, (rankings ?? []).map((entry, order) => {
           const slot = slotOfSeat(entry.playerId);
+          const tone = MEDAL_TONES[order];
           return el('li', { class: ['ranking-row', order === 0 ? 'ranking-row--champion' : null] }, [
-            el('span', { class: 'ranking-medal', 'aria-hidden': 'true', text: MEDALS[order] ?? `${entry.rank}` }),
+            el('span', {
+              class: ['ranking-medal', tone ? `ranking-medal--${tone}` : null],
+              'aria-hidden': 'true',
+              text: `${entry.rank}`,
+            }),
             el('span', {
               class: ['player-mark', `player-mark--${slot.color}`],
               dataset: { shape: slot.shape },

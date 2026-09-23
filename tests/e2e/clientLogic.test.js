@@ -5,6 +5,7 @@ import { EVENT_TYPES } from '../../src/domain/game/events.js';
 import { BUILDING_TYPES, City } from '../../src/domain/game/City.js';
 import { BASIC_BUILDINGS, BuildingUnlocks } from '../../src/domain/game/buildings.js';
 import { BOARD_SPACES, SPACE_KINDS } from '../../src/domain/game/data/board.js';
+import { TICKET_EFFECTS } from '../../src/domain/game/data/tickets.js';
 
 import { formatCompactWon, formatMoney, formatSignedWon, formatWon } from '../../public/js/format.js';
 import {
@@ -17,6 +18,7 @@ import {
   sideOf,
 } from '../../public/js/domain/boardLayout.js';
 import { LAP_UNLOCK_HINTS, formatEventLine } from '../../public/js/domain/eventLog.js';
+import { ticketEffectLabel } from '../../public/js/domain/labels.js';
 import { canBet, clampBet, quickChips, stepBet } from '../../public/js/domain/betRules.js';
 import {
   LAP_RULE_TEXT,
@@ -172,7 +174,7 @@ const LOG_CONTEXT = {
   spaceNameOf: (index) => BOARD_SPACES[index]?.name ?? `${index}번 칸`,
 };
 
-/** 43종 이벤트의 대표 필드를 담은 표본. */
+/** 45종 이벤트의 대표 필드를 담은 표본. */
 const EVENT_SAMPLES = {
   TURN_STARTED: { playerId: 'seat-1', round: 2 },
   DICE_ROLLED: { playerId: 'seat-1', die1: 3, die2: 3, sum: 6, isDouble: true },
@@ -217,6 +219,7 @@ const EVENT_SAMPLES = {
   },
   CASINO_LEFT: { playerId: 'seat-1' },
   JACKPOT_CHANGED: { jackpot: 125_000 },
+  JACKPOT_CLAIMED: { playerId: 'seat-1', amount: 326_500, share: 100, remaining: 0 },
   AIRPORT_TICKET_GRANTED: { playerId: 'seat-1' },
   AIRPORT_READY: { playerId: 'seat-1' },
   TRAVELED: { playerId: 'seat-1', from: 30, to: 39 },
@@ -301,10 +304,10 @@ const EVENT_SAMPLES = {
   },
 };
 
-test('게임 로그: 서버의 62종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
-  // Given 서버가 정의한 모든 이벤트 종류(증권거래소 19종 포함)
+test('게임 로그: 서버의 63종 도메인 이벤트 전부에 한국어 문장이 있다', () => {
+  // Given 서버가 정의한 모든 이벤트 종류(기본 45종 + 증권거래소 18종)
   const types = Object.keys(EVENT_TYPES);
-  assert.equal(types.length, 62);
+  assert.equal(types.length, 63);
 
   // When 각 이벤트를 로그 문장으로 바꾸면
   for (const type of types) {
@@ -330,6 +333,63 @@ test('게임 로그: 모르는 이벤트 종류가 와도 기본 문장으로 �
   // And 이벤트가 아예 없어도 깨지지 않는다
   assert.equal(typeof formatEventLine(null).text, 'string');
   assert.equal(typeof formatEventLine({}).text, 'string');
+});
+
+test('게임 로그: 잭팟 수령은 금액과 남은 적립금을 알리고, 빈 적립금은 따로 안내한다', () => {
+  // Given 잭팟을 전액 수령한 이벤트와 적립금이 비어 있던 이벤트
+  const won = formatEventLine(
+    { type: 'JACKPOT_CLAIMED', playerId: 'seat-1', amount: 326_500, share: 100, remaining: 0 },
+    LOG_CONTEXT,
+  );
+  const half = formatEventLine(
+    { type: 'JACKPOT_CLAIMED', playerId: 'seat-1', amount: 62_500, share: 50, remaining: 62_501 },
+    LOG_CONTEXT,
+  );
+  const empty = formatEventLine(
+    { type: 'JACKPOT_CLAIMED', playerId: 'seat-2', amount: 0, share: 50, remaining: 0 },
+    LOG_CONTEXT,
+  );
+
+  // When / Then 수령액은 문장에 그대로 담기고, 0원이면 비어 있었다고 알린다
+  assert.ok(won.text.includes('하나'));
+  assert.ok(won.text.includes('326,500원'));
+  assert.equal(won.kind, 'special');
+
+  // And 절반만 받았으면 남은 적립금까지 알린다
+  assert.ok(half.text.includes('62,500원'), `수령액이 없다: ${half.text}`);
+  assert.ok(half.text.includes('62,501원'), `남은 적립금이 없다: ${half.text}`);
+  assert.equal(half.kind, 'special');
+
+  assert.ok(empty.text.includes('두리'));
+  assert.ok(empty.text.includes('비어'), `빈 적립금 안내가 없다: ${empty.text}`);
+  assert.equal(empty.text.includes('326,500원'), false);
+  assert.notEqual(empty.kind, 'unknown');
+});
+
+test('행운 티켓 효과 라벨: 서버가 정의한 모든 효과 종류에 한국어 라벨이 있다', () => {
+  // Given 서버의 티켓 효과 종류 전부
+  const types = Object.values(TICKET_EFFECTS);
+
+  // When / Then 모르는 값에 쓰는 기본 문구로 떨어지지 않는다
+  for (const type of types) {
+    const label = ticketEffectLabel(type);
+    assert.ok(label.length > 0, `라벨이 빈 효과: ${type}`);
+    assert.notEqual(label, '즉시 효과', `라벨이 없는 효과: ${type}`);
+    assert.notEqual(label, type, `라벨이 없는 효과: ${type}`);
+  }
+
+  // And 잭팟 수령 티켓 두 장은 지분에 따라 서로 다른 문구가 된다
+  assert.equal(
+    ticketEffectLabel('CLAIM_JACKPOT', { type: 'CLAIM_JACKPOT', share: 100 }),
+    '잭팟 적립금 전액 수령',
+  );
+  assert.equal(
+    ticketEffectLabel('CLAIM_JACKPOT', { type: 'CLAIM_JACKPOT', share: 50 }),
+    '잭팟 적립금 절반 수령',
+  );
+
+  // And 모르는 효과는 기본 문구로 안전하게 넘어간다
+  assert.equal(ticketEffectLabel('STOCK_DIVIDEND'), '즉시 효과');
 });
 
 test('게임 로그: 이름과 금액이 문장에 그대로 반영된다', () => {
@@ -445,7 +505,7 @@ test('건설 미리보기: 건설 후 통행료가 서버의 계산과 일치한
   }
 });
 
-test('건설 미리보기: 랜드마크 통행료는 가격의 3.5배로 고정된다', () => {
+test('건설 미리보기: 관광명소 통행료는 가격의 3.5배로 고정된다', () => {
   // Given 3종을 모두 지은 도시
   const price = 200_000;
   const landmarkCity = new City({
@@ -458,7 +518,7 @@ test('건설 미리보기: 랜드마크 통행료는 가격의 3.5배로 고정�
     landmark: true,
   });
 
-  // When 랜드마크 업그레이드를 고르면
+  // When 관광명소 업그레이드를 고르면
   // Then 서버와 같은 고정 배율이 나온다
   assert.equal(
     predictToll({ price, buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: false, selected: ['LANDMARK'] }),
@@ -481,8 +541,8 @@ test('건설 미리보기: 정가 기준 건설비가 서버 도메인과 같다
   assert.equal(buildCostOf(undefined, 'VILLA'), 0);
 });
 
-test('건설 미리보기: 랜드마크는 단독 선택만 허용한다', () => {
-  // Given 랜드마크만 제안된 건설 기회
+test('건설 미리보기: 관광명소는 단독 선택만 허용한다', () => {
+  // Given 관광명소만 제안된 건설 기회
   const landmarkOnly = [{ type: BUILDING_TYPES.LANDMARK, cost: 200_000 }];
   // When 다른 건물과 함께 고르면
   // Then 유효하지 않다고 알려준다
@@ -517,7 +577,7 @@ test('건설 미리보기: 바퀴로 잠긴 건물은 잠긴 행으로 만들어
   ]);
 });
 
-test('건설 미리보기: 랜드마크 기회와 잠긴 것이 없는 기회에는 잠긴 행이 없다', () => {
+test('건설 미리보기: 관광명소 기회와 잠긴 것이 없는 기회에는 잠긴 행이 없다', () => {
   // Given
   const landmarkOffer = { options: [{ type: 'LANDMARK', cost: 70_000 }], lockedOptions: [] };
   const openOffer = {

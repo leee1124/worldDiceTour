@@ -6,11 +6,12 @@
  * - `spec = { id, title, subtitle, variant, dismissible, render(api), keepBody, onDismiss }`
  *   - `render(api)`는 본문 노드를 돌려준다. `api.close()`로 스스로 닫을 수 있다.
  *   - `keepBody: true`면 갱신 때 본문을 다시 만들지 않는다(카지노처럼 자체 상태를 가진 화면).
- *   - `onDismiss`는 **사용자가 직접 닫았을 때만** 불린다(Esc · 배경 클릭 · ✕).
+ *   - `onDismiss`는 **사용자가 직접 닫았을 때만** 불린다(Esc · 배경 클릭 · 닫기 버튼).
  *     페이즈 전환으로 `closeOthers`가 닫은 것과 구분해야 하는 화면(거래 시트)이 쓴다.
  */
 
 import { button, el, focusableWithin, replaceChildren, setText } from '../../dom.js';
+import { closeIcon } from '../icons.js';
 
 export function createModalHost(root) {
   /** @type {Array<{spec: object, backdrop: HTMLElement, body: HTMLElement, restoreFocus: Element|null}>} */
@@ -26,7 +27,7 @@ export function createModalHost(root) {
     dismiss(entry.spec.id);
   }
 
-  /** 사용자가 직접 닫았다(Esc · 배경 · ✕). 화면 쪽에 알려 준 뒤 닫는다. */
+  /** 사용자가 직접 닫았다(Esc · 배경 · 닫기 버튼). 화면 쪽에 알려 준 뒤 닫는다. */
   function dismiss(id) {
     const entry = stack.find((item) => item.spec.id === id);
     close(id);
@@ -107,7 +108,7 @@ export function createModalHost(root) {
           spec.dismissible
             ? button(
                 { class: 'modal-close', 'aria-label': '닫기', on: { click: () => dismiss(spec.id) } },
-                '✕',
+                [closeIcon()],
               )
             : null,
         ]),

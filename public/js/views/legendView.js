@@ -7,6 +7,7 @@
 import { el, clear } from '../dom.js';
 import { BUILDING_ORDER, buildingLabel } from '../domain/labels.js';
 import { buildingShortLabel } from '../domain/buildingSlots.js';
+import { starIcon } from './icons.js';
 import { slotOf } from '../store.js';
 
 function buildingLegendItem(type) {
@@ -23,7 +24,7 @@ export function createLegendView() {
   const ownersNode = el('div', { class: 'legend-row legend-row--owners' });
   const element = el('details', { class: 'legend' }, [
     el('summary', { class: 'legend-summary' }, [
-      el('span', { text: '🧭 범례' }),
+      el('span', { text: '범례' }),
       el('span', { class: 'legend-hint', text: '칸 표시 읽는 법' }),
     ]),
     el('div', { class: 'legend-body' }, [
@@ -35,9 +36,9 @@ export function createLegendView() {
         ]),
         el('span', { class: 'legend-item' }, [
           el('span', { class: 'build-landmark', 'aria-hidden': 'true' }, [
-            el('span', { class: 'build-landmark-star', text: '★' }),
+            el('span', { class: 'build-landmark-star' }, [starIcon()]),
           ]),
-          el('span', { class: 'legend-text', text: '랜드마크(통행료 최대)' }),
+          el('span', { class: 'legend-text', text: '관광명소(통행료 최대)' }),
         ]),
       ]),
       ownersNode,

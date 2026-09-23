@@ -47,6 +47,7 @@
 | 31 | **새 에러 코드** | `ERR018`(409) 주문 한도를 초과했습니다 / `ERR019`(429) 요청이 너무 잦습니다 | `ERR018`은 창구 예산(3건·2,000,000원)·종목 보유 상한·예금 한도 위반. `ERR019`는 좌석당 거래 커맨드 레이트 리밋(5초 10건) — **즉시 재시도하지 말 것** |
 | 32 | 동작 | 저장 파일이 `schemaVersion: 3`이 됐다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방은 자동 승급되며 **투자 모드는 `OFF`로 유지된다**(진행 중인 판에 기능이 끼어들지 않는다) |
 | 33 | 동작 | `rankings`와 `players[].totalAssets`가 주식 평가액·예금을 포함한다(단일 출처 `NetWorth`) | 종료 순위 모달의 총자산 내역도 28번의 `netWorth`로 분해해 보여 줄 수 있다 |
+| 34 | 동작 + **새 이벤트** | **행운 티켓이 22장이 됐다**: 잭팟 적립금을 받는 두 장이 추가됐다 — `T21 잭팟 당첨권`(전액)과 `T22 잭팟 나눔 행사`(절반, 내림). 새 효과 종류 `CLAIM_JACKPOT`(`share`: `100` \| `50`)과 새 이벤트 `JACKPOT_CLAIMED { playerId, amount, share, remaining }`. 적립금이 실제로 줄면 기존 `JACKPOT_CHANGED`가 뒤따르고, 적립금이 0원이면 `amount: 0`인 `JACKPOT_CLAIMED`만 발생한다(돈은 움직이지 않는다) | 티켓 카드 문구는 `TICKET_DRAWN.text`를 그대로 쓰면 된다(효과 라벨은 `effect.share`로 "전액/절반"을 구분할 수 있다). 로그/연출에 `JACKPOT_CLAIMED`를 추가할 것 — 모르는 이벤트는 무시해도 잭팟 숫자는 `view.jackpot`과 `JACKPOT_CHANGED`로 맞는다. `amount: 0`인 경우를 "당첨 연출"로 보여 주지 말 것 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -369,10 +370,10 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `board[].price` | 매입가(소유 가능 칸만) |
 | `board[].ownerId` | 소유 좌석 id 또는 `null` |
 | `board[].buildings` | `["VILLA","BUILDING","HOTEL"]` 중 지어진 것(정해진 순서) |
-| `board[].landmark` | 랜드마크 완성 여부 |
+| `board[].landmark` | 관광명소 완성 여부 |
 | `board[].invested` | 매입가 + 정가 기준 건설비 합계. 매각 환급은 이 값의 50% |
 | `board[].toll` | 지금 이 칸에 걸리면 낼 통행료 |
-| `board[].acquisitionPrice` | 인수 가격(`invested × 2`). 인수 불가(랜드마크/휴양지/주인 없음)면 `null` |
+| `board[].acquisitionPrice` | 인수 가격(`invested × 2`). 인수 불가(관광명소/휴양지/주인 없음)면 `null` |
 | `pending` | 현재 플레이어가 내려야 하는 결정(6장). 결정이 없으면 `null` |
 | `rankings` | 종료 시에만 채워진다: `[{ playerId, name, rank, cash, totalAssets, loanDebt, eliminated }]`. 정렬은 생존자 → 총자산 → **현금** → 좌석 순서(같은 상태면 항상 같은 순위) |
 
@@ -472,9 +473,9 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `options` | **지금 고를 수 있는 건물**만. 뜻이 바뀌지 않았으므로 이 목록만 쓰는 예전 클라이언트도 그대로 동작한다. 항목마다 `locked: false`와 `unlockLap`이 함께 온다(추가 필드) |
 | `lockedOptions` | **바퀴가 모자라 아직 못 짓는 건물**(`locked: true`). 화면에 비활성 행으로 보여 주기 위한 정보이며, 여기 있는 건물을 커맨드에 담으면 `400 ERR001`이다 |
 | `locked` | 그 항목을 지금 고를 수 있는지(`options`는 항상 `false`, `lockedOptions`는 항상 `true`) |
-| `unlockLap` | 그 건물이 열리는 바퀴(별장 1 · 빌딩 2 · 호텔 3). 랜드마크는 바퀴로 막지 않으므로 `1` |
+| `unlockLap` | 그 건물이 열리는 바퀴(별장 1 · 빌딩 2 · 호텔 3). 관광명소는 바퀴로 막지 않으므로 `1` |
 
-- 두 목록에는 **이미 지은 건물이 들어가지 않는다.** 랜드마크 업그레이드 기회(`options`가 `[{ type: "LANDMARK", … }]`)에서는 `lockedOptions`가 항상 빈 배열이다.
+- 두 목록에는 **이미 지은 건물이 들어가지 않는다.** 관광명소 업그레이드 기회(`options`가 `[{ type: "LANDMARK", … }]`)에서는 `lockedOptions`가 항상 빈 배열이다.
 - 그 바퀴에 **고를 수 있는 것이 하나도 없으면 건설 기회 자체가 열리지 않는다**(페이즈가 `AWAIT_BUILD`로 가지 않고 턴이 끝난다). `START_BUILD`의 `candidates`에도 그런 도시는 올라오지 않으며, 후보가 하나도 없으면 보너스를 자동으로 건너뛴다.
 - 예: 1바퀴 플레이어가 방콕(70,000원)을 막 매입한 직후
   ```json
@@ -521,6 +522,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `MONEY_LOST` | `playerId`, `amount`, `reason`, `ticketId?`, `toPlayerIds?` | 은행/타인에게 지불 |
 | `MONEY_TRANSFERRED` | `fromId`, `toId`, `amount`, `reason` | 플레이어 간 이동 |
 | `JACKPOT_CHANGED` | `jackpot` | 잭팟 적립금 변화 |
+| `JACKPOT_CLAIMED` | `playerId`, `amount`, `share`, `remaining` | **잭팟 수령 티켓**(`T21` 전액 / `T22` 절반). `amount`는 실제로 받은 금액(`floor(적립금 × share / 100)`), `remaining`은 수령 뒤 남은 적립금이다. `amount + remaining`이 수령 전 적립금과 정확히 같다. 적립금이 0원이면 `amount: 0`·`remaining: 0`이고 **돈은 전혀 움직이지 않는다**(위로금 없음) — 이때는 `JACKPOT_CHANGED`도 발생하지 않는다. 금액이 움직였으면 곧바로 `JACKPOT_CHANGED`가 따라온다 |
 
 `reason`: `SALARY`·`PURCHASE`·`BUILD`·`TOLL`·`TAX`·`TICKET`·`CASINO`·`ISLAND_RESCUE`·`LIQUIDATION`·`BANKRUPTCY`·`ACQUISITION`·`LOAN`
 ·`TRADE_BUY`·`TRADE_SELL`·`TRADE_FEE`·`DIVIDEND`·`DEPOSIT`·`DEPOSIT_INTEREST` (뒤 6개는 투자 모드 `STOCKS`에서만)
@@ -532,7 +534,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `PURCHASE_DECLINED` | `playerId`, `index` | 매입 포기 |
 | `BUILD_OFFERED` | `playerId`, `index`, `name`, `options`, `lockedOptions` | 건설 기회 열림. 두 목록은 같은 순간의 `pending`과 같다(6장) |
 | `BUILT` | `playerId`, `index`, `name`, `buildings`, `cost` | 건설 완료(지은 목록) |
-| `LANDMARK_BUILT` | `playerId`, `index`, `name`, `cost` | 랜드마크 완성(`BUILT`와 함께 발생) |
+| `LANDMARK_BUILT` | `playerId`, `index`, `name`, `cost` | 관광명소 완성(`BUILT`와 함께 발생) |
 | `BUILD_DECLINED` | `playerId`, `index` | 건설 포기(`index`는 출발 보너스 포기 시 `null`) |
 | `START_BONUS_OFFERED` | `playerId`, `candidates` | 출발 칸 보너스. 후보마다 `options`·`lockedOptions`가 있고, 그 바퀴에 지을 것이 없는 도시는 후보에 없다 |
 | `ACQUIRE_OFFERED` | `playerId`, `index`, `name`, `ownerId`, `price` | 인수 제안 |
@@ -604,7 +606,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 
 ### 행운 티켓 효과(`TICKET_DRAWN.effect.type`)
 
-`GAIN`·`LOSE`(`amount`) / `MOVE_RELATIVE`(`steps`) / `MOVE_TO`(`index`) / `TO_ISLAND` / `COLLECT_FROM_ALL`·`PAY_TO_ALL`(`amount`) / `PAY_PER_BUILDING`(`amount`) / `GAIN_PER_CITY`(`amount`) / `NEAREST_RESORT` / `TAX_RATE`(`rate`)
+`GAIN`·`LOSE`(`amount`) / `MOVE_RELATIVE`(`steps`) / `MOVE_TO`(`index`) / `TO_ISLAND` / `COLLECT_FROM_ALL`·`PAY_TO_ALL`(`amount`) / `PAY_PER_BUILDING`(`amount`) / `GAIN_PER_CITY`(`amount`) / `NEAREST_RESORT` / `TAX_RATE`(`rate`) / `CLAIM_JACKPOT`(`share`: `100` \| `50`)
 
 ---
 

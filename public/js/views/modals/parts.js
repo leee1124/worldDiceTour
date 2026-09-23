@@ -6,6 +6,7 @@ import { button, el } from '../../dom.js';
 import { formatWon } from '../../format.js';
 import { spaceKindLabel } from '../../domain/labels.js';
 import { buildingSlotView } from '../../domain/buildingSlots.js';
+import { landmarkBadge } from '../icons.js';
 
 /** 라벨 + 금액 한 줄. */
 export function moneyRow(label, amount, { tone = '', note = '' } = {}) {
@@ -26,7 +27,7 @@ export function infoRow(label, value) {
 
 /**
  * 도시 요약 카드(칸 이름 · 종류 · 건물 상태).
- * 건물은 보드 칸과 **같은 배지 언어**(별·빌·호 세 자리 + 금색 랜드마크 리본)로 그려서
+ * 건물은 보드 칸과 **같은 배지 언어**(별·빌·호 세 자리 + 금색 관광명소 리본)로 그려서
  * 모달에서 본 표시와 보드에서 본 표시가 어긋나지 않게 한다.
  */
 export function citySummary({
@@ -42,12 +43,7 @@ export function citySummary({
   const builds = !showBuildings
     ? []
     : view.landmark
-    ? [
-        el('span', { class: 'build-landmark' }, [
-          el('span', { class: 'build-landmark-star', text: '★' }),
-          el('span', { class: 'build-landmark-text', text: '랜드마크' }),
-        ]),
-      ]
+    ? [landmarkBadge()]
     : view.slots.map((slot) =>
         el(
           'span',

@@ -26,12 +26,13 @@ import {
   stepQuantity,
 } from '../domain/marketRules.js';
 import { previewOrder } from '../domain/marketOrder.js';
+import { assetKindIcon, diceIcon } from './icons.js';
 
 export const TRADE_MODAL_ID = 'trade';
 
 const TABS = Object.freeze([
-  { id: 'STOCK', icon: '📈', label: '주식' },
-  { id: 'DEPOSIT', icon: '🏦', label: '예금' },
+  { id: 'STOCK', icon: 'STOCK', label: '주식' },
+  { id: 'DEPOSIT', icon: 'DEPOSIT', label: '예금' },
 ]);
 
 /** 금액 한 줄(모달 공통 `money-row`와 같은 언어). */
@@ -86,7 +87,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
         on: { click: () => selectTab(item.id) },
       },
       [
-        el('span', { class: 'tab-icon', 'aria-hidden': 'true', text: item.icon }),
+        el('span', { class: 'tab-icon', 'aria-hidden': 'true' }, [assetKindIcon(item.icon)]),
         el('span', { class: 'tab-label', text: item.label }),
       ],
     ),
@@ -105,7 +106,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
   const budgetNode = el('p', { class: 'trade-budget' });
   const closeButton = button(
     { class: 'btn btn--primary btn--block trade-close', dataset: { focusKey: 'trade-close' }, on: { click: () => onCloseTrading() } },
-    '🎲 거래 마치고 주사위 굴리기',
+    [diceIcon(), ' 거래 마치고 주사위 굴리기'],
   );
   const holdNote = el('p', { class: 'trade-hold-note' });
   const queueListNode = el('div', { class: 'trade-queue' });
@@ -485,7 +486,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
     submitButton.setAttribute('aria-busy', ctx.locked ? 'true' : 'false');
 
     const kindLabel = orderKindLabel(tab === 'STOCK' ? side : depositSide);
-    setText(submitButton, queueMode() ? `🧾 ${kindLabel} 예약 담기` : `${kindLabel} 주문 넣기`);
+    setText(submitButton, queueMode() ? `${kindLabel} 예약 담기` : `${kindLabel} 주문 넣기`);
 
     const reason = cooling
       ? '주문이 너무 잦습니다 — 잠시 뒤 다시 눌러 주세요.'
@@ -516,7 +517,7 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
     closeButton.disabled = !ctx.interactive || ctx.locked;
     closeButton.setAttribute('aria-busy', ctx.locked ? 'true' : 'false');
     // "창을 닫아도 턴은 넘어가지 않는다"를 못 박는다(닫기 버튼과 CTA를 헷갈리지 않게).
-    setText(holdNote, '✕로 닫아도 차례는 그대로입니다(금색 버튼을 눌러야 넘어갑니다).');
+    setText(holdNote, '닫기(X)를 눌러도 차례는 그대로입니다(금색 버튼을 눌러야 넘어갑니다).');
     setHidden(holdNote, false);
   }
 
@@ -639,7 +640,7 @@ export function tradeModalSpec({ tradeView, seatName, mode, onDismiss }) {
   const queueing = mode === 'QUEUE';
   return {
     id: TRADE_MODAL_ID,
-    title: queueing ? '🧾 예약 주문' : '💱 거래 창구',
+    title: queueing ? '예약 주문' : '거래 창구',
     subtitle: queueing ? `${seatName} · 내 차례에 자동 체결` : `${seatName} · 주문 뒤 아래에서 마감`,
     dismissible: true,
     variant: 'sheet',

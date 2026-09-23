@@ -1,7 +1,7 @@
 /**
  * 도메인 이벤트 → 한국어 로그 문장. 순수 함수(DOM 없음)라 Node에서 그대로 테스트한다.
  *
- * - docs/API.md 7장의 모든 이벤트 종류를 처리한다(증권거래소 19종 포함).
+ * - docs/API.md 7장의 63종(기본 45종 + 증권거래소 18종)을 모두 처리한다.
  * - 모르는 종류가 와도 절대 예외를 던지지 않고 기본 문장(`kind: 'unknown'`)으로 넘어간다.
  * - 여기서 만든 문장은 화면에 `textContent`로만 출력한다.
  */
@@ -17,6 +17,8 @@ import {
   moneyReasonLabel,
 } from './labels.js';
 import { direction, object, subject, to } from './particles.js';
+import { roundStartLine } from './turnOrder.js';
+import { slotSymbolLabel } from './slotSymbols.js';
 
 /** 로그 줄의 성격(색/아이콘 구분용). */
 export const LINE_KINDS = Object.freeze({
@@ -80,19 +82,19 @@ const FORMATTERS = {
 
   TURN_ENDED: (event, ctx) => line(LINE_KINDS.INFO, `${ctx.name(event.playerId)}의 턴이 끝났습니다.`),
 
-  ROUND_ADVANCED: (event) => line(LINE_KINDS.TURN, `${event.round}라운드가 시작되었습니다.`),
+  ROUND_ADVANCED: (event) => line(LINE_KINDS.TURN, roundStartLine(event.round)),
 
   GAME_OVER: (event) => {
     const winner = Array.isArray(event.rankings) ? event.rankings[0] : null;
     const reason = gameOverReasonLabel(event.reason);
     const champion = winner?.name ? `${subject(winner.name)} 우승!` : '';
-    return line(LINE_KINDS.SPECIAL, `🏆 게임 종료 — ${reason}. ${champion}`.trim());
+    return line(LINE_KINDS.SPECIAL, `게임 종료 — ${reason}. ${champion}`.trim());
   },
 
   LAP_ADVANCED: (event, ctx) =>
     line(
       LINE_KINDS.SPECIAL,
-      `🔄 ${subject(ctx.name(event.playerId))} ${event.lap}바퀴에 들어섰습니다${
+      `${subject(ctx.name(event.playerId))} ${event.lap}바퀴에 들어섰습니다${
         LAP_UNLOCK_HINTS[event.lap] ?? ''
       }.`,
     ),
@@ -160,6 +162,18 @@ const FORMATTERS = {
 
   JACKPOT_CHANGED: (event) => line(LINE_KINDS.INFO, `잭팟 적립금 ${formatWon(event.jackpot)}`),
 
+  JACKPOT_CLAIMED: (event, ctx) => {
+    const who = subject(ctx.name(event.playerId));
+    if (!(event.amount > 0)) {
+      return line(LINE_KINDS.INFO, `${who} 잭팟을 수령했지만 적립금이 비어 있었습니다.`);
+    }
+    const rest = event.remaining > 0 ? ` (남은 적립금 ${formatWon(event.remaining)})` : '';
+    return line(
+      LINE_KINDS.SPECIAL,
+      `${who} 잭팟 적립금 ${formatWon(event.amount)}을 수령했습니다${rest}.`,
+    );
+  },
+
   /* ── 도시 · 건물 · 인수 ──────────────────────────────────── */
   CITY_PURCHASED: (event, ctx) =>
     line(
@@ -179,7 +193,7 @@ const FORMATTERS = {
     ),
 
   BUILT: (event, ctx) => {
-    // 서버가 보낸 순서와 무관하게 별장 · 빌딩 · 호텔(· 랜드마크) 순으로 읽히게 정리한다.
+    // 서버가 보낸 순서와 무관하게 별장 · 빌딩 · 호텔(· 관광명소) 순으로 읽히게 정리한다.
     const order = [...BUILDING_ORDER, 'LANDMARK'];
     const built = Array.isArray(event.buildings)
       ? [...event.buildings]
@@ -198,7 +212,7 @@ const FORMATTERS = {
   LANDMARK_BUILT: (event, ctx) =>
     line(
       LINE_KINDS.SPECIAL,
-      `🗼 ${ctx.name(event.playerId)}의 ${event.name ?? ctx.space(event.index)}에 랜드마크가 세워졌습니다 (${formatWon(
+      `${ctx.name(event.playerId)}의 ${event.name ?? ctx.space(event.index)}에 관광명소가 세워졌습니다 (${formatWon(
         event.cost,
       )}).`,
     ),
@@ -215,7 +229,7 @@ const FORMATTERS = {
     const count = Array.isArray(event.candidates) ? event.candidates.length : 0;
     return line(
       LINE_KINDS.SPECIAL,
-      `🚩 ${subject(ctx.name(event.playerId))} 출발 칸에 도착해 건설 기회를 얻었습니다 (후보 ${count}곳).`,
+      `${subject(ctx.name(event.playerId))} 출발 칸에 도착해 건설 기회를 얻었습니다 (후보 ${count}곳).`,
     );
   },
 
@@ -240,12 +254,12 @@ const FORMATTERS = {
 
   /* ── 행운 티켓 · 조난 섬 · 공항 ──────────────────────────── */
   TICKET_DRAWN: (event, ctx) =>
-    line(LINE_KINDS.SPECIAL, `🎫 ${ctx.name(event.playerId)} — ${event.text ?? '행운 티켓을 뽑았습니다.'}`),
+    line(LINE_KINDS.SPECIAL, `${ctx.name(event.playerId)} — ${event.text ?? '행운 티켓을 뽑았습니다.'}`),
 
   STRANDED: (event, ctx) =>
     line(
       LINE_KINDS.ALERT,
-      `🏝 ${subject(ctx.name(event.playerId))} 조난 섬에 갇혔습니다 (최대 ${event.remainingTurns}턴).`,
+      `${subject(ctx.name(event.playerId))} 조난 섬에 갇혔습니다 (최대 ${event.remainingTurns}턴).`,
     ),
 
   ISLAND_RESCUE_PAID: (event, ctx) =>
@@ -261,15 +275,15 @@ const FORMATTERS = {
     line(LINE_KINDS.ALERT, `${ctx.name(event.playerId)}의 탈출 실패 — 남은 조난 ${event.remainingTurns}턴.`),
 
   AIRPORT_TICKET_GRANTED: (event, ctx) =>
-    line(LINE_KINDS.SPECIAL, `✈️ ${subject(ctx.name(event.playerId))} 세계일주 이동권을 받았습니다 (다음 턴 사용).`),
+    line(LINE_KINDS.SPECIAL, `${subject(ctx.name(event.playerId))} 세계일주 이동권을 받았습니다 (다음 턴 사용).`),
 
   AIRPORT_READY: (event, ctx) =>
-    line(LINE_KINDS.INFO, `✈️ ${ctx.name(event.playerId)}의 이동권을 쓸 차례입니다.`),
+    line(LINE_KINDS.INFO, `${ctx.name(event.playerId)}의 이동권을 쓸 차례입니다.`),
 
   TRAVELED: (event, ctx) =>
     line(
       LINE_KINDS.MOVE,
-      `✈️ ${subject(ctx.name(event.playerId))} ${ctx.space(event.from)}에서 ${direction(
+      `${subject(ctx.name(event.playerId))} ${ctx.space(event.from)}에서 ${direction(
         ctx.space(event.to),
       )} 날아갔습니다.`,
     ),
@@ -278,7 +292,7 @@ const FORMATTERS = {
   CASINO_ENTERED: (event, ctx) =>
     line(
       LINE_KINDS.SPECIAL,
-      `🎰 ${subject(ctx.name(event.playerId))} 카지노에 입장했습니다 (${event.roundsLeft}판 가능 · 잭팟 ${formatWon(
+      `${subject(ctx.name(event.playerId))} 카지노에 입장했습니다 (${event.roundsLeft}판 가능 · 잭팟 ${formatWon(
         event.jackpot,
       )}).`,
     ),
@@ -289,10 +303,10 @@ const FORMATTERS = {
     const result = event.win
       ? `${formatWon(event.payout)} 획득`
       : `베팅 ${formatWon(event.bet)} 손실`;
-    const jackpot = event.jackpotWon > 0 ? ` 🎉 잭팟 ${formatWon(event.jackpotWon)} 당첨!` : '';
+    const jackpot = event.jackpotWon > 0 ? ` 잭팟 ${formatWon(event.jackpotWon)} 당첨!` : '';
     return line(
       event.win ? LINE_KINDS.MONEY_IN : LINE_KINDS.MONEY_OUT,
-      `🎰 ${who} · ${casinoGameLabel(event.game)} ${detail} → ${result}${jackpot}`,
+      `${who} · ${casinoGameLabel(event.game)} ${detail} → ${result}${jackpot}`,
     );
   },
 
@@ -304,7 +318,7 @@ const FORMATTERS = {
     const creditor = event.creditorId ? ctx.name(event.creditorId) : '은행';
     return line(
       LINE_KINDS.ALERT,
-      `⚠️ ${ctx.name(event.playerId)}의 현금이 부족합니다 — ${moneyReasonLabel(event.reason)} ${formatWon(
+      `${ctx.name(event.playerId)}의 현금이 부족합니다 — ${moneyReasonLabel(event.reason)} ${formatWon(
         event.amountDue,
       )} (채권자: ${creditor}).`,
     );
@@ -326,7 +340,7 @@ const FORMATTERS = {
     const released = Array.isArray(event.releasedIndexes) ? event.releasedIndexes.length : 0;
     return line(
       LINE_KINDS.ALERT,
-      `💀 ${subject(ctx.name(event.playerId))} 파산했습니다 — ${to(creditor)} ${formatWon(
+      `${subject(ctx.name(event.playerId))} 파산했습니다 — ${to(creditor)} ${formatWon(
         event.paidAmount,
       )} 지급, 자산 ${released}곳 초기화.`,
     );
@@ -336,7 +350,7 @@ const FORMATTERS = {
   TRADING_OPENED: (event, ctx) =>
     line(
       LINE_KINDS.SPECIAL,
-      `📈 ${ctx.name(event.playerId)}의 거래 시간 — 주문 ${event.ordersLeft}건 / 예산 ${formatWon(
+      `${ctx.name(event.playerId)}의 거래 시간 — 주문 ${event.ordersLeft}건 / 예산 ${formatWon(
         event.notionalLeft,
       )} 남음.`,
     ),
@@ -387,7 +401,7 @@ const FORMATTERS = {
   DEPOSIT_INTEREST_PAID: (event, ctx) =>
     line(
       LINE_KINDS.MONEY_IN,
-      `💰 ${ctx.name(event.playerId)}의 예금 이자 ${formatWon(event.amount)} (연 ${formatBp(
+      `${ctx.name(event.playerId)}의 예금 이자 ${formatWon(event.amount)} (연 ${formatBp(
         event.baseRateBp,
       )}).`,
     ),
@@ -395,7 +409,7 @@ const FORMATTERS = {
   DIVIDEND_PAID: (event, ctx) =>
     line(
       LINE_KINDS.MONEY_IN,
-      `💵 ${ctx.name(event.playerId)}의 ${event.name ?? event.instrumentId} 배당 ${formatWon(
+      `${ctx.name(event.playerId)}의 ${event.name ?? event.instrumentId} 배당 ${formatWon(
         event.amount,
       )} (1주 ${formatWon(event.perShare)} × ${event.quantity}주).`,
     ),
@@ -404,19 +418,19 @@ const FORMATTERS = {
   CYCLE_CHANGED: (event) =>
     line(
       LINE_KINDS.SPECIAL,
-      `🔄 경기 국면이 ${cyclePhaseLabel(event.from)}에서 ${cyclePhaseLabel(event.to)}으로 바뀌었습니다.`,
+      `경기 국면이 ${cyclePhaseLabel(event.from)}에서 ${cyclePhaseLabel(event.to)}으로 바뀌었습니다.`,
     ),
 
   NEWS_PUBLISHED: (event) =>
     line(
       LINE_KINDS.SPECIAL,
-      `📰 ${event.headline} — ${event.explanation}${describeNewsEffects(event.effects)}`,
+      `${event.headline} — ${event.explanation}${describeNewsEffects(event.effects)}`,
     ),
 
   BASE_RATE_CHANGED: (event) =>
     line(
       LINE_KINDS.INFO,
-      `🏦 기준금리가 ${formatBp(event.from)}에서 ${formatBp(event.to)}로 ${
+      `기준금리가 ${formatBp(event.from)}에서 ${formatBp(event.to)}로 ${
         event.changeBp > 0 ? '올랐' : '내렸'
       }습니다.`,
     ),
@@ -429,25 +443,25 @@ const FORMATTERS = {
     const summary = changes
       .map((change) => `${change.instrumentId} ${formatChangeBp(change.changeBp)}`)
       .join(' · ');
-    return line(LINE_KINDS.INFO, `📊 시세 갱신 — ${summary}`);
+    return line(LINE_KINDS.INFO, `시세 갱신 — ${summary}`);
   },
 
   INSTRUMENT_DELISTED: (event) =>
     line(
       LINE_KINDS.ALERT,
-      `⚠️ ${event.name ?? event.instrumentId}이 상장폐지됐습니다 (${formatWon(event.price)}).`,
+      `${event.name ?? event.instrumentId}이 상장폐지됐습니다 (${formatWon(event.price)}).`,
     ),
 
   INSTRUMENT_LISTED: (event) =>
     line(
       LINE_KINDS.SPECIAL,
-      `✨ ${event.name ?? event.instrumentId}이 새로 상장됐습니다 (${formatWon(event.price)}).`,
+      `${event.name ?? event.instrumentId}이 새로 상장됐습니다 (${formatWon(event.price)}).`,
     ),
 
   HOLDINGS_WIPED: (event, ctx) =>
     line(
       LINE_KINDS.ALERT,
-      `💥 ${ctx.name(event.playerId)}의 ${event.instrumentId} ${event.quantity}주가 휴지조각이 됐습니다 (원가 ${formatWon(
+      `${ctx.name(event.playerId)}의 ${event.instrumentId} ${event.quantity}주가 휴지조각이 됐습니다 (원가 ${formatWon(
         event.costBasis,
       )}).`,
     ),
@@ -456,7 +470,7 @@ const FORMATTERS = {
   QUEUED_ORDER_PLACED: (event, ctx) =>
     line(
       LINE_KINDS.INFO,
-      `🗒️ ${subject(ctx.name(event.playerId))} ${describeQueuedOrder(event)}를 예약했습니다.`,
+      `${subject(ctx.name(event.playerId))} ${describeQueuedOrder(event)}를 예약했습니다.`,
     ),
 
   QUEUED_ORDER_CANCELLED: (event, ctx) =>
@@ -584,7 +598,8 @@ function describeCasinoDetail(event) {
         detail.outcome,
       )}) / 선택 ${casinoChoiceLabel(detail.choice)}`;
     case 'SLOT': {
-      const symbols = Array.isArray(detail.symbols) ? detail.symbols.join(' ') : '';
+      // 서버는 심볼을 이모지 id로 보내지만, 로그는 글자만 쓰므로 한국어 이름으로 바꿔 적는다.
+      const symbols = Array.isArray(detail.symbols) ? detail.symbols.map(slotSymbolLabel).join(' ') : '';
       return `${symbols} (${detail.matched ?? 1}개 일치)`;
     }
     default:

@@ -3,8 +3,8 @@
  * pending: `{index, name, options:[{type,cost}], lockedOptions:[{type,cost,unlockLap}], buildings, landmark}`
  *
  * - 별장/빌딩/호텔은 원하는 조합을 한 번에 고른다(합계 비용 · 건설 후 통행료 미리보기).
- * - 바퀴가 모자라 아직 못 짓는 건물은 `lockedOptions`로 와서 잠긴 행(🔒)으로만 보여 준다.
- * - 3종을 이미 가진 기회라면 서버가 `LANDMARK` 하나만 제안한다 → 랜드마크 업그레이드 화면.
+ * - 바퀴가 모자라 아직 못 짓는 건물은 `lockedOptions`로 와서 잠긴 행(자물쇠 아이콘)으로만 보여 준다.
+ * - 3종을 이미 가진 기회라면 서버가 `LANDMARK` 하나만 제안한다 → 관광명소 업그레이드 화면.
  */
 
 import { el, setText } from '../../dom.js';
@@ -17,7 +17,8 @@ import {
   predictToll,
   validateSelection,
 } from '../../domain/buildRules.js';
-import { buildingIcon, buildingLabel } from '../../domain/labels.js';
+import { buildingLabel } from '../../domain/labels.js';
+import { buildingTypeIcon, lockIcon } from '../icons.js';
 import { actionRow, citySummary, moneyRow, noticeLine, primaryButton, quietButton } from './parts.js';
 
 export const BUILD_MODAL_ID = 'build';
@@ -52,11 +53,9 @@ export function createBuildingPicker({
       },
       [
         input,
-        el('span', {
-          class: 'check-icon',
-          'aria-hidden': 'true',
-          text: row.locked ? '🔒' : buildingIcon(row.type),
-        }),
+        el('span', { class: 'check-icon', 'aria-hidden': 'true' }, [
+          row.locked ? lockIcon() : buildingTypeIcon(row.type),
+        ]),
         el('span', { class: 'check-label', text: buildingLabel(row.type) }),
         row.locked ? el('span', { class: 'check-note', text: row.notice }) : null,
         el('span', { class: 'check-cost', text: formatWon(row.cost) }),
@@ -126,7 +125,7 @@ export function buildModalSpec({ pending, space, cash, keepBody, locked = false,
 
   return {
     id: BUILD_MODAL_ID,
-    title: landmarkOffer ? '랜드마크 업그레이드' : '건설 기회',
+    title: landmarkOffer ? '관광명소 업그레이드' : '건설 기회',
     subtitle: landmarkOffer
       ? '3종 건물을 모두 갖춘 도시입니다.'
       : '원하는 건물을 한 번에 골라 지을 수 있습니다.',
@@ -160,11 +159,11 @@ export function buildModalSpec({ pending, space, cash, keepBody, locked = false,
         landmarkOffer
           ? el('p', {
               class: 'modal-help',
-              text: '랜드마크를 세우면 통행료가 매입가의 3.5배로 고정되고, 더 이상 인수당하지 않습니다.',
+              text: '관광명소를 세우면 통행료가 매입가의 3.5배로 고정되고, 더 이상 인수당하지 않습니다.',
             })
           : el('p', {
               class: 'modal-help',
-              text: '세 종류를 모두 지으면 다음 기회에 랜드마크로 업그레이드할 수 있습니다.',
+              text: '세 종류를 모두 지으면 다음 기회에 관광명소로 업그레이드할 수 있습니다.',
             }),
         picker.element,
         cash <= 0 ? noticeLine('현금이 없어 건설할 수 없습니다.') : null,
