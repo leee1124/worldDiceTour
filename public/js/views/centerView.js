@@ -73,7 +73,8 @@ export function createCenterView({
     ]),
     dice.element,
     actionsNode,
-    // 증권거래소가 들어가는 자리(SPEC U7의 예약 자리). 투자 모드가 꺼진 방에서는 패널이 스스로 숨는다.
+    // 예전 예약 자리(SPEC U7). 지금 시장 패널은 gameView가 옆 칸에 놓는다(U19) — 넣으면 코어가 커져
+    // 넓은 화면에서 엠블럼을 덮는다. 호환을 위해 인자는 남긴다.
     marketView ? marketView.element : null,
   ]);
 
