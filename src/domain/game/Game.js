@@ -173,7 +173,7 @@ export class Game {
    * @param {{ticketCatalog?: Record<string, object>}} [options]
    *   `ticketCatalog`는 **테스트 전용** 티켓 목록이다. 배포 데이터로는 만들 수 없는 상황
    *   (예: 티켓이 연달아 나오는 연쇄)을 실제로 재현해 검증하기 위한 seam이며,
-   *   운영 경로에서는 언제나 생략해 배포 티켓 20장을 쓴다.
+   *   운영 경로에서는 언제나 생략해 배포 티켓 22장을 쓴다.
    */
   static restore(snapshot, random, { ticketCatalog } = {}) {
     if (!snapshot || !Array.isArray(snapshot.players)) {
@@ -429,14 +429,24 @@ export class Game {
   #buy() {
     const player = this.#current;
     const city = this.#board.cityAt(player.position);
-    this.#applyTrade(this.#cityTrade.buy({ player, city }));
+    this.#applyOutcome(this.#cityTrade.buy({ player, city }));
     this.#offerBuild(player, city.index);
   }
 
-  /** 도시 거래 결과(돈 이동 + 이벤트)를 반영한다. */
-  #applyTrade({ intents, events }) {
-    this.#treasury.apply(intents);
+  /**
+   * 서브시스템이 돌려준 결과(`{ intents, events }`)를 반영한다: 돈 이동 → 이벤트 →
+   * (잭팟이 움직였으면) `JACKPOT_CHANGED`.
+   *
+   * **이 모양의 결과는 모두 이 문을 지난다**(도시 거래·티켓 정산·출발 정산·매각·파산 청산).
+   * 잭팟 변화 이벤트를 각 호출 지점에서 따로 챙기면, 앞으로 잭팟에서 환급하는 자산군이
+   * 붙는 순간 어느 한 곳에서 조용히 빠진다 — 그래서 한 곳에 모아 둔다.
+   */
+  #applyOutcome({ intents, events }) {
+    const { jackpotChanged } = this.#treasury.apply(intents);
     this.#emitAll(events);
+    if (jackpotChanged) {
+      this.#emit(EVENT_TYPES.JACKPOT_CHANGED, { jackpot: this.#casino.jackpot });
+    }
   }
 
   #skipBuy() {
@@ -467,7 +477,7 @@ export class Game {
 
   #build({ buildings }) {
     const city = this.#board.cityAt(this.#turn.buildIndex);
-    this.#applyTrade(this.#cityTrade.build({ player: this.#current, city, buildings }));
+    this.#applyOutcome(this.#cityTrade.build({ player: this.#current, city, buildings }));
     this.#endTurn();
   }
 
@@ -492,7 +502,7 @@ export class Game {
       throw DomainError.invalidArgument(`건설할 칸이 올바르지 않습니다: ${cityIndex}`);
     }
     const city = this.#board.cityAt(cityIndex);
-    this.#applyTrade(this.#cityTrade.build({ player: this.#current, city, buildings }));
+    this.#applyOutcome(this.#cityTrade.build({ player: this.#current, city, buildings }));
     this.#endTurn();
   }
 
@@ -522,7 +532,7 @@ export class Game {
   #acquire() {
     const player = this.#current;
     const city = this.#board.cityAt(this.#turn.acquireIndex);
-    this.#applyTrade(this.#cityTrade.acquire({ player, city }));
+    this.#applyOutcome(this.#cityTrade.acquire({ player, city }));
     this.#turn.acquireIndex = null;
     this.#offerBuild(player, city.index);
   }
@@ -627,13 +637,13 @@ export class Game {
     if (!Number.isInteger(cityIndex)) {
       throw DomainError.invalidArgument(`매각할 칸이 올바르지 않습니다: ${cityIndex}`);
     }
-    const { intents, events } = this.#liquidator.sell({
-      playerId: this.#current.id,
-      kind: PROPERTY_ASSET_KIND,
-      assetId: String(cityIndex),
-    });
-    this.#treasury.apply(intents);
-    this.#emitAll(events);
+    this.#applyOutcome(
+      this.#liquidator.sell({
+        playerId: this.#current.id,
+        kind: PROPERTY_ASSET_KIND,
+        assetId: String(cityIndex),
+      }),
+    );
     this.#afterLiquidationStep();
   }
 
@@ -655,9 +665,7 @@ export class Game {
    * `LapIncome`이며 Game은 결과를 적용만 한다.
    */
   #collectLapIncome(player) {
-    const { intents, events } = this.#lapIncome.collect({ player });
-    this.#treasury.apply(intents);
-    this.#emitAll(events);
+    this.#applyOutcome(this.#lapIncome.collect({ player }));
   }
 
   #resolveLanding(player, index, depth) {
@@ -803,11 +811,12 @@ export class Game {
       ticket,
       player,
       board: this.#board,
+      casino: this.#casino,
       livingPlayers: this.livingPlayers(),
     });
     switch (action.action) {
       case TICKET_ACTIONS.SETTLE:
-        this.#applyTrade(action);
+        this.#applyOutcome(action);
         return this.#endTurn();
       case TICKET_ACTIONS.CHARGE:
         return this.#charge(action);
@@ -873,13 +882,13 @@ export class Game {
   #autoSell() {
     const player = this.#current;
     const note = this.#payment.assertPendingDebt();
-    const { intents, events } = this.#liquidator.autoSell({
-      playerId: player.id,
-      cash: player.cash,
-      amountDue: note.total,
-    });
-    this.#treasury.apply(intents);
-    this.#emitAll(events);
+    this.#applyOutcome(
+      this.#liquidator.autoSell({
+        playerId: player.id,
+        cash: player.cash,
+        amountDue: note.total,
+      }),
+    );
     this.#afterLiquidationStep();
   }
 
@@ -913,8 +922,7 @@ export class Game {
    */
   #bankrupt(player) {
     const liquidation = this.#bankruptcy.liquidateAll(player.id);
-    this.#treasury.apply(liquidation.intents);
-    this.#emitAll(liquidation.events);
+    this.#applyOutcome(liquidation);
 
     const plan = this.#bankruptcy.plan({
       player,

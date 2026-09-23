@@ -228,6 +228,157 @@ describe('Game(행운 티켓 효과)', () => {
     assertMoneyConserved(game, '세무조사');
   });
 
+  describe('잭팟 수령 티켓', () => {
+    it('잭팟 당첨권(T21)은 적립금 전액을 받고 적립금을 0원으로 만든다', () => {
+      // Given
+      const game = ticketGame('T21', { jackpot: 326_500 });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      const claimed = findEvent(events, EVENT_TYPES.JACKPOT_CLAIMED);
+      assert.deepEqual(claimed, {
+        type: EVENT_TYPES.JACKPOT_CLAIMED,
+        playerId: 's1',
+        amount: 326_500,
+        share: 100,
+        remaining: 0,
+      });
+      assert.equal(game.jackpot, 0);
+      assert.equal(game.playerById('s1').cash, STARTING_CASH + 326_500);
+      assertMoneyConserved(game, '잭팟 전액 수령');
+    });
+
+    it('잭팟 수령은 잭팟 변화 이벤트도 함께 낸다(중앙 표시가 따라온다)', () => {
+      // Given (4번 칸에서 3칸 이동 → 7번 티켓 칸. 더블이 아니라 그 턴이 끝난다)
+      const game = ticketGame('T21', {
+        jackpot: 100_000,
+        positions: { s1: 4 },
+        random: new FakeRandomSource([1, 2, 0]),
+      });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then (수령 이벤트가 먼저, 잭팟 변화가 뒤)
+      const types = eventTypes(events);
+      assert.ok(types.includes(EVENT_TYPES.JACKPOT_CHANGED));
+      assert.ok(
+        types.indexOf(EVENT_TYPES.JACKPOT_CLAIMED) < types.indexOf(EVENT_TYPES.JACKPOT_CHANGED),
+      );
+      assert.equal(findEvent(events, EVENT_TYPES.JACKPOT_CHANGED).jackpot, 0);
+      assert.equal(game.currentPlayerId, 's2', '수령 뒤 턴이 끝난다');
+    });
+
+    it('잭팟 나눔 행사(T22)는 홀수 적립금을 내림으로 나눠 절반만 받는다', () => {
+      // Given
+      const game = ticketGame('T22', { jackpot: 125_001 });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      const claimed = findEvent(events, EVENT_TYPES.JACKPOT_CLAIMED);
+      assert.equal(claimed.amount, 62_500);
+      assert.equal(claimed.share, 50);
+      assert.equal(claimed.remaining, 62_501);
+      assert.equal(game.jackpot, 62_501);
+      assert.equal(game.playerById('s1').cash, STARTING_CASH + 62_500);
+      assertMoneyConserved(game, '잭팟 절반 수령');
+    });
+
+    it('적립금이 0원이면 아무 돈도 움직이지 않고 금액 0원 이벤트만 남는다', () => {
+      // Given (위로금 없음)
+      const game = ticketGame('T21', { jackpot: 0 });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      const claimed = findEvent(events, EVENT_TYPES.JACKPOT_CLAIMED);
+      assert.equal(claimed.amount, 0);
+      assert.equal(claimed.remaining, 0);
+      assert.equal(findEvent(events, EVENT_TYPES.JACKPOT_CHANGED), undefined, '잭팟은 변하지 않았다');
+      assert.equal(game.playerById('s1').cash, STARTING_CASH);
+      assert.equal(game.jackpot, 0);
+      assertMoneyConserved(game, '빈 잭팟 수령');
+    });
+
+    it('잭팟 수령은 은행 장부를 건드리지 않는다(사유별 내역이 그대로다)', () => {
+      // Given
+      const game = ticketGame('T21', { jackpot: 200_000 });
+      const before = game.moneyReport();
+
+      // When
+      game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then (현금 + 잭팟 총합이 그대로이므로 장부에 남을 이유가 없다)
+      const after = game.moneyReport();
+      assert.equal(after.netFromBank, before.netFromBank);
+      assert.deepEqual(after.breakdown, before.breakdown);
+      assert.equal(after.totalCash + after.jackpot, before.totalCash + before.jackpot);
+      assertMoneyConserved(game, '잭팟 수령 후 장부');
+    });
+
+    it('잭팟이 움직이지 않는 거래(매입·건설)에서는 잭팟 이벤트가 생기지 않는다', () => {
+      // Given (돈 이동 결과를 모두 한 문으로 적용하므로, 그 문이 불필요한 이벤트를 만들지 않아야 한다)
+      const game = buildGame({
+        positions: { s1: 0 },
+        jackpot: 300_000,
+        random: new FakeRandomSource([1, 2]),
+      });
+
+      // When (3번 방콕 매입 → 별장 건설)
+      const rolled = game.execute('s1', COMMAND_TYPES.ROLL);
+      const bought = game.execute('s1', COMMAND_TYPES.BUY);
+      const built = game.execute('s1', COMMAND_TYPES.BUILD, { buildings: ['VILLA'] });
+
+      // Then
+      for (const [label, events] of [['굴림', rolled], ['매입', bought], ['건설', built]]) {
+        assert.equal(
+          events.some((event) => event.type === EVENT_TYPES.JACKPOT_CHANGED),
+          false,
+          `${label}에서 잭팟 이벤트가 생겼다`,
+        );
+      }
+      assert.equal(game.jackpot, 300_000);
+      assertMoneyConserved(game, '잭팟과 무관한 거래');
+    });
+
+    it('이동 티켓으로 티켓 칸에 이어 도착해 잭팟을 수령해도 정상 종료된다', () => {
+      // Given (36 → 주사위 6 → 2번 티켓 칸 → 앞으로 10칸 → 12번 티켓 칸 → 잭팟 당첨권)
+      const game = buildGame({
+        positions: { s1: 36 },
+        jackpot: 500_000,
+        drawPile: ['X1', 'T21'],
+        ticketCatalog: {
+          X1: {
+            id: 'X1',
+            text: '테스트용: 앞으로 10칸',
+            effect: { type: TICKET_EFFECTS.MOVE_RELATIVE, steps: 10 },
+          },
+          T21: TICKETS.find((ticket) => ticket.id === 'T21'),
+        },
+        random: new FakeRandomSource([2, 4, 0, 0]),
+      });
+
+      // When
+      const events = game.execute('s1', COMMAND_TYPES.ROLL);
+
+      // Then
+      assert.deepEqual(
+        events.filter((event) => event.type === EVENT_TYPES.TICKET_DRAWN).map((event) => event.ticketId),
+        ['X1', 'T21'],
+      );
+      assert.equal(game.playerById('s1').position, 12);
+      assert.equal(findEvent(events, EVENT_TYPES.JACKPOT_CLAIMED).amount, 500_000);
+      assert.equal(game.jackpot, 0);
+      assert.ok(eventTypes(events).includes(EVENT_TYPES.TURN_ENDED));
+      assertMoneyConserved(game, '티켓 연쇄 후 잭팟 수령');
+    });
+  });
+
   describe('티켓 연쇄 상한', () => {
     /**
      * 배포 티켓으로는 티켓 칸에서 티켓 칸으로 이어지는 연쇄가 **한 번도** 일어나지 않는다.

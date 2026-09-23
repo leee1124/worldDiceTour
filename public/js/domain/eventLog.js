@@ -1,7 +1,7 @@
 /**
  * 도메인 이벤트 → 한국어 로그 문장. 순수 함수(DOM 없음)라 Node에서 그대로 테스트한다.
  *
- * - docs/API.md 7장의 43종을 모두 처리한다.
+ * - docs/API.md 7장의 45종을 모두 처리한다.
  * - 모르는 종류가 와도 절대 예외를 던지지 않고 기본 문장(`kind: 'unknown'`)으로 넘어간다.
  * - 여기서 만든 문장은 화면에 `textContent`로만 출력한다.
  */
@@ -160,6 +160,18 @@ const FORMATTERS = {
     ),
 
   JACKPOT_CHANGED: (event) => line(LINE_KINDS.INFO, `잭팟 적립금 ${formatWon(event.jackpot)}`),
+
+  JACKPOT_CLAIMED: (event, ctx) => {
+    const who = subject(ctx.name(event.playerId));
+    if (!(event.amount > 0)) {
+      return line(LINE_KINDS.INFO, `🎰 ${who} 잭팟을 수령했지만 적립금이 비어 있었습니다.`);
+    }
+    const rest = event.remaining > 0 ? ` (남은 적립금 ${formatWon(event.remaining)})` : '';
+    return line(
+      LINE_KINDS.SPECIAL,
+      `🎰 ${who} 잭팟 적립금 ${formatWon(event.amount)}을 수령했습니다${rest}.`,
+    );
+  },
 
   /* ── 도시 · 건물 · 인수 ──────────────────────────────────── */
   CITY_PURCHASED: (event, ctx) =>

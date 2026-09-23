@@ -1,3 +1,4 @@
+import { DomainError } from '../shared/DomainError.js';
 import { EVENT_TYPES } from './events.js';
 import { MONEY_REASONS, MoneyIntent } from '../shared/MoneyIntent.js';
 import { SINKS } from './payment/DebtNote.js';
@@ -27,7 +28,7 @@ const TAX_SINK = SINKS.JACKPOT;
  * 행운 티켓 효과 해석기.
  *
  * "이 카드가 얼마를 어디로 움직이는가"를 계산하는 **순수 도메인 서비스**다. 상태를 바꾸지 않고
- * 행동 지시만 돌려주므로, 티켓이 20장에서 40장이 되어도 Game은 바뀌지 않는다.
+ * 행동 지시만 돌려주므로, 티켓이 22장에서 40장이 되어도 Game은 바뀌지 않는다.
  */
 export class TicketEffects {
   /**
@@ -35,10 +36,11 @@ export class TicketEffects {
    * @param {{id:string, effect:object}} params.ticket
    * @param {import('./Player.js').Player} params.player
    * @param {import('./Board.js').Board} params.board
+   * @param {import('./Casino.js').Casino} [params.casino] 잭팟 적립금의 주인(수령 티켓에만 필요)
    * @param {import('./Player.js').Player[]} params.livingPlayers 탈락하지 않은 좌석(좌석 순서)
    * @returns {{action: string, amount?: number, steps?: number, items?: object[], reason?: string, event?: object, intents?: object[], events?: object[]}}
    */
-  resolve({ ticket, player, board, livingPlayers = [] }) {
+  resolve({ ticket, player, board, casino = null, livingPlayers = [] }) {
     const { effect } = ticket;
     switch (effect.type) {
       case TICKET_EFFECTS.GAIN:
@@ -69,6 +71,8 @@ export class TicketEffects {
           amount: Math.floor(player.cash * effect.rate),
           sink: TAX_SINK,
         });
+      case TICKET_EFFECTS.CLAIM_JACKPOT:
+        return this.#claimJackpot({ ticket, player, casino, share: effect.share });
       case TICKET_EFFECTS.MOVE_RELATIVE:
         return { action: TICKET_ACTIONS.MOVE, steps: effect.steps };
       case TICKET_EFFECTS.MOVE_TO:
@@ -109,6 +113,42 @@ export class TicketEffects {
         {
           type: EVENT_TYPES.MONEY_GAINED,
           payload: { playerId: player.id, amount, reason, ticketId: ticket.id },
+        },
+      ],
+    };
+  }
+
+  /**
+   * 「잭팟 당첨권」·「잭팟 나눔 행사」: 쌓인 잭팟 적립금의 일부(또는 전부)를 받는다.
+   *
+   * **얼마가 움직이는지는 적립금의 주인(`Casino`)이 계산한다** — 지분과 내림 규칙은 잭팟의
+   * 규칙이지 티켓의 규칙이 아니다. 티켓의 규칙은 "어떤 지분을 청구하는가"와
+   * "적립금이 비어 있어도 위로금은 없다"는 것뿐이다(경제를 깨끗하게 유지한다).
+   * 금액이 0원이어도 이벤트는 남긴다 — 뽑은 사람은 비어 있었다는 사실을 알아야 한다.
+   *
+   * 사유는 `TICKET`을 그대로 쓴다: 잭팟 이동은 총합(현금 + 잭팟)을 바꾸지 않아 장부에
+   * 기록되지 않으므로 새 사유를 만들 이유가 없다(사유 목록을 넓히면 저장 스키마 승급이 따라온다).
+   */
+  #claimJackpot({ ticket, player, casino, share }) {
+    // 잭팟 수령 티켓에만 필요한 협력자라 선택 인자지만, 이 카드에는 **없으면 안 된다**.
+    // 빠졌을 때 TypeError로 터지면 규격 에러가 아니라 500이 나가므로 도메인 오류로 막는다.
+    if (!casino) {
+      throw DomainError.invalidState(`잭팟 수령 티켓에는 카지노가 필요합니다: ${ticket.id}`);
+    }
+    const { amount, remaining, intents } = casino.claimShare({
+      playerId: player.id,
+      share,
+      reason: MONEY_REASONS.TICKET,
+      meta: { ticketId: ticket.id },
+    });
+    return {
+      action: TICKET_ACTIONS.SETTLE,
+      amount,
+      intents,
+      events: [
+        {
+          type: EVENT_TYPES.JACKPOT_CLAIMED,
+          payload: { playerId: player.id, amount, share, remaining },
         },
       ],
     };

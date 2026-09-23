@@ -36,7 +36,7 @@ export function playTicketCard({ playerName, text, effect, mine = false, fastFor
         el('div', { class: 'ticket-face ticket-face--front' }, [
           el('span', { class: 'ticket-eyebrow', text: `${playerName} · 행운 티켓` }),
           el('p', { class: 'ticket-text', text }),
-          el('span', { class: 'ticket-effect', text: ticketEffectLabel(effect?.type) }),
+          el('span', { class: 'ticket-effect', text: ticketEffectLabel(effect?.type, effect) }),
         ]),
       ]);
       // 모션 축소면 뒤집는 움직임 없이 앞면부터 보여 준다(읽는 시간은 그대로).
