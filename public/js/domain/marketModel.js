@@ -44,7 +44,11 @@ export function holdingPnl(holding, price) {
   const cost = qty * avgCost;
   const profit = value - cost;
   const profitBp = cost > 0 ? Math.trunc((profit / cost) * 10_000) : 0;
-  return { qty, value, cost, profit, profitBp, tone: profit > 0 ? 'up' : profit < 0 ? 'down' : 'flat' };
+  const tone = profit > 0 ? 'up' : profit < 0 ? 'down' : 'flat';
+  // 사람이 읽는 문구 — 평단가는 "내가 얼마에 샀나"의 유일한 단서라 반드시 같이 보여 준다.
+  const holdingText = qty > 0 ? `보유 ${qty}주 · 평단 ${won(avgCost)}` : '';
+  const pnlText = qty > 0 ? `${profit < 0 ? '-' : '+'}${won(Math.abs(profit))} (${formatSignedBpPercent(profitBp)})` : '';
+  return { qty, avgCost, value, cost, profit, profitBp, tone, holdingText, pnlText };
 }
 
 /**
@@ -222,7 +226,7 @@ export function instrumentCards(market, seatId) {
         spark,
         sparkLabel: sparklineLabel({ name: item.name, series: item.series }),
         ariaLabel: `${item.name} ${sectorText} ${won(item.price)} ${change.label}${
-          pnl.qty > 0 ? ` 보유 ${pnl.qty}주` : ''
+          pnl.qty > 0 ? ` ${pnl.holdingText} 손익 ${pnl.pnlText}` : ''
         }${delisted ? ' 상장폐지' : ''}`,
       };
     });

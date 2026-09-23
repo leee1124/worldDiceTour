@@ -206,8 +206,8 @@ export function createMarketView({
     replaceChildren(entry.sparkSlot, sparkSvg(card));
 
     if (card.qty > 0) {
-      setText(entry.mine, `보유 ${card.qty}주`);
-      setText(entry.pnl, `${card.pnl.profit >= 0 ? '+' : '−'}${formatWon(Math.abs(card.pnl.profit))}`);
+      setText(entry.mine, card.pnl.holdingText);
+      setText(entry.pnl, card.pnl.pnlText);
       entry.pnl.dataset.tone = card.pnl.tone;
       setHidden(entry.pnl, false);
     } else {

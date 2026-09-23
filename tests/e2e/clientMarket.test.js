@@ -826,3 +826,35 @@ test('튜토리얼: 세 장의 카드가 제목·본문·핵심 요약을 갖는
   assert.equal(tutorialCard('STOCK').id, 'STOCK');
   assert.equal(tutorialCard('없는카드'), null);
 });
+
+test('보유 손익: 평단가와 수익률을 사람이 읽을 문구로 만든다', () => {
+  // Given — 40주를 평균 12,000원에 샀고 지금 12,800원
+  const pnl = holdingPnl({ qty: 40, avgCost: 12_000 }, 12_800);
+
+  // When / Then — 평단·수익 금액·수익률(원가 대비)이 한 줄로 읽힌다
+  assert.equal(pnl.avgCost, 12_000);
+  assert.equal(pnl.holdingText, '보유 40주 · 평단 12,000원');
+  assert.equal(pnl.pnlText, '+32,000원 (+6.66%)');
+});
+
+test('보유 손익: 손실이면 음수 부호와 하락률로 적고, 보유가 없으면 빈 문구다', () => {
+  // Given
+  const loss = holdingPnl({ qty: 10, avgCost: 10_000 }, 9_000);
+  const none = holdingPnl(null, 9_000);
+
+  // Then
+  assert.equal(loss.pnlText, '-10,000원 (-10.00%)');
+  assert.equal(none.holdingText, '');
+  assert.equal(none.pnlText, '');
+});
+
+test('종목 카드: 보유 중이면 평단가 문구가 카드에 실린다', () => {
+  // Given
+  const cards = instrumentCards(MARKET, 'seat-1');
+  const held = cards.find((card) => card.qty > 0);
+
+  // Then
+  assert.ok(held, '픽스처에 보유 종목이 있어야 한다');
+  assert.match(held.pnl.holdingText, /^보유 \d+주 · 평단 [\d,]+원$/);
+  assert.match(held.ariaLabel, /평단/);
+});
