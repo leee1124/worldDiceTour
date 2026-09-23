@@ -252,3 +252,27 @@ describe('카지노·엔터 종목은 경기 방어적이다(오너 지적 2026-
     assert.ok(ent < best, `호황에서 ENT ${percent(ent)}가 최고 종목 ${percent(best)}보다 낮아야 한다`);
   });
 });
+
+describe('밸런스: 긴 판(60라운드)에서도 종목이 바닥이나 천장에 고착되지 않는다', () => {
+  // 오너 피드백: 라운드 제한 없는 43라운드 방에서 카지노 종목이 기준가의 33%에 눌러붙었다.
+  const long = MarketSimulation.summarize({
+    seeds: SEEDS.slice(0, 150),
+    rounds: 60,
+    randomFactory: (seed) => new SeededRandomSource(seed),
+  });
+
+  it('60라운드 상장폐지율이 종목마다 5% 미만이다', () => {
+    for (const [id, stats] of Object.entries(long.perInstrument)) {
+      assert.ok(stats.delistRate < 0.05, `${id} 60R 상장폐지율 ${percent(stats.delistRate)}`);
+    }
+  });
+
+  it('60라운드 평균 종가가 기준가의 0.7~2.5배 안에 있다(눌러붙지도 폭주하지도 않는다)', () => {
+    for (const [id, stats] of Object.entries(long.perInstrument)) {
+      assert.ok(
+        stats.meanPriceOverBase >= 0.7 && stats.meanPriceOverBase <= 2.5,
+        `${id} 60R 평균 종가/기준가 ${stats.meanPriceOverBase.toFixed(2)}`,
+      );
+    }
+  });
+});

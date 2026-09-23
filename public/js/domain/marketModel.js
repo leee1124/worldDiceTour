@@ -102,7 +102,7 @@ export function newsChips(news) {
         bp,
         tone: change.tone,
         arrow: change.arrow,
-        text: formatSignedBpPercent(bp),
+        text: `${formatSignedBpPercent(bp)} 압력`,
         ariaLabel: `${label} ${change.label}`,
       };
     });
@@ -241,3 +241,34 @@ export function marketSummaryLine(market) {
   const headline = market.news?.headline;
   return headline ? `기준금리 ${rate} · ${headline}` : `기준금리 ${rate}`;
 }
+
+const PHASE_SHORT = Object.freeze({ EXPANSION: '호황', OVERHEAT: '과열', RECESSION: '침체', RECOVERY: '회복' });
+
+/** bp → "+10" / "-1.5" / "-0.8" (퍼센트, 불필요한 0 제거). */
+function shortPct(bp) {
+  const value = toInt(bp) / 100;
+  const text = Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '');
+  return value > 0 ? `+${text}` : text;
+}
+
+/**
+ * 한 종목의 실제 등락을 "뉴스 + 경기 추세 + 보드 압력 + 운"으로 나눠 읽어 준다.
+ * 뉴스 카드의 "+10%"는 확정 수익이 아니라 압력 하나일 뿐임을 플레이어가 보게 하는 문구.
+ * 서버가 `breakdown`을 안 주는 옛 이벤트면 등락만 적는다.
+ * @param {{changeBp?: number, breakdown?: {newsBp?:number, driftBp?:number, nudgeBp?:number, shockBp?:number}}} change
+ * @param {{cyclePhase?: string}} [context]
+ */
+export function priceBreakdownText(change, { cyclePhase } = {}) {
+  const head = formatChangeBp(change?.changeBp).text;
+  const b = change?.breakdown;
+  if (!b || typeof b !== 'object') {
+    return head;
+  }
+  const parts = [];
+  if (toInt(b.newsBp) !== 0) parts.push(`뉴스 ${shortPct(b.newsBp)}`);
+  if (toInt(b.driftBp) !== 0) parts.push(`${PHASE_SHORT[cyclePhase] ?? '추세'} ${shortPct(b.driftBp)}`);
+  if (toInt(b.nudgeBp) !== 0) parts.push(`보드 ${shortPct(b.nudgeBp)}`);
+  parts.push(`운 ${shortPct(b.shockBp)}`);
+  return `${head} (${parts.join(' · ')})`;
+}
+

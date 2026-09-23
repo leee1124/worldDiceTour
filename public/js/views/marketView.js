@@ -9,6 +9,7 @@
 
 import { button, clear, el, replaceChildren, setHidden, setText, svg, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
+import { priceBreakdownText } from '../domain/marketModel.js';
 import { formatRateBp } from '../domain/marketFormat.js';
 import { cycleView } from '../domain/marketLabels.js';
 import { instrumentCards, netWorthRows, nudgeRows, queueRows } from '../domain/marketModel.js';
@@ -318,7 +319,31 @@ export function createMarketView({
     queueNode.appendChild(list);
   }
 
+  /** 시세 갱신 직후 종목 카드의 등락 줄에 분해 내역을 잠깐 덮어쓴다(다음 update가 원래 문구로 되돌린다). */
+  let breakdownTimer = null;
+  function showBreakdown(changes, { cyclePhase } = {}) {
+    if (!Array.isArray(changes)) {
+      return;
+    }
+    window.clearTimeout(breakdownTimer);
+    for (const change of changes) {
+      const entry = cardNodes.get(change?.instrumentId);
+      if (!entry) {
+        continue;
+      }
+      setText(entry.change, priceBreakdownText(change, { cyclePhase }));
+      entry.change.dataset.detail = 'on';
+    }
+    breakdownTimer = window.setTimeout(() => {
+      for (const entry of cardNodes.values()) {
+        delete entry.change.dataset.detail;
+      }
+      breakdownTimer = null;
+    }, 4_000);
+  }
+
   return {
+    showBreakdown,
     element,
 
     /**

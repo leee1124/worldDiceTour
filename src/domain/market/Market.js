@@ -434,6 +434,9 @@ export class Market {
         from: result.from,
         to: result.to,
         changeBp: result.changeBp,
+        tickBp: result.tickBp,
+        // 뉴스 "+10%"가 확정 수익이 아님을 화면이 보여 줄 수 있게, 변화의 재료를 함께 싣는다(가산 계약).
+        breakdown: result.breakdown,
         state: instrument.state,
       });
       if (result.delisted) {

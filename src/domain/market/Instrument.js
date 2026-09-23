@@ -141,7 +141,8 @@ export class Instrument {
       volMulPct,
       random,
     });
-    const tickBp = PriceProcess.tickBp({ driftBp, newsBp, nudgeBp, shockBp });
+    const reversionBp = PriceProcess.reversionBp({ price: this.#price, basePrice: this.#spec.basePrice });
+    const tickBp = PriceProcess.tickBp({ driftBp, newsBp, nudgeBp, shockBp, reversionBp });
     const from = this.#price;
     const to = PriceProcess.nextPrice({
       price: from,
@@ -161,7 +162,15 @@ export class Instrument {
     if (delisted) {
       this.#state = INSTRUMENT_STATES.DELISTED;
     }
-    return { from, to, changeBp: PriceProcess.changeBp(from, to), delisted };
+    return {
+      from,
+      to,
+      changeBp: PriceProcess.changeBp(from, to),
+      delisted,
+      tickBp,
+      // 변화의 재료(가산 계약) — 화면이 "뉴스 +10%인데 실제는 +2.5%"를 설명할 수 있게
+      breakdown: { newsBp, driftBp, nudgeBp, shockBp, reversionBp },
+    };
   }
 
   /** 1주 배당(내림). 상장폐지·무배당 종목은 0이다. */

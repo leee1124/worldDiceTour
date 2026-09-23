@@ -42,6 +42,7 @@ import {
   instrumentCards,
   netWorthRows,
   newsChips,
+  priceBreakdownText,
   nudgeRows,
   queueRows,
 } from '../../public/js/domain/marketModel.js';
@@ -729,7 +730,7 @@ test('뉴스 칩: 섹터·전체·금리 효과를 각각 다른 칩으로 만�
   assert.equal(chips.length, 4);
   assert.equal(chips[0].label, '항공');
   assert.equal(chips[0].tone, 'up');
-  assert.equal(chips[0].text, '+6.00%');
+  assert.equal(chips[0].text, '+6.00% 압력');
   assert.equal(chips[2].label, '전 종목');
   assert.equal(chips[2].tone, 'down');
   assert.equal(chips[3].label, '기준금리');
@@ -857,4 +858,33 @@ test('종목 카드: 보유 중이면 평단가 문구가 카드에 실린다', 
   assert.ok(held, '픽스처에 보유 종목이 있어야 한다');
   assert.match(held.pnl.holdingText, /^보유 \d+주 · 평단 [\d,]+원$/);
   assert.match(held.ariaLabel, /평단/);
+});
+
+test('시세 분해 문구: 실제 등락을 뉴스·경기 추세·운으로 나눠 읽어 준다', () => {
+  // Given — 서버가 준 한 종목의 변화(+10% 뉴스, 회복 +1.5% 추세, 운 −9%)
+  const change = { instrumentId: 'ENT', changeBp: 250, breakdown: { newsBp: 1_000, driftBp: 150, nudgeBp: 0, shockBp: -900 } };
+
+  // When
+  const text = priceBreakdownText(change, { cyclePhase: 'RECOVERY' });
+
+  // Then — 뉴스가 +10%라도 실제는 +2.5%였음이 한 줄로 보인다
+  assert.equal(text, '▲ +2.50% (뉴스 +10 · 회복 +1.5 · 운 -9)');
+});
+
+test('시세 분해 문구: 보드 압력이 있으면 항목이 하나 더 붙고, 분해가 없으면 등락만 적는다', () => {
+  // Given
+  const withNudge = { instrumentId: 'CON', changeBp: 420, breakdown: { newsBp: 0, driftBp: 200, nudgeBp: 300, shockBp: -80 } };
+  const legacy = { instrumentId: 'AIR', changeBp: -300 };
+
+  // Then
+  assert.equal(priceBreakdownText(withNudge, { cyclePhase: 'EXPANSION' }), '▲ +4.20% (호황 +2 · 보드 +3 · 운 -0.8)');
+  assert.equal(priceBreakdownText(legacy, { cyclePhase: 'EXPANSION' }), '▼ -3.00%');
+});
+
+test('뉴스 칩: 효과는 확정 수익이 아니라 "압력"으로 표기한다', () => {
+  // Given
+  const chips = newsChips({ effects: [{ target: 'SECTOR', sector: 'ENTERTAINMENT', bp: 1_000 }] });
+
+  // Then
+  assert.equal(chips[0].text, '+10.00% 압력');
 });

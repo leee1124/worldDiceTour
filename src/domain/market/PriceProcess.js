@@ -17,6 +17,11 @@
 
 /** 한 라운드에 누적 보드 압력이 낼 수 있는 최대 영향(bp). */
 export const MAX_NUDGE_BP = 600;
+/** 평균 회귀 강도(로그 거리 계수)와 라운드당 상한(bp). */
+const REVERSION_K = 0.25;
+const MAX_REVERSION_BP = 600;
+/** 복원력이 작동하지 않는 정상 범위(기준가 배수). */
+const REVERSION_BAND = Object.freeze({ lowerMul: 0.5, upperMul: 2.5 });
 
 /** 한 라운드 최대 변화(bp) = ±40%. */
 export const MAX_TICK_BP = 4_000;
@@ -40,9 +45,44 @@ export class PriceProcess {
     return clamp(accumulatedBp, -MAX_NUDGE_BP, MAX_NUDGE_BP);
   }
 
-  /** 합산 변화율(bp). ±4000bp로 묶는다. */
-  static tickBp({ driftBp, newsBp, nudgeBp, shockBp }) {
-    return clamp(driftBp + newsBp + nudgeBp + shockBp, -MAX_TICK_BP, MAX_TICK_BP);
+  /**
+   * 평균 회귀(bp) — **극단에서만** 작동하는 복원력.
+   *
+   * 기준가의 0.5배~2.5배(정상 범위) 안에서는 정확히 0이다. 고정 기준가로 되돌리는 힘을 항상 걸면
+   * 25라운드에 1.3~1.5배로 끝나야 할 종목에 매 라운드 −2%의 역풍이 되어 설계된 상승 추세를
+   * 무너뜨린다(실측: 분산 1바퀴 +6.9% → +2.7%). 그래서 밴드 밖에서만, 밴드 가장자리로부터의
+   * 로그 거리에 비례해 되돌린다(가장자리에서 0부터 부드럽게 커진다).
+   *
+   *   `bp = −K × 10_000 × ln(price / edge)`, edge = 0.5·base(아래) 또는 2.5·base(위), ±600 상한. K = 0.25:
+   *   기준가의 1/3 → +1,014 → 상한 +600(라운드당 +6%)  ·  0.4배 → +558  ·  3배 → −456  ·  0.5~2.5배 → 0
+   *   K를 0.15로 두면 0.4배 근처에서 복원(+335)이 침체 역풍(−150 drift −500 악재 ≈ −400)과 비겨
+   *   상장폐지 선 20% 위(2,400원)에 **눌러붙는다**(테스트로 실측). 밴드 안쪽 어디서든 침체를 이겨야 한다.
+   *
+   * 오너 피드백(2026-09-23): 라운드 제한 없는 43라운드 방에서 종목이 기준가 33%에 눌러붙음. 25라운드
+   * 밸런스만 맞추고 긴 판을 안 본 것이 원인 — 이 항이 긴 판에서 바닥·천장 고착을 푼다(D45).
+   */
+  static reversionBp({ price, basePrice }) {
+    if (!(price > 0) || !(basePrice > 0)) {
+      return 0;
+    }
+    const lower = basePrice * REVERSION_BAND.lowerMul;
+    const upper = basePrice * REVERSION_BAND.upperMul;
+    let edge;
+    if (price < lower) {
+      edge = lower;
+    } else if (price > upper) {
+      edge = upper;
+    } else {
+      return 0;
+    }
+    // `Math.round(-0)`은 -0이라 Object.is 비교·JSON 왕복에서 헷갈린다 — 0으로 정규화한다.
+    const raw = Math.round(-REVERSION_K * 10_000 * Math.log(price / edge)) || 0;
+    return clamp(raw, -MAX_REVERSION_BP, MAX_REVERSION_BP);
+  }
+
+  /** 합산 변화율(bp). ±4000bp로 묶는다. `reversionBp`는 생략하면 0(하위호환). */
+  static tickBp({ driftBp, newsBp, nudgeBp, shockBp, reversionBp = 0 }) {
+    return clamp(driftBp + newsBp + nudgeBp + shockBp + reversionBp, -MAX_TICK_BP, MAX_TICK_BP);
   }
 
   /** 가격 하한(기준가의 `minPct`%, tickUnit 배수로 내림, 최소 1단위). */

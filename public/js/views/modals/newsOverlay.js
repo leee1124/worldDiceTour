@@ -54,6 +54,8 @@ export async function playNewsCard(news) {
         el('span', { class: 'news-why-text', text: news?.explanation ?? '' }),
       ]),
       chipRow(news),
+      // 칩의 숫자는 확정 수익이 아니다 — 실제 등락은 경기 추세와 그날의 운이 더해져 정해진다.
+      el('p', { class: 'news-footnote', text: '실제 등락 = 뉴스 압력 + 경기 추세 + 그날의 운. 시세 갱신 때 종목마다 내역이 보입니다.' }),
     ]),
   ]);
 
