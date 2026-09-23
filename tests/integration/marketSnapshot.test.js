@@ -75,7 +75,7 @@ describe('시장 스냅샷 왕복', () => {
     ]);
     assert.equal(view.deposits['seat-1'], 500_000);
     assert.equal(view.orderQueue.length, 1);
-    assert.equal(view.budget.ordersLeft, 1, '남은 창구 예산이 유지된다');
+    assert.equal(view.budget.ordersUsed, 2, '창구 주문 기록이 유지된다');
   });
 
   it('거래 도중 재접속해도 남은 예산으로 그대로 이어서 플레이할 수 있다', () => {
@@ -95,10 +95,11 @@ describe('시장 스냅샷 왕복', () => {
 
     // Then (예산이 되살아나지 않았고, 3번째 주문이라 창구가 자동으로 닫힌다)
     assert.deepEqual(afterBudget, beforeBudget, '재접속이 예산을 되돌렸다');
-    assert.equal(restored.game.phase, PHASES.AWAIT_ROLL, '예산 소진 자동 마감이 이어지지 않았다');
+    assert.equal(restored.game.phase, PHASES.AWAIT_TRADE, '한도가 없으므로 창구는 자동으로 닫히지 않고 이어진다(D46)');
     assert.equal(restored.game.moneyReport().balanced, true);
 
-    // When (그다음 턴 진행도 정상이다)
+    // When (창구를 직접 닫고 — 자동 마감은 없다(D46) — 그다음 턴 진행도 정상이다)
+    restored.executeCommand({ seatId: 'seat-1', type: COMMAND_TYPES.CLOSE_TRADING, payload: {}, now: NOW });
     const events = restored.executeCommand({
       seatId: 'seat-1',
       type: COMMAND_TYPES.ROLL,
@@ -210,8 +211,8 @@ describe('손상된 시장 스냅샷은 거부된다(참조 정합성 포함)', 
     '창구 좌석이 방에 없다': (market) => {
       market.window.seatId = 'seat-99';
     },
-    '창구 예산이 한도를 넘는다': (market) => {
-      market.window.budget.ordersUsed = 9;
+    '창구 주문 수가 음수다(상한은 없지만 음수·비정수는 손상이다)': (market) => {
+      market.window.budget.ordersUsed = -1;
     },
     '섹터 압력이 알 수 없는 섹터다': (market) => {
       market.nudges = { CRYPTO: 100 };
@@ -294,9 +295,10 @@ describe('손상된 시장 스냅샷은 거부된다(참조 정합성 포함)', 
     // Given (거짓 양성 방어: 실제로 일어나는 상태를 전부 통과시켜야 한다)
     const room = playingStockRoom();
 
-    // When / Then (3번째 주문에서 창구가 자동으로 닫히므로 그다음은 굴리기다)
+    // When / Then (창구는 스스로 닫히지 않으므로(D46) 직접 닫은 뒤 굴린다)
     for (const [type, payload] of [
       [COMMAND_TYPES.SELL_STOCK, { instrumentId: 'AIR', quantity: 5 }],
+      [COMMAND_TYPES.CLOSE_TRADING, {}],
       [COMMAND_TYPES.ROLL, {}],
     ]) {
       room.executeCommand({ seatId: 'seat-1', type, payload, now: NOW });

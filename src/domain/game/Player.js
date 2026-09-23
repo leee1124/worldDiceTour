@@ -3,7 +3,8 @@ import { assertAmount } from '../shared/Money.js';
 import { BuildingUnlocks, FIRST_LAP } from './buildings.js';
 
 /** 시작 자금. */
-export const STARTING_CASH = 3_000_000;
+/** 시작 자금. 오너 결정(2026-09-23): 3,000,000 → 10,000,000원. */
+export const STARTING_CASH = 10_000_000;
 /** 출발 칸 통과/도착 시 월급. */
 export const SALARY = 200_000;
 /** 조난 섬에 갇히는 최대 턴 수. */

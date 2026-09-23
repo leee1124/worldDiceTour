@@ -37,6 +37,8 @@ export const AUTO_DEPOSIT_RATE_BP = 125;
 export const AUTO_DEPOSIT_UNIT = 100_000;
 /** 한 번에 주식에 넣을 목표 금액. */
 export const AUTO_STOCK_BUDGET = 600_000;
+/** 컴퓨터가 한 창구에서 내는 최대 주문 수(사람 한도와 무관한 템포 규칙). */
+export const AUTO_MAX_ORDERS_PER_WINDOW = 2;
 /** 매수하는 국면. */
 const BUYING_PHASES = Object.freeze([CYCLE_PHASES.RECOVERY, CYCLE_PHASES.EXPANSION]);
 /** 매도하는 국면. */
@@ -104,7 +106,13 @@ export class AutoPlayerPolicy {
     const budget = pending.budget ?? market?.budget;
     const close = { type: COMMAND_TYPES.CLOSE_TRADING };
 
-    if (!market || !budget || budget.ordersLeft <= 0) {
+    // ordersLeft가 null이면 상한 없음(D46) — 0 이하일 때만 창구를 닫는다.
+    if (!market || !budget || (budget.ordersLeft !== null && budget.ordersLeft <= 0)) {
+      return close;
+    }
+    // 한도가 없어도 컴퓨터는 창구 하나에서 몇 건만 내고 닫는다(예금 조정 1건 + 주식 1건).
+    // 안 그러면 여유현금이 다 떨어질 때까지 600,000원짜리 매수를 반복해 남의 차례를 붙든다.
+    if ((budget.ordersUsed ?? 0) >= AUTO_MAX_ORDERS_PER_WINDOW) {
       return close;
     }
     const deposit = pending.deposit ?? 0;
@@ -207,8 +215,10 @@ export class AutoPlayerPolicy {
     if (!Number.isFinite(price) || price <= 0) {
       return 0;
     }
-    const perOrder = Math.floor((rules.maxNotionalPerOrder ?? MAX_NOTIONAL_PER_ORDER) / price);
-    const perWindow = Math.floor(budget.notionalLeft / price);
+    // 상한이 `null`이면 "없음"이다(D46). `null / price`는 0이 되어 매수가 영영 막히므로 반드시 걸러 낸다.
+    const orderCap = rules.maxNotionalPerOrder ?? MAX_NOTIONAL_PER_ORDER;
+    const perOrder = orderCap === null ? Infinity : Math.floor(orderCap / price);
+    const perWindow = budget.notionalLeft === null || budget.notionalLeft === undefined ? Infinity : Math.floor(budget.notionalLeft / price);
     return Math.max(0, Math.min(wanted, rules.maxQuantity ?? MAX_QUANTITY, perOrder, perWindow));
   }
 

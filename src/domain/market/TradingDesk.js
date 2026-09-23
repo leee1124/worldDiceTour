@@ -297,7 +297,7 @@ function assertBudget(budget, notional) {
   if (!verdict.ok) {
     throw DomainError.tradeLimit(`창구 한도를 넘습니다: ${verdict.reasonCode}`, verdict.reasonCode);
   }
-  if (notional > MAX_NOTIONAL_PER_ORDER) {
+  if (MAX_NOTIONAL_PER_ORDER !== null && notional > MAX_NOTIONAL_PER_ORDER) {
     throw DomainError.tradeLimit(
       `주문 1건 명목금액 한도를 넘습니다: ${notional}`,
       LIMIT_KINDS.NOTIONAL,

@@ -29,11 +29,19 @@ function positiveInt(value, fallback) {
   return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
+/** `null`을 "상한 없음"(Infinity)으로 읽어도 되는 규칙 키. */
+const UNLIMITED_OK = new Set(['maxOrdersPerWindow', 'maxNotionalPerWindow', 'maxNotionalPerOrder']);
+
 /** 서버 규칙을 안전한 숫자 묶음으로 정리한다(누락·음수·문자열 방어). */
 export function normalizeRules(rules) {
   const source = rules && typeof rules === 'object' ? rules : {};
   const normalized = {};
   for (const [key, fallback] of Object.entries(DEFAULT_MARKET_RULES)) {
+    // 상한 키는 서버가 `null`을 주면 "상한 없음"이다(D46). 기본값으로 되돌려 옛 한도를 몰래 되살리면 안 된다.
+    if (UNLIMITED_OK.has(key) && source[key] === null) {
+      normalized[key] = Infinity;
+      continue;
+    }
     normalized[key] = positiveInt(source[key], fallback);
   }
   // 최소 수량만 0을 허용할 이유가 없다(서버 계약도 1 이상).
@@ -81,10 +89,11 @@ export function sellProceedsOf(notional, rules) {
 function normalizeBudget(budget, rules) {
   const limits = normalizeRules(rules);
   const source = budget && typeof budget === 'object' ? budget : {};
-  const ordersLeft = Number.isInteger(source.ordersLeft) ? Math.max(0, source.ordersLeft) : limits.maxOrdersPerWindow;
-  const notionalLeft = Number.isInteger(source.notionalLeft)
-    ? Math.max(0, source.notionalLeft)
-    : limits.maxNotionalPerWindow;
+  // `null` = 상한 없음(D46). 정수가 아니면 규칙의 상한(그 역시 Infinity일 수 있다)으로 본다.
+  const ordersLeft = source.ordersLeft === null ? Infinity
+    : Number.isInteger(source.ordersLeft) ? Math.max(0, source.ordersLeft) : limits.maxOrdersPerWindow;
+  const notionalLeft = source.notionalLeft === null ? Infinity
+    : Number.isInteger(source.notionalLeft) ? Math.max(0, source.notionalLeft) : limits.maxNotionalPerWindow;
   return { open: source.open === true, ordersLeft, notionalLeft };
 }
 

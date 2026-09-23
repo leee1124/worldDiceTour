@@ -247,19 +247,19 @@ describe('거래 커맨드 권한 매트릭스(서비스 레이어)', () => {
     );
   });
 
-  it('창구 한도를 넘으면 ERR018이고 상태가 그대로다', async () => {
-    // Given (NRG 50주 = 1,000,000원 두 번이면 명목 예산이 끝난다)
+  it('종목 보유 상한(500주)을 넘으면 ERR018이고 상태가 그대로다 — 창구 예산은 더는 한도가 아니다(D46)', async () => {
+    // Given (AIR를 200주씩 두 번, 그리고 100주 → 500주 보유)
     const app = await stockApp();
-    for (let index = 0; index < 2; index += 1) {
+    for (const quantity of [200, 200, 100]) {
       await app.gameService.execute({
         code: app.code,
         token: app.host.token,
         type: COMMAND_TYPES.BUY_STOCK,
-        payload: { instrumentId: 'NRG', quantity: 50 },
+        payload: { instrumentId: 'AIR', quantity },
       });
     }
 
-    // When / Then
+    // When / Then — 501주째는 보유 상한
     await assertRejectedUnchanged(
       app,
       {
@@ -268,7 +268,7 @@ describe('거래 커맨드 권한 매트릭스(서비스 레이어)', () => {
         payload: { instrumentId: 'AIR', quantity: 1 },
       },
       'ERR018',
-      '창구 예산 초과',
+      '보유 상한 초과',
     );
   });
 
@@ -276,16 +276,22 @@ describe('거래 커맨드 권한 매트릭스(서비스 레이어)', () => {
     // Given
     const app = await stockApp();
 
-    // When / Then (200주 × 20,000 = 4,000,000원 — 1건 한도를 먼저 넘으므로 예금으로 확인한다)
+    // When / Then (시작 자금 10,000,000원 전액을 먼저 예치해 현금을 0으로 만든 뒤, 200주 매수를 시도한다)
+    await app.gameService.execute({
+      code: app.code,
+      token: app.host.token,
+      type: COMMAND_TYPES.DEPOSIT,
+      payload: { amount: 10_000_000 },
+    });
     await assertRejectedUnchanged(
       app,
       {
         token: app.host.token,
-        type: COMMAND_TYPES.DEPOSIT,
-        payload: { amount: 10_000_000 },
+        type: COMMAND_TYPES.BUY_STOCK,
+        payload: { instrumentId: 'NRG', quantity: 200 },
       },
       'ERR008',
-      '현금 부족 예치',
+      '현금 부족 매수',
     );
   });
 

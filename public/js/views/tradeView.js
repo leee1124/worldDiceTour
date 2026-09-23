@@ -521,8 +521,13 @@ export function createTradeView({ onOrder, onCloseTrading, onQueueOrder, onCance
       return;
     }
     const used = Number.isInteger(budget.ordersUsed) ? budget.ordersUsed : 0;
-    const max = Number.isInteger(budget.ordersMax) ? budget.ordersMax : limits.maxOrdersPerWindow;
-    setText(budgetNode, `주문 ${max}건 중 ${used}건 · 예산 ${formatWon(budget.notionalLeft)} 남음`);
+    if (budget.unlimited || budget.ordersMax === null) {
+      // 한도가 없으면(D46) 남은 예산 대신 이번 창구에서 낸 주문 수만 알려 준다.
+      setText(budgetNode, used > 0 ? `이번 창구 주문 ${used}건` : '');
+    } else {
+      const max = Number.isInteger(budget.ordersMax) ? budget.ordersMax : limits.maxOrdersPerWindow;
+      setText(budgetNode, `주문 ${max}건 중 ${used}건 · 예산 ${formatWon(budget.notionalLeft)} 남음`);
+    }
     setHidden(closeButton, false);
     closeButton.disabled = !ctx.interactive || ctx.locked;
     closeButton.setAttribute('aria-busy', ctx.locked ? 'true' : 'false');

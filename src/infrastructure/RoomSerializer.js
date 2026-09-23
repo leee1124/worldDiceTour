@@ -794,13 +794,14 @@ function validateWindowSnapshot(window, { seatIds, tradingPhase, currentSeatId }
   assert(
     isFiniteInteger(budget.ordersUsed) &&
       budget.ordersUsed >= 0 &&
-      budget.ordersUsed <= MAX_ORDERS_PER_WINDOW,
+      // 상한이 null이면 "없음"(D46) — `1 <= null`은 false라 모든 주문 뒤 스냅샷이 격리됐던 버그.
+      (MAX_ORDERS_PER_WINDOW === null || budget.ordersUsed <= MAX_ORDERS_PER_WINDOW),
     `창구 주문 수 오류: ${describe(budget.ordersUsed)}`,
   );
   assert(
     isFiniteInteger(budget.notionalUsed) &&
       budget.notionalUsed >= 0 &&
-      budget.notionalUsed <= MAX_NOTIONAL_PER_WINDOW,
+      (MAX_NOTIONAL_PER_WINDOW === null ? isMoney(budget.notionalUsed) : budget.notionalUsed <= MAX_NOTIONAL_PER_WINDOW),
     `창구 명목금액 오류: ${describe(budget.notionalUsed)}`,
   );
 }

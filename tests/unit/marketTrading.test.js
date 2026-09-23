@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { DepositAccount, DEPOSIT_CAP, DEPOSIT_UNIT } from '../../src/domain/market/DepositAccount.js';
 import { Holdings, MAX_POSITION_PER_INSTRUMENT } from '../../src/domain/market/Holdings.js';
 import { Instrument } from '../../src/domain/market/Instrument.js';
+import { STARTING_CASH } from '../../src/domain/game/Player.js';
 import {
   MAX_QUEUED_ORDERS_PER_SEAT,
   ORDER_KINDS,
@@ -272,69 +273,58 @@ describe('DepositAccount(예금 계좌)', () => {
 });
 
 describe('TradeBudget(창구 예산 VO)', () => {
-  it('한도는 3건 / 창구 2,000,000원 / 1건 1,000,000원이다', () => {
+  it('창구 한도는 없다 — 세 상한이 모두 null이다(D46)', () => {
     // Given / When / Then
-    assert.equal(MAX_ORDERS_PER_WINDOW, 3);
-    assert.equal(MAX_NOTIONAL_PER_WINDOW, 2_000_000);
-    assert.equal(MAX_NOTIONAL_PER_ORDER, 1_000_000);
+    assert.equal(MAX_ORDERS_PER_WINDOW, null);
+    assert.equal(MAX_NOTIONAL_PER_WINDOW, null);
+    assert.equal(MAX_NOTIONAL_PER_ORDER, null);
   });
 
-  it('새 창구는 예산이 가득 차 있고 소진되지 않았다', () => {
+  it('새 창구는 쓴 것이 없고 소진되지 않았다', () => {
     // Given / When
     const budget = TradeBudget.open();
 
     // Then
-    assert.equal(budget.ordersLeft, 3);
-    assert.equal(budget.notionalLeft, 2_000_000);
+    assert.equal(budget.ordersUsed, 0);
+    assert.equal(budget.notionalUsed, 0);
     assert.equal(budget.exhausted, false);
   });
 
-  it('주문을 쓰면 건수와 명목금액이 함께 줄고, 3건을 다 쓰면 소진된다', () => {
+  it('주문을 쓰면 건수와 명목금액이 기록되지만, 몇 건을 써도 소진되지 않는다(D46)', () => {
     // Given
     let budget = TradeBudget.open();
 
     // When
     budget = budget.consume(600_000);
     budget = budget.consume(500_000);
-
-    // Then
-    assert.equal(budget.ordersLeft, 1);
-    assert.equal(budget.notionalLeft, 900_000);
-    assert.equal(budget.exhausted, false);
-
-    // When
+    budget = budget.consume(0);
     budget = budget.consume(0);
 
-    // Then
-    assert.equal(budget.ordersLeft, 0);
-    assert.equal(budget.exhausted, true, '건수가 떨어지면 창구가 자동으로 닫힌다');
+    // Then — 기록은 남고 한도는 없다
+    assert.equal(budget.ordersUsed, 4);
+    assert.equal(budget.notionalUsed, 1_100_000);
+    assert.equal(budget.ordersLeft, null);
+    assert.equal(budget.notionalLeft, null);
+    assert.equal(budget.exhausted, false, '창구는 예산 소진으로 자동 마감되지 않는다');
   });
 
-  it('예금·인출은 건수만 쓰고 명목금액 예산은 쓰지 않는다(예금 한도가 10,000,000원이므로)', () => {
-    // Given
+  it('예금·인출은 건수만 기록하고 명목금액은 쌓지 않는다', () => {
+    // Given / When
     const budget = TradeBudget.open().consume(0);
 
-    // When / Then
-    assert.equal(budget.ordersLeft, 2);
-    assert.equal(budget.notionalLeft, 2_000_000);
+    // Then
+    assert.equal(budget.ordersUsed, 1);
+    assert.equal(budget.notionalUsed, 0);
   });
 
-  it('한도 위반을 사유 코드로 알려준다(예외를 던지지 않는다 — 예약 주문 재검증용)', () => {
+  it('check()는 예외 대신 사유 코드로 답하고, 한도가 없으므로 어떤 명목금액도 통과한다', () => {
     // Given
-    const full = TradeBudget.open().consume(0).consume(0).consume(0);
-    const spent = TradeBudget.open().consume(1_000_000).consume(900_000);
+    const heavy = TradeBudget.open().consume(50_000_000).consume(50_000_000);
 
     // When / Then
     assert.deepEqual(TradeBudget.open().check(500_000), { ok: true, reasonCode: null });
-    assert.deepEqual(full.check(0), { ok: false, reasonCode: REJECT_REASONS.ORDER_LIMIT });
-    assert.deepEqual(spent.check(200_000), {
-      ok: false,
-      reasonCode: REJECT_REASONS.NOTIONAL_LIMIT,
-    });
-    assert.deepEqual(TradeBudget.open().check(1_000_001), {
-      ok: false,
-      reasonCode: REJECT_REASONS.NOTIONAL_LIMIT,
-    });
+    assert.deepEqual(heavy.check(1_000_001), { ok: true, reasonCode: null });
+    assert.deepEqual(heavy.check(999_999_999), { ok: true, reasonCode: null });
   });
 
   it('스냅샷을 왕복해도 같고 손상된 값은 거부한다', () => {
@@ -347,7 +337,9 @@ describe('TradeBudget(창구 예산 VO)', () => {
     assert.throws(() => new TradeBudget({ ordersUsed: -1, notionalUsed: 0 }), {
       code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
     });
-    assert.throws(() => new TradeBudget({ ordersUsed: 99, notionalUsed: 0 }), {
+    // 건수 상한이 없으므로(D46) 큰 값은 정당하다 — 음수·비정수만 거부한다.
+    assert.doesNotThrow(() => new TradeBudget({ ordersUsed: 99, notionalUsed: 0 }));
+    assert.throws(() => new TradeBudget({ ordersUsed: 1.5, notionalUsed: 0 }), {
       code: DOMAIN_ERROR_CODES.INVALID_ARGUMENT,
     });
   });
@@ -393,8 +385,9 @@ describe('TradingDesk(주문 검증·체결·수수료 — 거래의 유일한 �
       [MONEY_REASONS.TRADE_FEE]: -4_800,
     });
     assert.equal(holdings.qtyOf('s1', 'AIR'), 40);
-    assert.equal(result.budget.ordersLeft, 2);
-    assert.equal(result.budget.notionalLeft, 1_520_000);
+    assert.equal(result.budget.ordersUsed, 1, '주문 1건이 기록된다');
+    assert.equal(result.budget.notionalUsed, 480_000, '명목금액이 기록된다');
+    assert.equal(result.budget.ordersLeft, null, '상한이 없다(D46)');
     assert.equal(result.events[0].type, 'ORDER_FILLED');
     assert.deepEqual(result.events[0].payload, {
       playerId: 's1',
@@ -473,56 +466,23 @@ describe('TradingDesk(주문 검증·체결·수수료 — 거래의 유일한 �
     );
   });
 
-  it('4번째 주문은 한도 초과로 거부한다', () => {
-    // Given
+  it('4번째 주문도 거부하지 않는다 — 건수 한도가 없다(D46)', () => {
+    // Given — 이미 3건을 낸 창구
     const budget = TradeBudget.open().consume(10_000).consume(10_000).consume(10_000);
 
-    // When / Then
-    assert.throws(
-      () =>
-        new TradingDesk().buy({
-          playerId: 's1',
-          instrument: air(),
-          quantity: 1,
-          cash: 1_000_000,
-          budget,
-          holdings: new Holdings(),
-        }),
-      { code: DOMAIN_ERROR_CODES.TRADE_LIMIT },
-    );
+    // When / Then — 한도가 없으므로 예산 사유로는 던지지 않는다(잔고·수량 규칙만 남는다)
+    assert.doesNotThrow(() => budget.consume(10_000));
+    assert.equal(budget.consume(10_000).ordersUsed, 4);
   });
 
-  it('1건 명목금액 1,000,000원과 창구 예산 2,000,000원을 넘으면 거부한다', () => {
-    // Given (AIR 12,000원 → 84주 = 1,008,000원)
-    const { tradingDesk, holdings } = desk();
+  it('1건 1,000,000원·창구 2,000,000원을 넘어도 거부하지 않는다 — 명목 한도가 없다(D46)', () => {
+    // Given
+    const spent = TradeBudget.open().consume(1_200_000);
 
     // When / Then
-    assert.throws(
-      () =>
-        tradingDesk.buy({
-          playerId: 's1',
-          instrument: air(),
-          quantity: 84,
-          cash: 10_000_000,
-          budget: TradeBudget.open(),
-          holdings,
-        }),
-      { code: DOMAIN_ERROR_CODES.TRADE_LIMIT },
-      '1건 한도',
-    );
-    assert.throws(
-      () =>
-        tradingDesk.buy({
-          playerId: 's1',
-          instrument: air(),
-          quantity: 83,
-          cash: 10_000_000,
-          budget: TradeBudget.open().consume(1_200_000),
-          holdings,
-        }),
-      { code: DOMAIN_ERROR_CODES.TRADE_LIMIT },
-      '창구 예산',
-    );
+    assert.deepEqual(TradeBudget.open().check(1_000_001), { ok: true, reasonCode: null });
+    assert.deepEqual(spent.check(900_000), { ok: true, reasonCode: null });
+    assert.doesNotThrow(() => spent.consume(5_000_000));
   });
 
   it('종목별 보유 상한 500주를 넘기면 거부한다(매점 차단)', () => {
@@ -621,8 +581,8 @@ describe('TradingDesk(주문 검증·체결·수수료 — 거래의 유일한 �
     assert.deepEqual(byReason(made.intents), { [MONEY_REASONS.DEPOSIT]: -500_000 });
     assert.deepEqual(byReason(taken.intents), { [MONEY_REASONS.DEPOSIT]: 200_000 });
     assert.equal(account.balanceOf('s1'), 300_000);
-    assert.equal(taken.budget.ordersLeft, 1);
-    assert.equal(taken.budget.notionalLeft, 2_000_000, '명목금액 예산은 그대로');
+    assert.equal(taken.budget.ordersUsed, 2, '예치·인출이 각각 1건으로 기록된다');
+    assert.equal(taken.budget.notionalUsed, 0, '예금은 명목금액을 쌓지 않는다');
     assert.equal(made.events[0].type, 'DEPOSIT_MADE');
     assert.deepEqual(made.events[0].payload, { playerId: 's1', amount: 500_000, balance: 500_000 });
     assert.deepEqual(taken.events[0].payload, {
@@ -930,5 +890,46 @@ describe('매도 수수료 지불 능력(명목금액이 수수료보다 작을 
     assert.equal(result.notional, 500);
     assert.equal(result.fee, 1_000);
     assert.equal(holdings.qtyOf('s1', 'AIR'), 0);
+  });
+});
+
+describe('TradeBudget — 한도 해제(오너 결정 2026-09-23: 매매 금액·횟수 제한 없음)', () => {
+  it('상한이 없으면 ordersLeft·notionalLeft는 null이고 exhausted는 항상 false다', () => {
+    // Given / When
+    const budget = new TradeBudget();
+
+    // Then
+    assert.equal(budget.ordersLeft, null);
+    assert.equal(budget.notionalLeft, null);
+    assert.equal(budget.exhausted, false);
+  });
+
+  it('아무리 큰 명목금액도, 몇 번을 내도 예산에 막히지 않는다', () => {
+    // Given
+    let budget = new TradeBudget();
+
+    // When — 1건에 5,000,000원짜리를 10번
+    for (let i = 0; i < 10; i += 1) {
+      assert.deepEqual(budget.check(5_000_000), { ok: true, reasonCode: null });
+      budget = budget.consume(5_000_000);
+    }
+
+    // Then — 쓴 양은 기록되지만 한도는 없다
+    assert.equal(budget.ordersUsed, 10);
+    assert.equal(budget.notionalUsed, 50_000_000);
+    assert.equal(budget.exhausted, false);
+  });
+
+  it('DTO는 한도가 없음을 명시한다(unlimited: true, max는 null)', () => {
+    const vm = new TradeBudget().viewModel({ seatId: 's1', open: true });
+    assert.equal(vm.unlimited, true);
+    assert.equal(vm.ordersMax, null);
+    assert.equal(vm.notionalMax, null);
+  });
+});
+
+describe('시작 자금 — 10,000,000원(오너 결정 2026-09-23)', () => {
+  it('STARTING_CASH가 10,000,000원이다', () => {
+    assert.equal(STARTING_CASH, 10_000_000);
   });
 });
