@@ -24,9 +24,13 @@ import { buildCostOf } from './domain/buildRules.js';
 import { createCommandLock } from './domain/commandLock.js';
 import { inferGameOverReason } from './domain/gameOverReason.js';
 import { isRoomGoneError } from './domain/roomErrors.js';
+import { STALE_MODAL_GRACE_MS, partitionStaleModals } from './domain/modalGuard.js';
+import { ownedCitiesOf } from './domain/ownedCities.js';
+import { LOCATION_PREFIX, playerCellLabel } from './domain/locationLabel.js';
 import { EventPlaybackQueue } from './animation/EventQueue.js';
 import { createPlaybackEngine } from './animation/playback.js';
 import { createToastHost } from './views/toast.js';
+import { createOpponentToastHost } from './views/opponentToastHost.js';
 import { createHomeView } from './views/homeView.js';
 import { createLobbyView } from './views/lobbyView.js';
 import { createBoardView } from './views/boardView.js';
@@ -47,6 +51,9 @@ import { LIQUIDATION_MODAL_ID, liquidationModalSpec } from './views/modals/liqui
 import { GAME_OVER_MODAL_ID, gameOverModalSpec } from './views/modals/gameOverModal.js';
 import { TRAVEL_MODAL_ID, travelConfirmSpec } from './views/modals/travelModal.js';
 import { CELL_SHEET_ID, cellSheetSpec } from './views/modals/cellSheet.js';
+import { OWNED_CITIES_SHEET_ID, ownedCitiesSheetSpec } from './views/modals/ownedCitiesSheet.js';
+import { OWNED_HIGHLIGHT_MS } from './views/boardView.js';
+import { clearNotices } from './views/modals/noticeCard.js';
 
 /** 방 목록 자동 새로고침 주기. */
 const ROOM_LIST_INTERVAL_MS = 3000;
@@ -57,6 +64,8 @@ export function createGameController({ appRoot, overlayRoot }) {
   const store = createStore();
   const toast = createToastHost(overlayRoot);
   const modalHost = createModalHost(overlayRoot);
+  // 상대가 무엇을 했는지 한 줄로 알려 주는 줄(결정 모달보다 아래 층에 그린다).
+  const opponentToasts = createOpponentToastHost(overlayRoot);
   const queue = new EventPlaybackQueue();
 
   let roomCode = null;
@@ -105,8 +114,8 @@ export function createGameController({ appRoot, overlayRoot }) {
   });
   const playersView = createPlayersView({
     onSetAutopilot: (seatId, enabled) => void setAutopilot(seatId, enabled),
-    // 카드를 누르면 그 사람의 말과 칸을 잠깐 강조한다("어디 있는지 모르겠다"의 가장 빠른 답).
-    onFocusPlayer: (seatId) => focusSeatOnBoard(seatId),
+    // 카드의 🔎는 그 사람이 **가진 도시**를 보드에서 찾아 준다(말의 위치는 시트의 보조 줄로).
+    onShowHoldings: (seatId) => showOwnedCities(seatId),
   });
   const logView = createLogView();
   const statusStrip = createStatusStrip({
@@ -150,6 +159,46 @@ export function createGameController({ appRoot, overlayRoot }) {
     boardView.findSeat(seatId, player.position);
   }
 
+  /**
+   * 🔎 한 좌석이 가진 도시를 보드에서 모두 강조하고 목록 시트를 연다.
+   * (말의 위치는 시트 안의 "현재 위치" 줄로만 남긴다 — 오너 요청.)
+   */
+  function showOwnedCities(seatId) {
+    const state = store.state;
+    const view = state.view;
+    const player = view?.players.find((item) => item.seatId === seatId) ?? null;
+    if (!player) {
+      toast.info('좌석 정보를 찾을 수 없습니다.');
+      return;
+    }
+    const holdings = ownedCitiesOf({
+      board: view.board,
+      seatId,
+      ownerName: seatNameOf(state, seatId),
+    });
+    const slot = slotOf(state, seatId);
+    boardView.highlightOwned(holdings.indexes, { color: slot.color });
+    modalHost.present(
+      ownedCitiesSheetSpec({
+        holdings,
+        // 칸 이름은 찾지 못하면 null로 넘긴다(대체 문구는 locationLabel이 한 곳에서 만든다).
+        positionLabel: `${LOCATION_PREFIX}: ${playerCellLabel({
+          index: player.position,
+          spaceName: view.board?.[player.position]?.name ?? null,
+          islandRemainingTurns: player.islandRemainingTurns,
+          eliminated: player.eliminated,
+        })}`,
+        slotColor: slot.color,
+        highlightSeconds: Math.round(OWNED_HIGHLIGHT_MS / 1000),
+        onFocusCell: (index) => boardView.revealCell(index),
+        onClose: () => {
+          modalHost.close(OWNED_CITIES_SHEET_ID);
+          boardView.clearOwnedHighlight();
+        },
+      }),
+    );
+  }
+
   /** 이 기기의 좌석 중 지금 차례인 좌석을(없으면 첫 좌석을) 찾아 비춘다. */
   function findMyToken() {
     const state = store.state;
@@ -180,6 +229,8 @@ export function createGameController({ appRoot, overlayRoot }) {
       store.patch({ view, locked: commandLock.locked });
     },
     isLocalSeat: (seatId) => isMySeat(store.state, seatId),
+    opponentToasts,
+    onViewArrived: (view) => scheduleStaleModalSweep(view),
     onGameOver: (reason) => {
       gameOverReason = reason;
     },
@@ -219,6 +270,46 @@ export function createGameController({ appRoot, overlayRoot }) {
     }
   }
 
+  /* ── 결정 모달 안전망 ─────────────────────────────────────── */
+
+  /**
+   * 서버가 이미 다음 페이즈로 넘어갔는데도 열려 있는 결정 모달을 닫는다.
+   *
+   * 평소에는 최신 뷰를 그릴 때(`syncModals`) 닫히지만, 그 시점은 **연출 큐가 다 비워진 뒤**다.
+   * 연출 약속이 멈추면(예외·멈춘 타이머·백그라운드 탭) 모달이 화면에 남는다 —
+   * 폰에서 "카드가 안 꺼진다"는 신고의 가장 그럴듯한 경로여서 도착 시점 기준으로 한 번 더 막는다.
+   *
+   * 곧바로 닫지 않고 짧게 기다리는 이유: 카지노 3판째 결과처럼 **지금 재생 중인 연출**을
+   * 사용자가 보기도 전에 모달을 치워 버리면 무슨 일이 있었는지 알 수 없다.
+   */
+  let staleSweepTimer = null;
+  function scheduleStaleModalSweep(view) {
+    // ① 자기 연출이 없는 모달(조난·매입·건설·인수·정리…)은 **기다릴 이유가 없다**.
+    //    안내 카드가 재생되는 동안 결정 모달이 화면에 남는 일을 여기서 끊는다.
+    const { immediate } = partitionStaleModals(modalHost.openIds, view);
+    for (const id of immediate) {
+      modalHost.close(id);
+    }
+
+    // ② 카지노처럼 본문에서 연출이 도는 모달만 유예 뒤에 다시 본다.
+    //    이미 예약돼 있으면 **다시 미루지 않는다**. 컴퓨터 좌석이 0.3초마다 메시지를 보내는 동안
+    //    타이머를 계속 뒤로 밀면 안전망이 영영 동작하지 않는다(그때가 바로 필요한 순간이다).
+    if (staleSweepTimer !== null) {
+      return;
+    }
+    staleSweepTimer = window.setTimeout(() => {
+      staleSweepTimer = null;
+      // 그새 최신 뷰가 반영됐다면 그 뷰를 기준으로 다시 판단한다.
+      const latest = store.state.view ?? view;
+      const target = (latest?.version ?? -1) >= (view?.version ?? -1) ? latest : view;
+      const stale = partitionStaleModals(modalHost.openIds, target);
+      for (const id of [...stale.immediate, ...stale.graced]) {
+        console.error('[controller] 페이즈가 어긋난 결정 모달을 안전망으로 닫았습니다', id, target?.phase ?? null);
+        modalHost.close(id);
+      }
+    }, STALE_MODAL_GRACE_MS);
+  }
+
   /* ── 모달 동기화 (phase + pending) ─────────────────────────── */
 
   function syncTravelMode(state) {
@@ -241,13 +332,15 @@ export function createGameController({ appRoot, overlayRoot }) {
 
     if (view.isOver) {
       presentGameOver(state);
-      modalHost.closeOthers([GAME_OVER_MODAL_ID, CELL_SHEET_ID]);
+      modalHost.closeOthers([GAME_OVER_MODAL_ID, CELL_SHEET_ID, OWNED_CITIES_SHEET_ID]);
       return;
     }
 
     const pending = view.pending;
+    // 스스로 닫는 정보 시트(칸 상세 · 도시 목록)는 페이즈가 바뀌어도 남겨 둔다.
     // 목적지 확인 시트는 공항 선택 페이즈에서만 남겨 둔다.
-    const keep = view.phase === 'AWAIT_TRAVEL' ? [CELL_SHEET_ID, TRAVEL_MODAL_ID] : [CELL_SHEET_ID];
+    const sheets = [CELL_SHEET_ID, OWNED_CITIES_SHEET_ID];
+    const keep = view.phase === 'AWAIT_TRAVEL' ? [...sheets, TRAVEL_MODAL_ID] : sheets;
 
     // 카지노는 관전자도 함께 본다(조작은 자기 차례에만).
     if (view.phase === 'AWAIT_CASINO' && pending) {
@@ -627,6 +720,9 @@ export function createGameController({ appRoot, overlayRoot }) {
     gameOverReason = null;
     commandLock.onResync();
     modalHost.closeAll();
+    // 화면을 떠날 때 떠 있던 안내 카드·상대 알림도 함께 걷어 낸다(다음 화면에 남지 않게).
+    clearNotices();
+    opponentToasts.clear();
     store.resetRoom();
     store.patch({ screen: SCREENS.HOME, savedRooms: storage.savedRooms(), connection: CONNECTION.IDLE, locked: false });
     startRoomListPolling();

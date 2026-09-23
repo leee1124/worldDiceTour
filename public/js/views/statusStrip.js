@@ -8,6 +8,7 @@
 
 import { button, el, setText, toggleClass } from '../dom.js';
 import { currentLocationLabel } from '../domain/locationLabel.js';
+import { remainingTurnsOf } from '../domain/turnOrder.js';
 import { isMySeat, seatNameOf, slotOf, spaceOf } from '../store.js';
 import { createDicePair } from './diceView.js';
 
@@ -16,6 +17,8 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
   const nameNode = el('span', { class: 'strip-name' });
   const tagNode = el('span', { class: 'strip-tag' });
   const locationNode = el('span', { class: 'strip-location', text: currentLocationLabel(null) });
+  // "내 차례까지 몇 명 남았지?"를 글자로 알려 준다(좌석 순서 = 차례 순서).
+  const queueNode = el('span', { class: 'strip-queue' });
 
   const dice = createDicePair({ labels: ['상황판 주사위 1', '상황판 주사위 2'], variant: 'strip' });
 
@@ -45,6 +48,7 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
       el('span', { class: 'strip-who' }, [chip, nameNode, tagNode]),
       locationNode,
     ]),
+    queueNode,
     el('div', { class: 'strip-line strip-line--tools' }, [dice.element, findButton, zoomButton]),
   ]);
 
@@ -68,6 +72,14 @@ export function createStatusStrip({ onFindMe, onToggleZoom }) {
 
       const current = view.players.find((player) => player.seatId === view.currentSeatId) ?? null;
       setText(locationNode, currentLocationLabel(current ? spaceOf(state, current.position)?.name ?? null : null));
+
+      const remaining = remainingTurnsOf({
+        players: view.players,
+        currentSeatId: view.currentSeatId,
+        isOver: view.isOver,
+      });
+      setText(queueNode, remaining.label);
+      queueNode.hidden = remaining.label === '';
 
       // 이 기기에 좌석이 없으면(순수 관전) "내 위치"는 의미가 없다.
       findButton.disabled = state.mySeats.length === 0;

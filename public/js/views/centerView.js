@@ -9,6 +9,7 @@ import { button, clear, el, setText, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
 import { phasePrompt } from '../domain/labels.js';
 import { currentLocationLabel } from '../domain/locationLabel.js';
+import { remainingTurnsOf } from '../domain/turnOrder.js';
 import { countTo, DURATIONS } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
 import { isMySeatOnAutopilot, isMyTurn, seatNameOf, slotOf, spaceOf } from '../store.js';
@@ -42,6 +43,9 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
   // "내 말이 어디 있는지 모르겠다" — 그림만으로는 부족해서 칸 이름을 글자로도 말해 준다.
   const locationNode = el('p', { class: 'core-location', text: currentLocationLabel(null) });
 
+  // "내 차례까지 몇 명 남았지?" — 좌석 순서(=차례 순서)로 만든 한 줄.
+  const queueNode = el('p', { class: 'core-queue' });
+
   const dice = createDicePair();
 
   const actionsNode = el('div', { class: 'core-actions' });
@@ -54,6 +58,7 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
     el('div', { class: 'core-turn', role: 'status', 'aria-live': 'polite' }, [
       el('div', { class: 'turn-line' }, [turnChip, turnNameNode, turnTagNode]),
       locationNode,
+      queueNode,
       promptTitle,
       promptHint,
     ]),
@@ -187,6 +192,17 @@ export function createCenterView({ onRoll, onOpenDecision, onShowRankings, onLea
       if (locationNode.textContent !== locationText) {
         setText(locationNode, locationText);
       }
+
+      const remaining = remainingTurnsOf({
+        players: view.players,
+        currentSeatId: view.currentSeatId,
+        isOver: view.isOver,
+      });
+      // aria-live 영역 안이라 값이 그대로면 다시 쓰지 않는다(같은 문장을 반복해 읽지 않게).
+      if (queueNode.textContent !== remaining.label) {
+        setText(queueNode, remaining.label);
+      }
+      queueNode.hidden = remaining.label === '';
 
       const prompt = phasePrompt(view.isOver ? 'GAME_OVER' : view.phase);
       setText(promptTitle, myTurn || view.isOver ? prompt.title : `${currentName}의 차례입니다`);

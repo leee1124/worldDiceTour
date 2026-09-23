@@ -33,6 +33,8 @@ const CORNER_ART = Object.freeze({
 const SPOTLIGHT_MS = 1200;
 /** 플레이어 카드를 눌러 말을 찾을 때 강조하는 시간. */
 const FIND_MS = 2000;
+/** 돋보기 버튼으로 한 좌석의 도시를 모두 강조하는 시간. */
+export const OWNED_HIGHLIGHT_MS = 4000;
 
 function nameSizeClass(name) {
   const length = String(name ?? '').length;
@@ -74,6 +76,8 @@ export function createBoardView({ onCellActivate }) {
   let boardBuilt = false;
   let travelMode = { active: false, forbidden: [], locked: false };
   let selectedIndex = null;
+  /** 소유 도시 강조 상태(칸 번호 + 해제 타이머). */
+  let ownedFocus = { indexes: [], timer: null };
 
   function buildCell(space) {
     const index = space.index;
@@ -383,6 +387,28 @@ export function createBoardView({ onCellActivate }) {
     highlightTimers.set(timerKey, { timer, node });
   }
 
+  /** 소유 도시 강조를 끈다(다른 좌석을 누르거나 시간이 지났을 때). */
+  function clearOwnedFocus() {
+    if (ownedFocus.timer !== null) {
+      window.clearTimeout(ownedFocus.timer);
+    }
+    for (const index of ownedFocus.indexes) {
+      cells.get(index)?.root.classList.remove('cell--owned-focus');
+    }
+    ownedFocus = { indexes: [], timer: null };
+    stage.classList.remove('board-stage--owned-focus');
+    delete stage.dataset.ownedSlot;
+  }
+
+  /** 칸을 화면 안으로 끌어온다(폰에서 목록의 한 줄을 눌렀을 때). */
+  function scrollCellIntoView(index) {
+    cells.get(index)?.root.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    });
+  }
+
   return {
     element: stage,
     boardElement: boardNode,
@@ -488,24 +514,62 @@ export function createBoardView({ onCellActivate }) {
       flash(cells.get(index)?.root, 'cell--spotlight', SPOTLIGHT_MS, 'spotlight-cell');
     },
 
-    /** 플레이어 카드를 눌렀을 때: 그 사람의 말과 칸을 2초 동안 강조한다. */
+    /** 상황판의 "내 위치"에서 쓴다: 그 사람의 말과 칸을 2초 동안 강조한다. */
     findSeat(seatId, index) {
       flash(tokens.get(seatId) ?? null, 'token--found', FIND_MS, 'find-token');
       if (Number.isInteger(index)) {
         flash(cells.get(index)?.root ?? null, 'cell--found', FIND_MS, 'find-cell');
-        cells.get(index)?.root.scrollIntoView({
-          block: 'nearest',
-          inline: 'nearest',
-          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        });
+        scrollCellIntoView(index);
       }
     },
+
+    /**
+     * 한 좌석이 가진 칸을 **전부** 강조한다(나머지 칸은 흐리게).
+     * 강조는 테두리·색이라 모션 축소에서도 그대로 보인다(움직이는 부분만 CSS가 끈다).
+     *
+     * @param {number[]} indexes 강조할 칸 번호
+     * @param {{color?: string|null, durationMs?: number}} [options] 좌석 색(테두리 색으로 쓴다)
+     * @returns {number} 실제로 강조한 칸 수
+     */
+    highlightOwned(indexes, { color = null, durationMs = OWNED_HIGHLIGHT_MS } = {}) {
+      clearOwnedFocus();
+      const list = (Array.isArray(indexes) ? indexes : []).filter((index) => cells.has(index));
+      if (list.length === 0) {
+        return 0;
+      }
+      if (color) {
+        stage.dataset.ownedSlot = color;
+      }
+      stage.classList.add('board-stage--owned-focus');
+      for (const index of list) {
+        cells.get(index).root.classList.add('cell--owned-focus');
+      }
+      ownedFocus = {
+        indexes: list,
+        timer: window.setTimeout(() => clearOwnedFocus(), durationMs),
+      };
+      // 폰에서는 강조한 칸 중 첫 칸이 보이도록 끌어온다.
+      scrollCellIntoView(list[0]);
+      return list.length;
+    },
+
+    /** 목록의 한 줄을 눌렀을 때: 그 칸만 반짝이고 화면 안으로 끌어온다. */
+    revealCell(index) {
+      if (!Number.isInteger(index) || !cells.has(index)) {
+        return;
+      }
+      flash(cells.get(index).root, 'cell--found', FIND_MS, 'find-cell');
+      scrollCellIntoView(index);
+    },
+
+    clearOwnedHighlight: clearOwnedFocus,
 
     /**
      * 다른 방으로 옮길 때 보드를 비운다.
      * (말·강조 타이머·확대 상태가 남으면 새 방에 이전 방의 흔적이 보인다.)
      */
     reset() {
+      clearOwnedFocus();
       for (const { timer, node } of highlightTimers.values()) {
         window.clearTimeout(timer);
         node.classList.remove('token--found', 'cell--found', 'cell--spotlight');

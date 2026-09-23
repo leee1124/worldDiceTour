@@ -17,6 +17,7 @@ import {
   moneyReasonLabel,
 } from './labels.js';
 import { direction, object, subject, to } from './particles.js';
+import { roundStartLine } from './turnOrder.js';
 
 /** 로그 줄의 성격(색/아이콘 구분용). */
 export const LINE_KINDS = Object.freeze({
@@ -80,7 +81,7 @@ const FORMATTERS = {
 
   TURN_ENDED: (event, ctx) => line(LINE_KINDS.INFO, `${ctx.name(event.playerId)}의 턴이 끝났습니다.`),
 
-  ROUND_ADVANCED: (event) => line(LINE_KINDS.TURN, `${event.round}라운드가 시작되었습니다.`),
+  ROUND_ADVANCED: (event) => line(LINE_KINDS.TURN, roundStartLine(event.round)),
 
   GAME_OVER: (event) => {
     const winner = Array.isArray(event.rankings) ? event.rankings[0] : null;
