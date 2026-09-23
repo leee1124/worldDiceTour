@@ -25,7 +25,19 @@ const ICONS_JS_PATH = path.join(ROOT, 'public/js/views/icons.js');
 const ICON_PATHS_JS_PATH = path.join(ROOT, 'public/js/views/iconPaths.js');
 
 const KNOWN_TAGS = new Set(['path', 'circle', 'rect']);
-const FORBIDDEN_ATTR_NAMES = new Set(['style', 'href', 'xlink:href', 'class', 'id', 'onload', 'onclick']);
+// fill·stroke도 금지: 색은 항상 상위 <svg>의 currentColor를 물려받아야 테마가 따라온다.
+// (지금은 생성기 화이트리스트가 구조적으로 못 넣지만, 화이트리스트가 넓어져도 이 테스트가 막는다.)
+const FORBIDDEN_ATTR_NAMES = new Set([
+  'style',
+  'href',
+  'xlink:href',
+  'class',
+  'id',
+  'onload',
+  'onclick',
+  'fill',
+  'stroke',
+]);
 const EXTERNAL_URL_PATTERN = /^(https?:)?\/\//i;
 const EMOJI_PATTERN = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2B55}️\u{1F000}-\u{1F2FF}]/gu;
 

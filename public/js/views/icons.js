@@ -11,7 +11,7 @@
  * - 주사위 눈·건물 배지(별장/빌딩/호텔)·슬롯 심볼·섬 등 게임 고유 도안은 이 파일에 직접
  *   16x16 좌표로 손으로 그렸다(아래 `icon()` + `strokePath` 등 헬퍼).
  * - 깃발·비행기·돋보기·해/달·자물쇠 같은 범용 글리프는 서드파티 아이콘 세트
- *   [Lucide](https://lucide.dev)(ISC/MIT, `public/vendor/lucide/LICENSE`)에서 가져온
+ *   [Lucide](https://lucide.dev)(ISC/MIT, `third_party/lucide/LICENSE`)에서 가져온
  *   벡터 데이터(`iconPaths.js`, `scripts/buildIcons.js`로 생성)를 `libraryIcon()`으로 그린다.
  *   CSP가 `innerHTML`을 막기 때문에 마크업이 아니라 데이터로 받아 `dom.js`의 `svg()`로 조립한다.
  */

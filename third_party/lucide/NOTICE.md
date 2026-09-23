@@ -3,7 +3,7 @@
 - 출처: [lucide-static](https://www.npmjs.com/package/lucide-static) v1.47.0 (npm 레지스트리 배포본,
   `https://registry.npmjs.org/lucide-static/-/lucide-static-1.47.0.tgz`, sha1 `ad0520340308bc22b719e88f037a014866e5fe1f`)
 - 라이선스: ISC (전문은 같은 폴더의 [`LICENSE`](./LICENSE) 참고). 그 중 Feather 프로젝트에서
-  가져온 일부 아이콘(이 저장소가 쓰는 것 중 `lock`, `moon`, `search`, `target`, `circle-help` 포함)은
+  가져온 일부 아이콘(이 저장소가 쓰는 것 중 `lock`, `moon`, `search`, `target`, `circle-help`(Feather·구버전 lucide에서는 `help-circle`) 포함)은
   LICENSE 파일에 함께 실린 MIT 조항이 적용된다. 두 라이선스 모두 출처 표시 외 실질적인 사용 제약이 없다.
 - 이 폴더(`public/vendor/lucide/svg/*.svg`)에는 실제로 쓰는 아이콘 21개의 **원본 SVG만** 받아 두었다
   (전체 세트를 담지 않는다). 각 파일 상단의 라이선스 주석은 원본 그대로 보존했다.

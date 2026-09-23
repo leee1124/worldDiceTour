@@ -2,8 +2,8 @@
  * Lucide 아이콘 벡터 데이터 — **자동 생성 파일. 손으로 고치지 말 것.**
  *
  * 생성 명령: `node scripts/buildIcons.js`
- * 원본: lucide-static v1.47.0 (ISC/MIT, public/vendor/lucide/LICENSE · NOTICE.md),
- *       public/vendor/lucide/svg/*.svg
+ * 원본: lucide-static v1.47.0 (ISC/MIT, third_party/lucide/LICENSE · NOTICE.md),
+ *       third_party/lucide/svg/*.svg
  *
  * CSP가 innerHTML을 막으므로(public/js/dom.js) SVG 마크업 문자열이 아니라
  * "viewBox + 자식 엘리먼트 서술자" 데이터로 내보낸다. public/js/views/icons.js의

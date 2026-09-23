@@ -6,15 +6,15 @@
  * "viewBox + 자식 엘리먼트 서술자(JS 객체)" 데이터로 내보낸다. `public/js/views/icons.js`가
  * `dom.js`의 `svg()` 헬퍼로 이 데이터를 노드로 조립해 그린다.
  *
- * 입력은 이미 저장소에 받아 둔 원본 SVG(`public/vendor/lucide/svg/*.svg`, lucide-static
- * v1.47.0, ISC/MIT 라이선스 — `public/vendor/lucide/LICENSE`·`NOTICE.md` 참고)뿐이다.
+ * 입력은 이미 저장소에 받아 둔 원본 SVG(`third_party/lucide/svg/*.svg`, lucide-static
+ * v1.47.0, ISC/MIT 라이선스 — `third_party/lucide/LICENSE`·`NOTICE.md` 참고)뿐이다.
  * 네트워크 접근이 없으므로 오프라인에서도 재생성할 수 있다.
  *
  * 사용법:
  *   node scripts/buildIcons.js
  *
  * 아이콘 추가/교체:
- *   1. 새 아이콘의 `.svg`를 `public/vendor/lucide/svg/`에 받는다.
+ *   1. 새 아이콘의 `.svg`를 `third_party/lucide/svg/`에 받는다.
  *   2. 아래 `ICON_NAMES`에 파일명(확장자 제외)을 추가한다.
  *   3. 다시 `node scripts/buildIcons.js`를 실행해 `iconPaths.js`를 재생성한다.
  */
@@ -24,7 +24,7 @@ import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const SVG_DIR = path.join(ROOT, 'public/vendor/lucide/svg');
+const SVG_DIR = path.join(ROOT, 'third_party/lucide/svg');
 const OUT_FILE = path.join(ROOT, 'public/js/views/iconPaths.js');
 const LUCIDE_VERSION = '1.47.0';
 
@@ -86,6 +86,24 @@ function parseSvg(source, name) {
   }
   const viewBox = viewBoxMatch[1];
 
+  // 화이트리스트 밖의 도형(line·polyline·polygon·ellipse·g 등)이 섞여 있으면 **즉시 실패**한다.
+  // 조용히 버리면 일부 도형이 빠진 아이콘이 그대로 생성되고 테스트도 잡지 못한다(코드리뷰 지적).
+  const body = source.slice(source.indexOf('>', source.indexOf('<svg')) + 1);
+  const unknown = new Set();
+  const anyTagRe = /<([a-zA-Z][\w-]*)\b/g;
+  let tagMatch;
+  while ((tagMatch = anyTagRe.exec(body))) {
+    const tag = tagMatch[1];
+    if (tag !== 'svg' && !ATTR_WHITELIST[tag]) {
+      unknown.add(tag);
+    }
+  }
+  if (unknown.size > 0) {
+    throw new Error(
+      `${name}.svg: 지원하지 않는 태그가 있습니다(<${[...unknown].join('>, <')}>) — buildIcons.js의 ATTR_WHITELIST와 icons.js의 조립 코드를 먼저 확장하세요`,
+    );
+  }
+
   const children = [];
   const tagRe = /<(path|circle|rect)\s+([^>]*?)\/?>/g;
   let match;
@@ -114,8 +132,8 @@ function render(icons) {
  * Lucide 아이콘 벡터 데이터 — **자동 생성 파일. 손으로 고치지 말 것.**
  *
  * 생성 명령: \`node scripts/buildIcons.js\`
- * 원본: lucide-static v${LUCIDE_VERSION} (ISC/MIT, public/vendor/lucide/LICENSE · NOTICE.md),
- *       public/vendor/lucide/svg/*.svg
+ * 원본: lucide-static v${LUCIDE_VERSION} (ISC/MIT, third_party/lucide/LICENSE · NOTICE.md),
+ *       third_party/lucide/svg/*.svg
  *
  * CSP가 innerHTML을 막으므로(public/js/dom.js) SVG 마크업 문자열이 아니라
  * "viewBox + 자식 엘리먼트 서술자" 데이터로 내보낸다. public/js/views/icons.js의
