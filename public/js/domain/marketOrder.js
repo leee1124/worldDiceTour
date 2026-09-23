@@ -131,8 +131,11 @@ export function previewOrder(input) {
   }
 
   const open = budget?.open === true;
-  const ordersLeft = Number.isInteger(budget?.ordersLeft) ? budget.ordersLeft : limits.maxOrdersPerWindow;
-  const notionalLeft = Number.isInteger(budget?.notionalLeft) ? budget.notionalLeft : limits.maxNotionalPerWindow;
+  // `null` = 상한 없음(D46)
+  const ordersLeft = budget?.ordersLeft === null ? Infinity
+    : Number.isInteger(budget?.ordersLeft) ? budget.ordersLeft : limits.maxOrdersPerWindow;
+  const notionalLeft = budget?.notionalLeft === null ? Infinity
+    : Number.isInteger(budget?.notionalLeft) ? budget.notionalLeft : limits.maxNotionalPerWindow;
 
   /* ── 주식 ─────────────────────────────────────────────── */
   if (STOCK_KINDS.has(kind)) {
@@ -185,7 +188,8 @@ export function previewOrder(input) {
         total,
         cashAfter: context.cash - total,
         depositAfter: context.deposit,
-        ordersLeftAfter: queueMode ? null : Math.max(0, ordersLeft - 1),
+        // 한도가 없으면(Infinity) 남은 건수도 없다 — 화면에 ∞를 보이지 않게 null.
+        ordersLeftAfter: queueMode || !Number.isFinite(ordersLeft) ? null : Math.max(0, ordersLeft - 1),
       };
     }
 
@@ -211,7 +215,8 @@ export function previewOrder(input) {
       total: proceeds,
       cashAfter: context.cash + proceeds,
       depositAfter: context.deposit,
-      ordersLeftAfter: queueMode ? null : Math.max(0, ordersLeft - 1),
+      // 한도가 없으면(Infinity) 남은 건수도 없다 — 화면에 ∞를 보이지 않게 null.
+        ordersLeftAfter: queueMode || !Number.isFinite(ordersLeft) ? null : Math.max(0, ordersLeft - 1),
     };
   }
 
@@ -247,7 +252,8 @@ export function previewOrder(input) {
       total: money,
       cashAfter: context.cash - money,
       depositAfter: context.deposit + money,
-      ordersLeftAfter: queueMode ? null : Math.max(0, ordersLeft - 1),
+      // 한도가 없으면(Infinity) 남은 건수도 없다 — 화면에 ∞를 보이지 않게 null.
+        ordersLeftAfter: queueMode || !Number.isFinite(ordersLeft) ? null : Math.max(0, ordersLeft - 1),
     };
   }
 
@@ -265,6 +271,7 @@ export function previewOrder(input) {
     total: money,
     cashAfter: context.cash + money,
     depositAfter: context.deposit - money,
-    ordersLeftAfter: queueMode ? null : Math.max(0, ordersLeft - 1),
+    // 한도가 없으면(Infinity) 남은 건수도 없다 — 화면에 ∞를 보이지 않게 null.
+        ordersLeftAfter: queueMode || !Number.isFinite(ordersLeft) ? null : Math.max(0, ordersLeft - 1),
   };
 }

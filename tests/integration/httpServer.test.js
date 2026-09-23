@@ -996,7 +996,7 @@ describe('HTTP 서버(REST + SSE)', () => {
         ['VILLA', 'BUILDING'],
       );
       assert.deepEqual(response.body.game.pending.lockedOptions, [
-        { type: 'HOTEL', cost: 63_000, locked: true, unlockLap: 3 },
+        { type: 'HOTEL', cost: 94_500, locked: true, unlockLap: 3 },
       ]);
     });
 

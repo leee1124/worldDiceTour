@@ -32,12 +32,12 @@ describe('Casino(라스베이거스 카지노)', () => {
       assert.throws(() => casino.assertValidBet(200_000, 150_000), DomainError);
     });
 
-    it('상한(500,000원)을 넘으면 거부한다', () => {
+    it('상한(750,000원)을 넘으면 거부한다', () => {
       // Given
       const casino = new Casino();
 
       // When / Then
-      assert.throws(() => casino.assertValidBet(510_000, 3_000_000), DomainError);
+      assert.throws(() => casino.assertValidBet(760_000, 3_000_000), DomainError);
     });
 
     it('단위·범위의 경계값은 모두 통과하고, 한 칸 벗어나면 거부한다', () => {
@@ -50,7 +50,7 @@ describe('Casino(라스베이거스 카지노)', () => {
       }
       // 경계 바로 밖은 거부
       assert.throws(() => casino.assertValidBet(9_999, 500_000), DomainError);
-      assert.throws(() => casino.assertValidBet(510_000, 600_000), DomainError);
+      assert.throws(() => casino.assertValidBet(760_000, 800_000), DomainError);
       assert.throws(() => casino.assertValidBet(10_001, 500_000), DomainError);
       // 현금과 정확히 같은 금액은 통과하고, 1원 넘으면 현금 부족
       assert.doesNotThrow(() => casino.assertValidBet(20_000, 20_000));

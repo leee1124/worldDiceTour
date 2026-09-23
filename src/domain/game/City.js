@@ -28,7 +28,7 @@ const ACQUISITION_MULTIPLIER = 2;
 /** 매각 환급 = 투자액 × 0.5. */
 const LIQUIDATION_RATE = 0.5;
 /** 휴양지 1개당 통행료 단가. */
-const RESORT_TOLL_UNIT = 50_000;
+const RESORT_TOLL_UNIT = 75_000;
 
 /**
  * 소유 가능한 칸(도시/휴양지).

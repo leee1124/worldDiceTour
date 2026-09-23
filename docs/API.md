@@ -44,11 +44,13 @@
 | 28 | **추가 필드** | `GameViewDto.players[]`에 `stockValue`·`depositBalance`·`netWorth`(내역 객체) 가산. `totalAssets`의 **뜻이 넓어졌다** — 이제 주식 평가액과 예금도 포함한다 | 플레이어 패널의 총자산 내역을 `현금 / 부동산 / 주식 / 예금 / −대출`로 분해해 보여 줄 것. `totalAssets === netWorth.total` |
 | 29 | **추가 필드** | `pending`에 `kind: "TRADE"`가 생겼고, `LIQUIDATION`의 `sellable` 항목에 `quantity`·`maxQuantity`·`unitValue`가 가산됐다(`index`·`name`은 여전히 부동산 항목에만 있다) | 정리 모달은 `assetKind`로 분기하고 주식은 수량 입력을 받을 것 |
 | 30 | **새 이벤트** | 18종: `TRADING_OPENED` `TRADING_CLOSED` `ORDER_FILLED` `DEPOSIT_MADE` `DEPOSIT_WITHDRAWN` `DEPOSIT_INTEREST_PAID` `DIVIDEND_PAID` `NEWS_PUBLISHED` `CYCLE_CHANGED` `BASE_RATE_CHANGED` `PRICES_UPDATED` `INSTRUMENT_DELISTED` `INSTRUMENT_LISTED` `HOLDINGS_WIPED` `QUEUED_ORDER_PLACED` `QUEUED_ORDER_CANCELLED` `QUEUED_ORDER_EXECUTED` `QUEUED_ORDER_REJECTED` (7장) | 라운드 틱 연출(뉴스 카드 뒤집기 → 시세 갱신)은 `NEWS_PUBLISHED` → `PRICES_UPDATED` 순서로 온다 |
-| 31 | **새 에러 코드** | `ERR018`(409) 주문 한도를 초과했습니다 / `ERR019`(429) 요청이 너무 잦습니다 | `ERR018`은 창구 예산(3건·2,000,000원)·종목 보유 상한·예금 한도 위반. `ERR019`는 좌석당 거래 커맨드 레이트 리밋(5초 10건) — **즉시 재시도하지 말 것** |
+| 31 | **새 에러 코드** | `ERR018`(409) 주문 한도를 초과했습니다 / `ERR019`(429) 요청이 너무 잦습니다 | `ERR018`은 종목 보유 상한(500주)·예금 한도 위반(창구 건수·명목 한도는 D46으로 해제됨). `ERR019`는 좌석당 거래 커맨드 레이트 리밋(5초 10건) — **즉시 재시도하지 말 것** |
 | 32 | 동작 | 저장 파일이 `schemaVersion: 3`이 됐다(서버 내부 형식) | 클라이언트 영향 없음. 예전에 저장된 방은 자동 승급되며 **투자 모드는 `OFF`로 유지된다**(진행 중인 판에 기능이 끼어들지 않는다) |
 | 33 | 동작 | `rankings`와 `players[].totalAssets`가 주식 평가액·예금을 포함한다(단일 출처 `NetWorth`) | 종료 순위 모달의 총자산 내역도 28번의 `netWorth`로 분해해 보여 줄 수 있다 |
 | 34 | 동작 + **새 이벤트** | **행운 티켓이 22장이 됐다**: 잭팟 적립금을 받는 두 장이 추가됐다 — `T21 잭팟 당첨권`(전액)과 `T22 잭팟 나눔 행사`(절반, 내림). 새 효과 종류 `CLAIM_JACKPOT`(`share`: `100` \| `50`)과 새 이벤트 `JACKPOT_CLAIMED { playerId, amount, share, remaining }`. 적립금이 실제로 줄면 기존 `JACKPOT_CHANGED`가 뒤따르고, 적립금이 0원이면 `amount: 0`인 `JACKPOT_CLAIMED`만 발생한다(돈은 움직이지 않는다) | 티켓 카드 문구는 `TICKET_DRAWN.text`를 그대로 쓰면 된다(효과 라벨은 `effect.share`로 "전액/절반"을 구분할 수 있다). 로그/연출에 `JACKPOT_CLAIMED`를 추가할 것 — 모르는 이벤트는 무시해도 잭팟 숫자는 `view.jackpot`과 `JACKPOT_CHANGED`로 맞는다. `amount: 0`인 경우를 "당첨 연출"로 보여 주지 말 것 |
 | 35 | 가산 필드 | `PRICES_UPDATED.changes[]`에 `tickBp`와 `breakdown { newsBp, driftBp, nudgeBp, shockBp, reversionBp }`(모두 bp 정수, 합 = `tickBp`)가 실린다 | 뉴스 카드의 "+10%"는 확정 수익이 아니라 압력 하나다 — 화면은 이 분해로 "▲ +2.50% (뉴스 +10 · 회복 +1.5 · 운 -9)"를 보여 줄 수 있다. `reversionBp`는 기준가 0.5~2.5배 밖에서만 0이 아니다(SPEC D45). 없는 옛 이벤트는 등락만 표시하면 된다 |
+| 36 | 동작 + 가산 필드 | **창구 한도 해제·시작 자금 10,000,000원**(D46). `market.rules`의 `maxOrdersPerWindow`·`maxNotionalPerWindow`·`maxNotionalPerOrder`가 `null`이고, `budget.ordersLeft`·`notionalLeft`·`ordersMax`·`notionalMax`도 `null`, 새 필드 `budget.unlimited: true`. 창구는 예산 소진으로 자동 마감되지 않는다 — `CLOSE_TRADING`만이 닫는다 | 클라이언트는 `null`을 "상한 없음"으로 읽고 "주문 n건 중 · 예산" 줄을 숨길 것. 최대 수량은 현금·수량(200)·보유 상한(500주)만으로 계산 |
+| 37 | 동작(값만) | **보드 경제 1.5배·월급 300,000원**(D47). 도시·휴양지 `price`(90,000 ~ 1,200,000 / 휴양지 300,000), 휴양지 통행료 단가 75,000, `ISLAND_PAY` 구조비 300,000, `TAKE_LOAN` 원금 1,500,000 / 채무 1,800,000, `CASINO_BET` 상한 750,000, 행운 티켓 고정 금액, 보드 압력 "비싼 도시" 기준 450,000. `pending.LIQUIDATION`에 `loanPrincipal`·`loanDebt` 가산. **진행 중인 방도 새 가격을 쓴다**(가격은 스냅샷에 없고 보드 정의에서 복원) | 금액을 하드코딩한 안내 문구(출발 칸 월급, 휴양지 통행료, 구조비, 베팅 상한)는 새 값으로 바꿀 것. 건설비·통행료는 이미 서버 값을 그대로 쓴다 |
 
 서버는 **게임 상태와 모든 난수의 유일한 권위**다. 클라이언트는 커맨드를 POST로 보내고, SSE로 받은 스냅샷(`GameViewDto`)과 이벤트 목록으로 화면을 그리고 연출만 한다.
 
@@ -99,7 +101,7 @@
 | `ERR015` | 403 | 허용되지 않은 접속 주소입니다. | `Host` 헤더가 랜 주소 화이트리스트에 없음(DNS 리바인딩 방어). 헤더 자체가 없어도 거부 |
 | `ERR016` | 503 | 접속자가 너무 많습니다. 잠시 후 다시 시도하세요. | SSE 구독자 상한(방당 16 / 전체 128) 초과 |
 | `ERR017` | 503 | 방을 더 만들 수 없습니다. 잠시 후 다시 시도하세요. | 서버 방 개수 상한(200) 초과. 30분 이상 방치된 대기실을 먼저 정리한 뒤에도 자리가 없을 때 |
-| `ERR018` | 409 | 주문 한도를 초과했습니다. | 창구 주문 수(3건)·창구 명목금액(2,000,000원)·1건 명목금액(1,000,000원)·종목 보유 상한(500주)·예금 한도(10,000,000원)·예약 주문 수(3건) 초과 |
+| `ERR018` | 409 | 주문 한도를 초과했습니다. | 종목 보유 상한(500주)·예금 한도(10,000,000원)·예약 주문 수(3건) 초과. 창구 주문 수·명목금액 한도는 **없음**(D46) |
 | `ERR019` | 429 | 요청이 너무 잦습니다. 잠시 후 다시 시도하세요. | 좌석당 거래 커맨드 레이트 리밋(5초에 10건) 초과. `retry-after: 1` 헤더가 함께 온다 |
 
 > `ERR015`/`ERR016`은 이미 다른 뜻(접속 주소·구독자 상한)으로 쓰이고 있어, 설계서가 예고한 번호 대신
@@ -412,15 +414,15 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `SKIP_START_BUILD` | 보너스 포기 |
 | `ACQUIRE` | 통행료를 낸 남의 도시를 `pending.price`(= invested × 2)에 인수. **보유 현금만** 사용(부족하면 `ERR008`). 인수 후 `AWAIT_BUILD`. 통행료를 정리 페이즈로 낸 턴에는 이 페이즈에 오지 않는다 |
 | `SKIP_ACQUIRE` | 인수 포기 |
-| `CASINO_BET` | `game`: `ODD_EVEN`(choice `ODD`\|`EVEN`) / `HIGH_LOW_SEVEN`(choice `LOW`\|`HIGH`\|`SEVEN`) / `SLOT`(choice 불필요). `bet`은 10,000원 단위, 10,000 ~ min(현금, 500,000). 한 방문 최대 3판 |
+| `CASINO_BET` | `game`: `ODD_EVEN`(choice `ODD`\|`EVEN`) / `HIGH_LOW_SEVEN`(choice `LOW`\|`HIGH`\|`SEVEN`) / `SLOT`(choice 불필요). `bet`은 10,000원 단위, 10,000 ~ min(현금, 750,000). 한 방문 최대 3판 |
 | `CASINO_LEAVE` | 카지노에서 나가 턴 종료 |
-| `ISLAND_PAY` | 구조비 200,000원 지불 후 즉시 `AWAIT_ROLL`(같은 턴에 정상 굴림). 현금 부족 시 `ERR008` |
+| `ISLAND_PAY` | 구조비 300,000원 지불 후 즉시 `AWAIT_ROLL`(같은 턴에 정상 굴림). 현금 부족 시 `ERR008` |
 | `ISLAND_ROLL` | 더블이면 탈출해 그 눈만큼 이동(추가 턴 없음), 아니면 남은 턴 −1 후 턴 종료 |
 | `TRAVEL` | 공항 이동권 사용. 앞 방향으로 이동하므로 출발 칸을 지나면 월급. 도착 칸 효과 정상 적용. `pending.forbiddenIndexes`의 칸(공항 칸·현재 칸)을 고르면 `ERR001` |
 | `SELL` | 정리 페이즈에서 고른 **도시** 하나를 `invested × 0.5`에 은행 매각(건물 포함 초기화). 하위호환으로 계속 유지된다 |
 | `SELL_ASSET` | 정리 페이즈에서 고른 자산 하나를 매각(자산군 무관). `pending.sellable` 항목의 `assetKind`/`assetId`를 그대로 보낸다. 주식·예금은 `quantity`로 일부만 팔 수 있다. 정리·파산 중에는 **거래 수수료가 면제**된다 |
 | `AUTO_SELL` | 정해진 순서대로 필요한 만큼 자동 매각: **주식 → 예금 → 부동산**(자산군 안에서는 환급액이 낮은 것부터, 그마저 같으면 목록 순서). 팔 자산이 없으면 `ERR005` |
-| `TAKE_LOAN` | 게임당 1회. 현금 +1,000,000, 채무 1,200,000. 이후 월급이 채무 상환에 압류된다. 이미 썼으면 `ERR005` |
+| `TAKE_LOAN` | 게임당 1회. 현금 +1,500,000, 채무 1,800,000. 이후 월급이 채무 상환에 압류된다. 이미 썼으면 `ERR005` |
 | `DECLARE_BANKRUPTCY` | 정리 페이즈에서 **항상 가능**. 남은 현금을 채권자에게 넘기고 모든 자산 초기화 후 탈락 |
 
 > 현금 ≥ 지불액이 되는 즉시 지불이 자동 완료되고 중단됐던 흐름이 이어진다.
@@ -437,9 +439,9 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `START_BUILD` | `candidates: [{ index, name, price, options: [{ type, cost, locked, unlockLap }], lockedOptions: [...] }]` |
 | `ACQUIRE` | `index`, `name`, `ownerId`, `price` |
 | `CASINO` | `roundsLeft`, `limits: { min, max, unit }`, `jackpot` |
-| `ISLAND` | `remainingTurns`, `fee`(200000), `canPayFee` |
+| `ISLAND` | `remainingTurns`, `fee`(300000, D47), `canPayFee` |
 | `TRAVEL` | `forbiddenIndexes: number[]` — 공항 칸(30)과 현재 칸. 공항 칸에 서 있으면 한 칸으로 합쳐져 `[30]` |
-| `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `sellable: [{ assetKind, assetId, name, label, refund, quantity, maxQuantity, unitValue, index? }]` — `assetKind`는 `"PROPERTY"` \| `"STOCK"` \| `"DEPOSIT"` |
+| `LIQUIDATION` | `amountDue`, `creditorId`(은행/잭팟이면 `null`), `canSell`, `canLoan`, `loanPrincipal`(1500000), `loanDebt`(1800000) — 화면은 이 값을 그대로 쓰고 숫자를 하드코딩하지 않는다(D47), `sellable: [{ assetKind, assetId, name, label, refund, quantity, maxQuantity, unitValue, index? }]` — `assetKind`는 `"PROPERTY"` \| `"STOCK"` \| `"DEPOSIT"` |
 | `TRADE` | `budget`(9.3), `cash`, `deposit`, `holdings: [{ instrumentId, qty, avgCost, marketValue }]`, `afterTrade`(`"ROLL"` \| `"ISLAND"` \| `"TRAVEL"` — 창구를 닫으면 갈 곳) |
 
 `AWAIT_ROLL`과 `GAME_OVER`에서는 `pending`이 `null`이다.
@@ -729,9 +731,9 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 
 | 항목 | 값 |
 |---|---|
-| 창구당 주문 수 | **3건** (예치·인출도 1건으로 센다) |
-| 창구당 총 명목금액 | **2,000,000원** |
-| 주문 1건 명목금액 | **≤ 1,000,000원** |
+| 창구당 주문 수 | **없음** (D46; 예치·인출도 사용량 1건으로 센다) |
+| 창구당 총 명목금액 | **없음** (D46) |
+| 주문 1건 명목금액 | **없음** (D46; 수량 1~200주 · 종목당 보유 500주만 남는다) |
 | 주문 1건 수량 | **1 ~ 200주** |
 | 종목별 보유 상한 | **500주** |
 | 거래 수수료 | `max(1000, ceil(명목금액 / 100))` — 1%, 최소 1,000원. **매수·매도 양방향** |
@@ -806,7 +808,7 @@ TURN_STARTED
 | 보드 사건 | 압력 |
 |---|---|
 | `LANDMARK_BUILT` | 건설 +300 |
-| `CITY_PURCHASED`(가격 ≥ 300,000) | 건설 +100 |
+| `CITY_PURCHASED`(가격 ≥ 450,000) | 건설 +100 |
 | 잭팟 당첨 | 카지노·엔터 +500 |
 | 잭팟 누적 1,000,000 돌파 | 카지노·엔터 +200 |
 | 휴양지 통행료 발생 | 호텔 +100 |
@@ -818,7 +820,8 @@ TURN_STARTED
 ### 9.7 샘플
 
 `docs/fixtures/marketView.sample.json`에 샘플이 있다. **실제 게임을 돌려 생성한 파일**이므로
-필드 구성이 구현과 정확히 일치한다(문서와 코드가 어긋날 수 없다).
+필드 구성이 구현과 정확히 일치한다(문서와 코드가 어긋날 수 없다). 단, **D45 시점의 값**이라
+금액(시작 자금 3,000,000·창구 한도·도시 가격)은 D46·D47 이전 숫자다 — 모양만 참고할 것.
 
 - `view`: `AWAIT_TRADE` 페이즈의 완전한 `GameViewDto`(보드 40칸·시세·전원 보유·예약·예산 포함)
 - `messages[].events`: SSE `game` 메시지의 `events` 배열 5종

@@ -63,9 +63,9 @@ describe('Market(시장 루트) — 생성과 뷰', () => {
     assert.deepEqual(rules, {
       feeBp: 100,
       feeMin: 1_000,
-      maxOrdersPerWindow: 3,
-      maxNotionalPerWindow: 2_000_000,
-      maxNotionalPerOrder: 1_000_000,
+      maxOrdersPerWindow: null,
+      maxNotionalPerWindow: null,
+      maxNotionalPerOrder: null,
       minQuantity: 1,
       maxQuantity: 200,
       maxPositionPerInstrument: 500,
@@ -89,7 +89,7 @@ describe('Market(시장 루트) — 생성과 뷰', () => {
     const other = market.viewModel({ seatIds: SEATS, actingSeatId: 's2' }).budget;
 
     // Then
-    assert.deepEqual(closed, { ...closed, seatId: 's1', open: false, ordersLeft: 3 });
+    assert.deepEqual(closed, { ...closed, seatId: 's1', open: false, ordersLeft: null, unlimited: true });
     assert.equal(open.open, true);
     assert.equal(other.open, false, '창구는 한 좌석만 열려 있다');
   });
@@ -139,7 +139,7 @@ describe('Market — 거래 창구', () => {
     assert.deepEqual(typesOf(result.events), [MARKET_EVENT_TYPES.ORDER_FILLED]);
     assert.equal(result.intents.length, 2, '명목금액과 수수료를 따로 발행한다');
     assert.equal(market.holdingsOf('s1')[0].qty, 40);
-    assert.equal(market.budgetOf('s1').ordersLeft, 2);
+    assert.equal(market.budgetOf('s1').ordersUsed, 1, '주문이 기록된다(상한은 없다)');
   });
 
   it('창구가 닫혀 있으면 거래 커맨드를 거부한다', () => {
@@ -177,19 +177,20 @@ describe('Market — 거래 창구', () => {
     });
   });
 
-  it('주문 3건을 쓰면 예산이 소진돼 창구가 자동으로 닫힌다', () => {
+  it('주문을 아무리 내도 창구는 소진되지 않는다 — 닫는 것은 CLOSE_TRADING뿐(D46)', () => {
     // Given
     const market = freshMarket();
     market.openWindow('s1');
 
-    // When
-    market.buy({ playerId: 's1', instrumentId: 'AIR', quantity: 1, cash: 1_000_000 });
-    market.buy({ playerId: 's1', instrumentId: 'AIR', quantity: 1, cash: 1_000_000 });
-    assert.equal(market.windowExhausted, false);
-    market.buy({ playerId: 's1', instrumentId: 'AIR', quantity: 1, cash: 1_000_000 });
+    // When — 5건 연속
+    for (let i = 0; i < 5; i += 1) {
+      market.buy({ playerId: 's1', instrumentId: 'AIR', quantity: 1, cash: 10_000_000 });
+    }
 
     // Then
-    assert.equal(market.windowExhausted, true);
+    assert.equal(market.windowExhausted, false);
+    assert.equal(market.budgetOf('s1').ordersUsed, 5);
+    assert.equal(market.openSeatId, 's1', '창구가 스스로 닫히지 않는다');
   });
 });
 
@@ -261,7 +262,7 @@ describe('Market — 예약 주문', () => {
     ]);
     assert.equal(market.holdingsOf('s1')[0].qty, 10);
     assert.equal(market.depositOf('s1'), 100_000);
-    assert.equal(market.budgetOf('s1').ordersLeft, 1, '예약도 창구 예산을 쓴다');
+    assert.equal(market.budgetOf('s1').ordersUsed, 2, '예약 체결도 주문으로 기록된다');
   });
 
   it('예약은 체결 시점에 재검증되고 실패하면 사유와 함께 버려진다(흐름은 멈추지 않는다)', () => {
@@ -331,23 +332,23 @@ describe('Market — 예약 주문', () => {
     );
   });
 
-  it('예약이 창구 예산을 다 쓰면 나머지는 한도 초과로 버려진다', () => {
-    // Given
+  it('예약 주문은 창구 예산 부족으로는 버려지지 않는다 — 현금·보유 상한만이 이유다(D46)', () => {
+    // Given — 예약 3건(좌석당 상한)을 걸어 둔다
     const market = freshMarket();
-    for (let index = 0; index < 3; index += 1) {
-      market.queueOrder({ seatId: 's1', kind: ORDER_KINDS.DEPOSIT, amount: 10_000 });
+    for (let i = 0; i < 3; i += 1) {
+      market.queueOrder({ seatId: 's1', kind: ORDER_KINDS.BUY_STOCK, instrumentId: 'AIR', quantity: 10 });
     }
 
-    // When (예약은 3건까지이므로 3건 모두 체결되고 예산이 소진된다)
+    // When — 창구가 열리며 전부 체결된다(예전에는 3건째가 창구 예산 소진으로 버려졌다)
     market.openWindow('s1');
-    const result = market.runQueuedOrders({ playerId: 's1', cash: 1_000_000 });
+    const result = market.runQueuedOrders({ playerId: 's1', cash: 10_000_000 });
 
-    // Then
-    assert.equal(
-      result.events.filter((event) => event.type === MARKET_EVENT_TYPES.QUEUED_ORDER_EXECUTED).length,
-      3,
-    );
-    assert.equal(market.windowExhausted, true);
+    // Then — 셋 다 QUEUED_ORDER_EXECUTED, 거절 없음, 창구는 열려 있다
+    const types = typesOf(result.events).filter((t) => t.startsWith('QUEUED_ORDER_'));
+    assert.deepEqual(types, Array(3).fill(MARKET_EVENT_TYPES.QUEUED_ORDER_EXECUTED));
+    assert.equal(market.windowExhausted, false);
+    assert.equal(market.holdingsOf('s1')[0].qty, 30);
+    assert.equal(market.budgetOf('s1').ordersUsed, 3);
   });
 });
 
@@ -830,7 +831,7 @@ describe('Market — 스냅샷', () => {
     // Then
     assert.deepEqual(market.toSnapshot().window, { seatId: 's1', budget: { ordersUsed: 1, notionalUsed: 24_000 } });
     assert.equal(restored.openSeatId, 's1');
-    assert.equal(restored.budgetOf('s1').ordersLeft, 2, '예산이 되살아나면 3건이 될 것이다');
+    assert.equal(restored.budgetOf('s1').ordersUsed, 1, '주문 기록이 되살아나 0건이 되면 안 된다');
     assert.deepEqual(restored.toSnapshot(), market.toSnapshot());
   });
 

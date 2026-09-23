@@ -7,13 +7,13 @@ import { DomainError } from '../../src/domain/shared/DomainError.js';
 const newPlayer = (overrides = {}) => new Player({ id: 'p1', name: '가나', ...overrides });
 
 describe('Player(플레이어)', () => {
-  it('시작 자금 3,000,000원과 출발 칸에서 시작한다', () => {
+  it('시작 자금 10,000,000원과 출발 칸에서 시작한다', () => {
     // Given / When
     const player = newPlayer();
 
     // Then
     assert.equal(player.cash, STARTING_CASH);
-    assert.equal(STARTING_CASH, 3_000_000);
+    assert.equal(STARTING_CASH, 10_000_000);
     assert.equal(player.position, 0);
     assert.equal(player.eliminated, false);
   });
@@ -27,7 +27,7 @@ describe('Player(플레이어)', () => {
       player.pay(500_000);
 
       // Then
-      assert.equal(player.cash, 2_500_000);
+      assert.equal(player.cash, 9_500_000);
     });
 
     it('현금보다 많은 금액은 지불할 수 없다', () => {

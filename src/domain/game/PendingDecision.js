@@ -1,4 +1,4 @@
-import { ISLAND_RESCUE_FEE } from './Player.js';
+import { ISLAND_RESCUE_FEE, LOAN_DEBT, LOAN_PRINCIPAL } from './Player.js';
 import { PHASES } from './phases.js';
 import { SPACE_KINDS } from './data/board.js';
 
@@ -107,6 +107,9 @@ export function buildPendingDecision({
         creditorId: payment.primaryCreditorId,
         canSell: sellable.length > 0,
         canLoan: player.canTakeLoan(),
+        // 대출 조건은 규칙(도메인 상수)이다 — 화면이 숫자를 따로 갖지 않도록 함께 보낸다.
+        loanPrincipal: LOAN_PRINCIPAL,
+        loanDebt: LOAN_DEBT,
         sellable: sellable.map((asset) => asset.view),
       };
     }

@@ -31,7 +31,8 @@ describe('AWAIT_TRADE: 거래 창구 진입과 탈출', () => {
     assert.equal(game.pendingDecision.afterTrade, 'ROLL');
     assert.equal(game.pendingDecision.cash, STARTING_CASH);
     assert.deepEqual(game.pendingDecision.holdings, []);
-    assert.equal(game.pendingDecision.budget.ordersLeft, 3);
+    assert.equal(game.pendingDecision.budget.ordersLeft, null, '상한 없음(D46)');
+    assert.equal(game.pendingDecision.budget.unlimited, true);
   });
 
   it('투자 모드 OFF인 방에는 거래 창구가 아예 없다', () => {
@@ -204,37 +205,39 @@ describe('AWAIT_TRADE: 주문과 예금', () => {
     assertMoneyConserved(game, '예금 왕복');
   });
 
-  it('4번째 주문은 ERR018(주문 한도)이고 3번째에서 창구가 자동으로 닫힌다', () => {
+  it('주문 건수에 상한이 없어 4번째 주문도 체결되고 창구는 스스로 닫히지 않는다(D46)', () => {
     // Given
     const game = buildStockGame();
 
-    // When
-    game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'AIR', quantity: 1 });
-    game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'AIR', quantity: 1 });
-    const third = game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'AIR', quantity: 1 });
+    // When — 4번 연속 매수
+    let last = null;
+    for (let i = 0; i < 4; i += 1) {
+      last = game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'AIR', quantity: 1 });
+    }
 
-    // Then
-    assert.deepEqual(eventTypes(third), [EVENT_TYPES.ORDER_FILLED, EVENT_TYPES.TRADING_CLOSED]);
-    assert.equal(
-      eventPayload(third, EVENT_TYPES.TRADING_CLOSED).reason,
-      TRADING_CLOSE_REASONS.BUDGET_EXHAUSTED,
-    );
+    // Then — 체결만 있고 자동 마감 이벤트는 없다. 창구는 CLOSE_TRADING으로만 닫힌다.
+    assert.deepEqual(eventTypes(last), [EVENT_TYPES.ORDER_FILLED]);
+    assert.equal(game.phase, PHASES.AWAIT_TRADE);
+    const closed = game.execute('s1', COMMAND_TYPES.CLOSE_TRADING, {});
+    assert.equal(eventPayload(closed, EVENT_TYPES.TRADING_CLOSED).reason, TRADING_CLOSE_REASONS.PLAYER);
     assert.equal(game.phase, PHASES.AWAIT_ROLL);
   });
 
-  it('창구 예산(2,000,000원)을 넘는 주문은 한도 초과로 거부되고 상태가 그대로다', () => {
-    // Given (NRG 20,000 × 50주 = 1,000,000원 두 번이면 예산이 끝난다)
+  it('창구 명목금액에 상한이 없어 2,000,000원을 넘는 누적 주문도 체결된다(D46)', () => {
+    // Given (NRG 20,000 × 50주 = 1,000,000원씩 — 예전 창구 예산 2,000,000원을 넘긴다)
     const game = buildStockGame();
     game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'NRG', quantity: 50 });
     game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'NRG', quantity: 50 });
     const cashBefore = game.playerById('s1').cash;
 
-    // When / Then
-    assert.throws(() => game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'AIR', quantity: 1 }), {
-      code: DOMAIN_ERROR_CODES.TRADE_LIMIT,
-    });
-    assert.equal(game.playerById('s1').cash, cashBefore);
-    assert.equal(game.version, 2, '거부된 커맨드는 version을 올리지 않는다');
+    // When — 세 번째 주문도 예산 사유로는 막히지 않는다
+    const third = game.execute('s1', COMMAND_TYPES.BUY_STOCK, { instrumentId: 'NRG', quantity: 50 });
+
+    // Then
+    assert.deepEqual(eventTypes(third), [EVENT_TYPES.ORDER_FILLED]);
+    assert.ok(game.playerById('s1').cash < cashBefore);
+    assert.equal(game.version, 3);
+    assertMoneyConserved(game, '누적 3,000,000원 매수');
   });
 
   it('현금보다 비싼 주문은 ERR008이고 상태가 그대로다', () => {
@@ -452,7 +455,11 @@ describe('보드 연동 압력(nudge)', () => {
     assert.ok(eventTypes(events).includes(EVENT_TYPES.TAX_PAID));
     const nudges = game.marketView({ actingSeatId: 's1' }).pendingNudges;
     assert.equal(nudges.length, 5, '전 섹터에 적립된다');
-    assert.ok(nudges.every((nudge) => nudge.bp === -100));
+    // 시작 자금 10,000,000원의 10% 세금 = 1,000,000원이 잭팟을 **정확히** 마일스톤(1,000,000)에 올려
+    // 카지노·엔터에 +200(JACKPOT_MILESTONE)이 겹친다 → 그 섹터만 −100 + 200 = +100. 규칙끼리의 정당한 상호작용이다.
+    for (const nudge of nudges) {
+      assert.equal(nudge.bp, nudge.sector === 'ENTERTAINMENT' ? 100 : -100, `${nudge.sector} 압력`);
+    }
     assert.equal(
       game.marketView({ actingSeatId: 's1' }).instruments[0].price,
       12_000,
@@ -776,12 +783,12 @@ describe('총자산(NetWorth)과 순위', () => {
 
     // Then (현금 3,000,000 − 121,200 − 500,000 = 2,378,800 / 주식 120,000 / 예금 500,000)
     assert.deepEqual(breakdown, {
-      cash: 2_378_800,
+      cash: 9_378_800, // STARTING_CASH 10,000,000 − 지출 621,200
       property: 0,
       stock: 120_000,
       deposit: 500_000,
       loanDebt: 0,
-      total: 2_998_800,
+      total: 9_998_800,
     });
     assert.equal(game.netWorthOf('s1'), breakdown.total, '순위와 화면이 같은 계산을 쓴다');
     assert.equal(
@@ -820,7 +827,7 @@ describe('스냅샷', () => {
     // Then
     assert.deepEqual(restored.toSnapshot(), snapshot);
     assert.equal(restored.phase, PHASES.AWAIT_TRADE);
-    assert.equal(restored.marketView({ actingSeatId: 's1' }).budget.ordersLeft, 2, '창구 예산이 유지된다');
+    assert.equal(restored.marketView({ actingSeatId: 's1' }).budget.ordersUsed, 1, '창구 주문 기록이 유지된다');
   });
 
   it('투자 모드 OFF인 방의 스냅샷에는 market이 null이다', () => {

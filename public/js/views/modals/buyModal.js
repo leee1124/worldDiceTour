@@ -25,7 +25,7 @@ export function buyModalSpec({ pending, space, cash, locked = false, onBuy, onSk
         moneyRow('보유 현금', cash),
         moneyRow('매입 후 현금', Math.max(0, cash - pending.price)),
         isResort
-          ? moneyRow('통행료', 50_000, { note: '보유 휴양지 수 × 50,000원' })
+          ? moneyRow('통행료', 75_000, { note: '보유 휴양지 수 × 75,000원' })
           : moneyRow('땅만 있을 때 통행료', predictToll({ price: pending.price }), {
               note: '건설하면 크게 올라갑니다',
             }),

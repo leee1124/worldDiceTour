@@ -13,7 +13,7 @@ export const NUDGE_BP = Object.freeze({
 });
 
 /** "비싼 도시"의 기준(이 가격 이상이면 건설 섹터에 압력). */
-export const EXPENSIVE_CITY_PRICE = 300_000;
+export const EXPENSIVE_CITY_PRICE = 450_000;
 /** 잭팟 누적이 이 금액을 넘어서는 순간 카지노·엔터에 압력. */
 export const JACKPOT_MILESTONE = 1_000_000;
 

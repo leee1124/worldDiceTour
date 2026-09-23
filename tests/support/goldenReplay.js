@@ -50,7 +50,9 @@ export const STOCKS_GOLDEN_SCENARIOS = Object.freeze([
   { seed: 77, roundLimit: 20 },
   { seed: 512, roundLimit: 20 },
   { seed: 4_096, roundLimit: 20 },
-  { seed: 20_260_921, roundLimit: null },
+  // 라운드 제한 없는 시나리오는 **끝나는 시드**여야 한다(D47). 20_260_921은 1.5배 경제에서 생존 2명이
+  // 주식·예금 수익으로 통행료를 상쇄해 20,000커맨드 안에 끝나지 않았다(OFF 목록은 그대로 99라운드에 끝난다).
+  { seed: 123, roundLimit: null },
 ]);
 
 /** 골든 대상 시나리오(시드 × 라운드 제한). 12개 이상을 유지한다. */

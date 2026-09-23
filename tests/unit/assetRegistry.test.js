@@ -72,7 +72,7 @@ class FakeDepositAssets {
   }
 }
 
-/** 하나(s1)가 1번 하노이(60,000)와 39번 서울(800,000)을 가진 보드. */
+/** 하나(s1)가 1번 하노이(90,000)와 39번 서울(1,200,000)을 가진 보드. */
 function boardWithCities() {
   return Board.restore([
     { index: 1, ownerId: 's1', buildings: [], landmark: false },
@@ -118,11 +118,11 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
           index: 1,
           name: '하노이',
           label: '하노이',
-          refund: 30_000,
+          refund: 45_000,
           quantity: 1,
           maxQuantity: 1,
           heldQuantity: 1,
-          unitValue: 30_000,
+          unitValue: 45_000,
           assetKind: 'PROPERTY',
           assetId: '1',
         },
@@ -130,11 +130,11 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
           index: 39,
           name: '서울',
           label: '서울',
-          refund: 400_000,
+          refund: 600_000,
           quantity: 1,
           maxQuantity: 1,
           heldQuantity: 1,
-          unitValue: 400_000,
+          unitValue: 600_000,
           assetKind: 'PROPERTY',
           assetId: '39',
         },
@@ -147,8 +147,8 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
     const registry = registryWith(boardWithCities(), [new FakeDepositAssets({ s1: 500_000 })]);
 
     // When / Then
-    assert.equal(registry.valueOf('s1'), 60_000 + 800_000 + 500_000);
-    assert.equal(registry.valueOf('s2'), 70_000);
+    assert.equal(registry.valueOf('s1'), 90_000 + 1_200_000 + 500_000);
+    assert.equal(registry.valueOf('s2'), 105_000);
     assert.equal(registry.valueOf('ghost'), 0);
   });
 
@@ -175,9 +175,9 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
     const result = registry.liquidate({ playerId: 's1', kind: PROPERTY_ASSET_KIND, assetId: '1' });
 
     // Then
-    assert.equal(result.refund, 30_000);
+    assert.equal(result.refund, 45_000);
     assert.equal(result.intents.length, 1);
-    assert.equal(result.intents[0].amount, 30_000);
+    assert.equal(result.intents[0].amount, 45_000);
     assert.equal(result.events[0].type, EVENT_TYPES.PROPERTY_SOLD);
     assert.equal(board.cityAt(1).isOwned(), false);
   });
@@ -231,7 +231,7 @@ describe('AssetRegistry / PropertyAssets(자산군 포트)', () => {
 
 describe('Liquidator(정리 매각 순서)', () => {
   it('환급액이 낮은 자산부터 팔고, 채무를 덮으면 멈춘다', () => {
-    // Given (하노이 30,000 / 서울 400,000, 필요액 30,000)
+    // Given (하노이 45,000 / 서울 600,000, 필요액 20,000)
     const board = boardWithCities();
     const liquidator = new Liquidator({ registry: registryWith(board) });
 
@@ -263,7 +263,7 @@ describe('Liquidator(정리 매각 순서)', () => {
   });
 
   it('자산군 우선순위가 환급액보다 먼저다 — 예금이 더 비싸도 먼저 팔린다', () => {
-    // Given (예금 500,000 > 하노이 30,000 이지만 예금 우선순위가 앞선다)
+    // Given (예금 500,000 > 하노이 45,000 이지만 예금 우선순위가 앞선다)
     const board = boardWithCities();
     const liquidator = new Liquidator({
       registry: registryWith(board, [new FakeDepositAssets({ s1: 500_000 })]),

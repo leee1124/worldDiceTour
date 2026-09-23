@@ -33,7 +33,7 @@ describe('Game(행운 티켓 효과)', () => {
 
     // Then
     assert.equal(findEvent(events, EVENT_TYPES.TICKET_DRAWN).ticketId, 'T01');
-    assert.equal(game.playerById('s1').cash, STARTING_CASH + 100_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH + 150_000);
     assertMoneyConserved(game, '수령 티켓');
   });
 
@@ -45,7 +45,7 @@ describe('Game(행운 티켓 효과)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // Then
-    assert.equal(game.playerById('s1').cash, STARTING_CASH - 50_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH - 75_000);
     assertMoneyConserved(game, '지불 티켓');
   });
 
@@ -138,7 +138,7 @@ describe('Game(행운 티켓 효과)', () => {
     assert.equal(game.playerById('s1').airportPending, true);
   });
 
-  it('생일 축하 티켓은 다른 모든 플레이어에게서 50,000원씩 받는다', () => {
+  it('생일 축하 티켓은 다른 모든 플레이어에게서 75,000원씩 받는다', () => {
     // Given
     const game = ticketGame('T15', {
       seats: [
@@ -152,13 +152,13 @@ describe('Game(행운 티켓 효과)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // Then
-    assert.equal(game.playerById('s1').cash, STARTING_CASH + 100_000);
-    assert.equal(game.playerById('s2').cash, STARTING_CASH - 50_000);
-    assert.equal(game.playerById('s3').cash, STARTING_CASH - 50_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH + 150_000);
+    assert.equal(game.playerById('s2').cash, STARTING_CASH - 75_000);
+    assert.equal(game.playerById('s3').cash, STARTING_CASH - 75_000);
     assertMoneyConserved(game, '생일 축하');
   });
 
-  it('한턱 쏘기 티켓은 다른 모든 플레이어에게 30,000원씩 준다', () => {
+  it('한턱 쏘기 티켓은 다른 모든 플레이어에게 45,000원씩 준다', () => {
     // Given
     const game = ticketGame('T16');
 
@@ -166,12 +166,12 @@ describe('Game(행운 티켓 효과)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // Then
-    assert.equal(game.playerById('s1').cash, STARTING_CASH - 30_000);
-    assert.equal(game.playerById('s2').cash, STARTING_CASH + 30_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH - 45_000);
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 45_000);
     assertMoneyConserved(game, '한턱 쏘기');
   });
 
-  it('건물 점검 티켓은 건물 수 × 40,000원을 낸다', () => {
+  it('건물 점검 티켓은 건물 수 × 60,000원을 낸다', () => {
     // Given
     const game = ticketGame('T17', {
       cities: [
@@ -184,10 +184,10 @@ describe('Game(행운 티켓 효과)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // Then
-    assert.equal(game.playerById('s1').cash, STARTING_CASH - 120_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH - 180_000);
   });
 
-  it('관광 붐 티켓은 보유 도시 수 × 30,000원을 받는다(휴양지 제외)', () => {
+  it('관광 붐 티켓은 보유 도시 수 × 45,000원을 받는다(휴양지 제외)', () => {
     // Given
     const game = ticketGame('T18', {
       cities: [
@@ -201,7 +201,7 @@ describe('Game(행운 티켓 효과)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // Then
-    assert.equal(game.playerById('s1').cash, STARTING_CASH + 60_000);
+    assert.equal(game.playerById('s1').cash, STARTING_CASH + 90_000);
   });
 
   it('휴양 충동 티켓은 가장 가까운 휴양지로 전진한다', () => {
@@ -597,7 +597,7 @@ describe('Game(조난 섬)', () => {
     game.execute('s1', COMMAND_TYPES.ROLL);
 
     // Then
-    assert.equal(game.playerById('s2').cash, STARTING_CASH + 7_000);
+    assert.equal(game.playerById('s2').cash, STARTING_CASH + 10_500);
   });
 });
 

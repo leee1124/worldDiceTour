@@ -888,3 +888,31 @@ test('뉴스 칩: 효과는 확정 수익이 아니라 "압력"으로 표기한�
   // Then
   assert.equal(chips[0].text, '+10.00% 압력');
 });
+
+test('한도 해제: rules에 상한이 없으면 살 수 있는 최대 수량은 현금과 종목 보유 상한만으로 정해진다', () => {
+  // Given — 서버가 한도 없음을 알림(max null), 현금 10,000,000원, 12,000원짜리 종목
+  // 금액·건수 한도만 풀렸다(D46). 1회 수량 1~200주와 종목당 500주 보유 상한은 그대로다.
+  const rules = { feeBp: 100, feeMin: 1_000, maxNotionalPerOrder: null, maxNotionalPerWindow: null, maxOrdersPerWindow: null, maxPositionPerInstrument: 500, maxQuantity: 200 };
+  const budget = { open: true, ordersLeft: null, notionalLeft: null, unlimited: true };
+
+  // When — 예전 1건 명목 한도(1,000,000)로는 83주가 최대였다
+  const qty = maxBuyQuantity({ price: 12_000, cash: 10_000_000, rules, budget, held: 0 });
+
+  // Then — 이제 1회 수량 상한(200주)이 벽이다(200 × 12,000 = 2,400,000 + 수수료 < 현금)
+  assert.equal(qty, 200);
+});
+
+test('한도 해제: 주문 검증은 건수·명목 한도를 사유로 거절하지 않는다', () => {
+  // Given
+  const rules = { ...RULES, maxNotionalPerOrder: null, maxNotionalPerWindow: null, maxOrdersPerWindow: null };
+  const budget = { ...OPEN_BUDGET, ordersLeft: null, notionalLeft: null, ordersMax: null, notionalMax: null, unlimited: true };
+
+  // When — AIR 12,800원 × 200주 = 2,560,000원 매수(예전 1건 한도 1,000,000의 2.5배, 수량은 상한 200주 안)
+  const preview = previewOrder({ ...base, rules, budget, cash: 10_000_000, held: 0, kind: 'BUY_STOCK', instrument: AIR, quantity: 200 });
+
+  // Then
+  assert.equal(preview.ok, true, preview.reasonText ?? '');
+  assert.equal(preview.reason, 'NONE');
+  assert.equal(preview.notional, 2_560_000);
+  assert.equal(preview.ordersLeftAfter, null, '한도가 없으면 남은 건수도 없다');
+});

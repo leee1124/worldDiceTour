@@ -28,14 +28,14 @@ function build({ cities = [], extra = [] } = {}) {
 
 describe('NetWorth(총자산 단일 출처)', () => {
   it('총자산 = 현금 + 자산 평가액 − 남은 대출 채무', () => {
-    // Given (1번 하노이 60,000 + 별장 18,000 = 투자액 78,000)
+    // Given (1번 하노이 90,000 + 별장 27,000 = 투자액 117,000)
     const netWorth = build({
       cities: [{ index: 1, ownerId: 's1', buildings: ['VILLA'], landmark: false }],
     });
     const player = new Player({ id: 's1', name: '하나', cash: 1_000_000, loanDebt: 200_000 });
 
     // When / Then
-    assert.equal(netWorth.of(player), 1_000_000 + 78_000 - 200_000);
+    assert.equal(netWorth.of(player), 1_000_000 + 117_000 - 200_000);
   });
 
   it('탈락자는 0이다', () => {

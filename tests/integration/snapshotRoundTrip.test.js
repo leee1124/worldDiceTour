@@ -179,3 +179,32 @@ describe('저장 스냅샷 왕복(검증 거짓 양성 방어)', () => {
     assert.equal(reloaded.game.version, 1);
   });
 });
+
+describe('투자 모드 방은 주문 뒤에도 저장·복원된다(D46 회귀 방지)', () => {
+  // 한도가 null이 된 뒤 검증기가 ordersUsed를 `1 <= null`로 비교해 **첫 주문 뒤 스냅샷을 격리**하던 버그.
+  // 골든 리플레이가 자기 저장분을 다시 읽으면서 잡았다 — 실제 플레이라면 주식을 한 번 산 순간 방이 사라졌을 것.
+  it('주식을 한 번 산 방의 스냅샷이 검증을 통과하고 주문 기록까지 그대로 복원된다', () => {
+    // Given — 투자 모드를 켠 4인 방, 첫 좌석이 창구에서 주식을 산다
+    const random = new SeededRandomSource(11);
+    const room = Room.create({ code: 'AB2C', hostName: '자동1', token: 'a'.repeat(64), now: NOW });
+    for (const [index, name] of ['자동2', '자동3', '자동4'].entries()) {
+      room.join({ name, token: String(index + 1).repeat(64).slice(0, 64), now: NOW });
+    }
+    room.setOptions({ bySeatId: room.hostSeatId, finance: { investmentMode: 'STOCKS' }, now: NOW });
+    room.start({ bySeatId: room.hostSeatId, random, now: NOW });
+    assert.equal(room.game.phase, PHASES.AWAIT_TRADE, '투자 모드는 창구에서 시작한다');
+    room.game.executeCommand?.({ seatId: 'seat-1', type: COMMAND_TYPES.BUY_STOCK, payload: { instrumentId: 'AIR', quantity: 50 }, now: NOW })
+      ?? room.executeCommand({ seatId: 'seat-1', type: COMMAND_TYPES.BUY_STOCK, payload: { instrumentId: 'AIR', quantity: 50 }, now: NOW });
+
+    // When — 저장했다가 다시 읽는다
+    const snapshot = room.toSnapshot();
+    const restored = deserializeRoom(snapshot, random);
+
+    // Then — 거부되지 않고, 주문 1건이 기록된 채 복원된다
+    assert.equal(restored.game.phase, PHASES.AWAIT_TRADE);
+    const budget = restored.game.toSnapshot().market?.window?.budget;
+    assert.ok(budget, '창구 예산이 스냅샷(market.window.budget)에 있어야 한다');
+    assert.equal(budget.ordersUsed, 1);
+    assert.equal(budget.notionalUsed, 50 * 12_000, '명목금액도 그대로 복원된다');
+  });
+});

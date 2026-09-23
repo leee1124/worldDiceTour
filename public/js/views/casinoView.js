@@ -107,7 +107,8 @@ export function createCasinoView({ onBet, onLeave }) {
     class: 'bet-range',
     type: 'range',
     min: '10000',
-    max: '500000',
+    // 실제 상한은 서버 pending.limits로 매번 덮어쓴다(렌더 시). 초기값은 자리만 채운다.
+    max: '10000',
     step: '10000',
     'aria-label': '베팅액',
   });

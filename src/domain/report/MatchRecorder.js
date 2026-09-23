@@ -24,8 +24,8 @@ export const HIGHLIGHT_TYPES = Object.freeze({
   BANKRUPT: 'BANKRUPT',
 });
 
-/** "큰 통행료"의 기준(원). */
-export const BIG_TOLL_AMOUNT = 500_000;
+/** "큰 통행료"의 기준(원). D47 보드 경제 1.5배에 맞춰 500,000 → 750,000. */
+export const BIG_TOLL_AMOUNT = 750_000;
 /** "큰 거래"의 기준(명목금액, 원). */
 export const BIG_TRADE_NOTIONAL = 500_000;
 

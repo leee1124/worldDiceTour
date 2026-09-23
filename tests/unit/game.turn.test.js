@@ -113,7 +113,7 @@ describe('Game(게임 시작과 턴 진행)', () => {
       assert.equal(game.phase, PHASES.AWAIT_BUY);
       assert.equal(game.pendingDecision.kind, 'BUY');
       assert.equal(game.pendingDecision.index, 3);
-      assert.equal(game.pendingDecision.price, 70_000);
+      assert.equal(game.pendingDecision.price, 105_000);
     });
 
     it('매입하면 가격을 지불하고 소유자가 된다', () => {
@@ -125,9 +125,9 @@ describe('Game(게임 시작과 턴 진행)', () => {
       const events = game.execute('s1', COMMAND_TYPES.BUY);
 
       // Then
-      assert.equal(game.playerById('s1').cash, STARTING_CASH - 70_000);
+      assert.equal(game.playerById('s1').cash, STARTING_CASH - 105_000);
       assert.equal(game.board.cityAt(3).isOwnedBy('s1'), true);
-      assert.equal(findEvent(events, EVENT_TYPES.CITY_PURCHASED).price, 70_000);
+      assert.equal(findEvent(events, EVENT_TYPES.CITY_PURCHASED).price, 105_000);
       assert.equal(game.phase, PHASES.AWAIT_BUILD, '매입 직후 건설 기회가 주어진다');
       game.execute('s1', COMMAND_TYPES.SKIP_BUILD);
       assert.equal(game.currentPlayerId, 's2');
@@ -163,7 +163,7 @@ describe('Game(게임 시작과 턴 진행)', () => {
 
   describe('통행료', () => {
     it('남의 도시에 도착하면 통행료를 소유자에게 지불한다', () => {
-      // Given (방콕 70,000원 + 별장 → 배율 0.4)
+      // Given (방콕 105,000원 + 별장 → 배율 0.4)
       const game = buildGame({
         cities: [{ index: 3, ownerId: 's2', buildings: ['VILLA'] }],
         random: new FakeRandomSource([1, 2]),
@@ -174,13 +174,13 @@ describe('Game(게임 시작과 턴 진행)', () => {
 
       // Then
       const toll = findEvent(events, EVENT_TYPES.TOLL_PAID);
-      assert.equal(toll.amount, 28_000);
-      assert.equal(game.playerById('s1').cash, STARTING_CASH - 28_000);
-      assert.equal(game.playerById('s2').cash, STARTING_CASH + 28_000);
+      assert.equal(toll.amount, 42_000);
+      assert.equal(game.playerById('s1').cash, STARTING_CASH - 42_000);
+      assert.equal(game.playerById('s2').cash, STARTING_CASH + 42_000);
       assertMoneyConserved(game, '통행료 후');
     });
 
-    it('휴양지 통행료는 소유자의 휴양지 수 × 50,000원이다', () => {
+    it('휴양지 통행료는 소유자의 휴양지 수 × 75,000원이다', () => {
       // Given
       const game = buildGame({
         cities: [
@@ -194,7 +194,7 @@ describe('Game(게임 시작과 턴 진행)', () => {
       const events = game.execute('s1', COMMAND_TYPES.ROLL);
 
       // Then
-      assert.equal(findEvent(events, EVENT_TYPES.TOLL_PAID).amount, 100_000);
+      assert.equal(findEvent(events, EVENT_TYPES.TOLL_PAID).amount, 150_000);
     });
 
     it('탈락한 소유자의 도시는 통행료가 없다', () => {
