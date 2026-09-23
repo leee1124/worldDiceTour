@@ -46,7 +46,8 @@
           "loanDebt": 1000000,
           "totalAssets": 0
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 7,
@@ -94,7 +95,8 @@
           "loanDebt": 1000000,
           "totalAssets": 0
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 42,
@@ -142,7 +144,8 @@
           "loanDebt": 1200000,
           "totalAssets": -323675
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 99,
@@ -190,7 +193,8 @@
           "loanDebt": 1200000,
           "totalAssets": -248100
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 123,
@@ -238,7 +242,8 @@
           "loanDebt": 800000,
           "totalAssets": 0
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 2024,
@@ -286,7 +291,8 @@
           "loanDebt": 800000,
           "totalAssets": 0
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 31337,
@@ -334,7 +340,8 @@
           "loanDebt": 0,
           "totalAssets": 2289500
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 65535,
@@ -382,7 +389,8 @@
           "loanDebt": 1000000,
           "totalAssets": -343500
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 777777,
@@ -430,7 +438,8 @@
           "loanDebt": 0,
           "totalAssets": 1871600
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 1000003,
@@ -478,7 +487,8 @@
           "loanDebt": 1200000,
           "totalAssets": 0
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 3,
@@ -526,7 +536,8 @@
           "loanDebt": 1200000,
           "totalAssets": -364900
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 11,
@@ -574,7 +585,8 @@
           "loanDebt": 1000000,
           "totalAssets": -330000
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 77,
@@ -622,7 +634,8 @@
           "loanDebt": 0,
           "totalAssets": 2553200
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 512,
@@ -670,7 +683,8 @@
           "loanDebt": 0,
           "totalAssets": 1099000
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 4096,
@@ -718,7 +732,8 @@
           "loanDebt": 1000000,
           "totalAssets": -42400
         }
-      ]
+      ],
+      "market": null
     },
     {
       "seed": 20260921,
@@ -766,7 +781,8 @@
           "loanDebt": 1200000,
           "totalAssets": 0
         }
-      ]
+      ],
+      "market": null
     }
   ]
 }
