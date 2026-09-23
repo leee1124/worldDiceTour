@@ -298,6 +298,7 @@ describe('Game(게임 시작과 턴 진행)', () => {
         debt: null,
         buildIndex: null,
         acquireIndex: null,
+        afterTrade: null,
       });
     });
 

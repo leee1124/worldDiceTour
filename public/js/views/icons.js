@@ -296,3 +296,134 @@ export function landmarkBadge() {
     el('span', { class: 'build-landmark-text', text: '관광명소' }),
   ]);
 }
+
+/* ── 증권거래소 ───────────────────────────────────────────────
+ * 시장 화면(패널·거래 시트·뉴스·안내 카드)이 쓰는 글리프.
+ * 위와 같은 규칙이다 — 1em 정사각, 선 굵기 1.3, `currentColor`.
+ */
+
+/** 주식·시세: 오른쪽 위로 꺾여 오르는 꺾은선. */
+export function chartIcon() {
+  return icon([
+    strokePath('M2.5 13.5 V2.5', { 'stroke-width': 1.2 }),
+    strokePath('M2.5 13.5 H13.5', { 'stroke-width': 1.2 }),
+    strokePath('M4.2 11 L7 8 L9.2 9.6 L13 5.2'),
+    strokePath('M10.4 5.2 H13 V7.8'),
+  ]);
+}
+
+/** 예금·은행·기준금리: 기둥 세 개가 선 신전. */
+export function bankIcon() {
+  return icon([
+    strokePath('M2.4 6.2 L8 3 L13.6 6.2'),
+    strokeLine(2.6, 13.4, 13.4, 13.4, { 'stroke-width': 1.4 }),
+    strokeLine(4.6, 7.6, 4.6, 12, { 'stroke-width': 1.2 }),
+    strokeLine(8, 7.6, 8, 12, { 'stroke-width': 1.2 }),
+    strokeLine(11.4, 7.6, 11.4, 12, { 'stroke-width': 1.2 }),
+  ]);
+}
+
+/** 경제 뉴스: 접힌 신문. */
+export function newsIcon() {
+  return icon([
+    strokeRect(2.2, 3.4, 9.4, 9.2, { rx: 1 }),
+    strokePath('M11.6 5.8 H13.8 V11.2 A1.4 1.4 0 0 1 11.6 12.6'),
+    strokeLine(4.2, 6.2, 9.6, 6.2, { 'stroke-width': 1.1 }),
+    strokeLine(4.2, 8.2, 9.6, 8.2, { 'stroke-width': 1.1 }),
+    strokeLine(4.2, 10.2, 7.8, 10.2, { 'stroke-width': 1.1 }),
+  ]);
+}
+
+/** 예약 주문: 영수증. */
+export function receiptIcon() {
+  return icon([
+    strokePath('M3.6 2.6 H12.4 V13.8 L10.6 12.6 L8 13.8 L5.4 12.6 L3.6 13.8 Z'),
+    strokeLine(5.8, 5.8, 10.2, 5.8, { 'stroke-width': 1.1 }),
+    strokeLine(5.8, 8.2, 10.2, 8.2, { 'stroke-width': 1.1 }),
+  ]);
+}
+
+/** 거래 창구: 서로 반대로 도는 두 화살표(사고팔기). */
+export function exchangeIcon() {
+  return icon([
+    strokePath('M3 6 H11.4'),
+    strokePath('M9.4 3.8 L11.8 6 L9.4 8.2'),
+    strokePath('M13 10 H4.6'),
+    strokePath('M6.6 7.8 L4.2 10 L6.6 12.2'),
+  ]);
+}
+
+/** 설명·도움말: 물음표. */
+export function questionIcon() {
+  return icon([
+    svg('circle', { cx: 8, cy: 8, r: 6, stroke: 'currentColor', 'stroke-width': 1.2, fill: 'none' }),
+    strokePath('M6.2 6.2 A1.9 1.9 0 1 1 8 8.6 V9.6', { 'stroke-width': 1.3 }),
+    dot(8, 11.6, 0.85),
+  ]);
+}
+
+/** 호황: 해. */
+export function sunIcon() {
+  return icon([
+    svg('circle', { cx: 8, cy: 8, r: 3.2, stroke: 'currentColor', 'stroke-width': 1.3, fill: 'none' }),
+    strokeLine(8, 1.6, 8, 3.2),
+    strokeLine(8, 12.8, 8, 14.4),
+    strokeLine(1.6, 8, 3.2, 8),
+    strokeLine(12.8, 8, 14.4, 8),
+    strokeLine(3.6, 3.6, 4.7, 4.7),
+    strokeLine(11.3, 11.3, 12.4, 12.4),
+    strokeLine(12.4, 3.6, 11.3, 4.7),
+    strokeLine(4.7, 11.3, 3.6, 12.4),
+  ]);
+}
+
+/** 과열: 불꽃. */
+export function flameIcon() {
+  return icon([
+    strokePath('M8 1.8 C9.6 4.6 12.2 5.8 12.2 9.2 A4.2 4.2 0 0 1 3.8 9.2 C3.8 7 5 6.2 5.8 4.8 C6.6 6.2 7.2 6.4 7.6 5.6 C8 4.8 7.6 3.4 8 1.8 Z'),
+  ]);
+}
+
+/** 침체: 비구름. */
+export function rainIcon() {
+  return icon([
+    strokePath('M4.6 9.4 A2.6 2.6 0 0 1 5 4.3 A3.4 3.4 0 0 1 11.4 5.3 A2.2 2.2 0 0 1 11.2 9.4 Z'),
+    strokeLine(5.6, 11.2, 5, 13.4, { 'stroke-width': 1.2 }),
+    strokeLine(8, 11.2, 7.4, 13.4, { 'stroke-width': 1.2 }),
+    strokeLine(10.4, 11.2, 9.8, 13.4, { 'stroke-width': 1.2 }),
+  ]);
+}
+
+/** 회복: 새싹. */
+export function sproutIcon() {
+  return icon([
+    strokePath('M8 13.6 V7.4'),
+    strokePath('M8 8.2 C8 5.6 6.2 4.2 3.8 4.2 C3.8 6.8 5.6 8.2 8 8.2 Z'),
+    strokePath('M8 7.6 C8 5.4 9.6 4.2 11.8 4.2 C11.8 6.4 10.2 7.6 8 7.6 Z'),
+  ]);
+}
+
+/** 경기 국면(EXPANSION/OVERHEAT/RECESSION/RECOVERY) → 글리프. */
+const CYCLE_ICONS = Object.freeze({
+  EXPANSION: sunIcon,
+  OVERHEAT: flameIcon,
+  RECESSION: rainIcon,
+  RECOVERY: sproutIcon,
+});
+
+export function cycleIcon(kind) {
+  const build = CYCLE_ICONS[kind] ?? chartIcon;
+  return build();
+}
+
+/** 자산 종류(STOCK/DEPOSIT)와 경기 안내(CYCLE) → 글리프. 거래 시트 탭도 같은 것을 쓴다. */
+const ASSET_KIND_ICONS = Object.freeze({
+  STOCK: chartIcon,
+  DEPOSIT: bankIcon,
+  CYCLE: sunIcon,
+});
+
+export function assetKindIcon(kind) {
+  const build = ASSET_KIND_ICONS[kind] ?? chartIcon;
+  return build();
+}

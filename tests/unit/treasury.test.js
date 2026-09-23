@@ -5,7 +5,7 @@ import { BankLedger } from '../../src/domain/game/BankLedger.js';
 import { Casino } from '../../src/domain/game/Casino.js';
 import { Player } from '../../src/domain/game/Player.js';
 import { Treasury } from '../../src/domain/game/Treasury.js';
-import { DomainError } from '../../src/domain/shared/DomainError.js';
+import { DOMAIN_ERROR_CODES, DomainError } from '../../src/domain/shared/DomainError.js';
 import { MAX_MONEY } from '../../src/domain/shared/Money.js';
 import { MoneyIntent } from '../../src/domain/shared/MoneyIntent.js';
 import { MONEY_REASONS } from '../../src/domain/game/events.js';
@@ -373,5 +373,153 @@ describe('Treasury(돈 이동의 유일한 통로)', () => {
       assert.deepEqual(ledger.breakdown, {});
       assert.equal(treasury.report().balanced, true);
     });
+  });
+});
+
+describe('Treasury.apply의 원자성(중간 실패가 돈을 만들지 않는다)', () => {
+  it('목록 중간에서 실패하면 **아무것도** 적용되지 않는다', () => {
+    // Given (현금 1,000원인 좌석이 +500을 받고 −5,000을 내는 목록.
+    //        한 건씩 즉시 적용하면 +500만 반영된 채 두 번째가 터져 돈이 생기고
+    //        보존 불변식이 영구히 깨진다 — 그 상태가 파일로 저장되면 그 방은 되살릴 수 없다)
+    const players = [new Player({ id: 's1', name: '하나', cash: 1_000 })];
+    const ledger = new BankLedger();
+    const casino = new Casino();
+    const treasury = new Treasury({ players, ledger, casino, initialTotal: 1_000 });
+
+    // When
+    assert.throws(
+      () =>
+        treasury.apply([
+          MoneyIntent.fromBank({ playerId: 's1', amount: 500, reason: MONEY_REASONS.SALARY }),
+          MoneyIntent.toBank({ playerId: 's1', amount: 5_000, reason: MONEY_REASONS.TAX }),
+        ]),
+      { code: DOMAIN_ERROR_CODES.INSUFFICIENT_CASH },
+    );
+
+    // Then
+    assert.equal(players[0].cash, 1_000, '첫 intent가 적용된 채로 남았다');
+    assert.equal(ledger.netFromBank, 0, '장부가 절반만 기록됐다');
+    assert.equal(treasury.report().balanced, true, '보존 불변식이 깨진 채로 남았다');
+  });
+
+  it('잭팟이 부족한 지급도 앞의 intent를 남기지 않는다', () => {
+    // Given
+    const players = [new Player({ id: 's1', name: '하나', cash: 1_000 })];
+    const casino = new Casino({ jackpot: 100 });
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino,
+      initialTotal: 1_100,
+    });
+
+    // When
+    assert.throws(() =>
+      treasury.apply([
+        MoneyIntent.fromBank({ playerId: 's1', amount: 700, reason: MONEY_REASONS.SALARY }),
+        MoneyIntent.fromJackpot({ playerId: 's1', amount: 9_999, reason: MONEY_REASONS.CASINO }),
+      ]),
+    );
+
+    // Then
+    assert.equal(players[0].cash, 1_000);
+    assert.equal(casino.jackpot, 100);
+    assert.equal(treasury.report().balanced, true);
+  });
+
+  it('모든 intent가 유효하면 그대로 전부 적용된다(정상 경로 불변)', () => {
+    // Given
+    const players = [
+      new Player({ id: 's1', name: '하나', cash: 1_000 }),
+      new Player({ id: 's2', name: '두리', cash: 1_000 }),
+    ];
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino: new Casino(),
+      initialTotal: 2_000,
+    });
+
+    // When
+    treasury.apply([
+      MoneyIntent.fromBank({ playerId: 's1', amount: 500, reason: MONEY_REASONS.SALARY }),
+      MoneyIntent.transfer({ fromId: 's1', toId: 's2', amount: 300, reason: MONEY_REASONS.TOLL }),
+    ]);
+
+    // Then
+    assert.equal(players[0].cash, 1_200);
+    assert.equal(players[1].cash, 1_300);
+    assert.equal(treasury.report().balanced, true);
+  });
+});
+
+describe('Treasury 관찰자(성적표 사유별 손익)', () => {
+  /** 적용된 이동을 좌석별·사유별로 모으는 최소 관찰자. */
+  function recordingObserver() {
+    const pnl = new Map();
+    return {
+      pnl,
+      onMoneyMoved(playerId, reason, amount) {
+        const byReason = pnl.get(playerId) ?? new Map();
+        byReason.set(reason, (byReason.get(reason) ?? 0) + amount);
+        pnl.set(playerId, byReason);
+      },
+    };
+  }
+
+  it('좌석 간 이동은 **양쪽 모두** 관찰자에게 알린다', () => {
+    // Given (통행료는 지불자 기준 intent 1건으로 양쪽을 옮긴다. 지불 측만 기록하면
+    //        "상품별 손익 합 + 현금 = 최종 순자산"이 원리적으로 성립하지 않는다)
+    const players = [
+      new Player({ id: 's1', name: '하나', cash: 1_000_000 }),
+      new Player({ id: 's2', name: '두리', cash: 1_000_000 }),
+    ];
+    const observer = recordingObserver();
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino: new Casino(),
+      initialTotal: 2_000_000,
+      observer,
+    });
+
+    // When
+    treasury.transfer({
+      fromId: 's1',
+      toId: 's2',
+      amount: 140_000,
+      reason: MONEY_REASONS.TOLL,
+    });
+
+    // Then
+    assert.equal(observer.pnl.get('s1').get(MONEY_REASONS.TOLL), -140_000, '지불 측');
+    assert.equal(observer.pnl.get('s2').get(MONEY_REASONS.TOLL), 140_000, '수령 측이 누락됐다');
+  });
+
+  it('은행·잭팟 이동은 한쪽만 알린다(상대 좌석이 없다)', () => {
+    // Given
+    const players = [new Player({ id: 's1', name: '하나', cash: 1_000_000 })];
+    const observer = recordingObserver();
+    const treasury = new Treasury({
+      players,
+      ledger: new BankLedger(),
+      casino: new Casino(),
+      initialTotal: 1_000_000,
+      observer,
+    });
+
+    // When
+    treasury.receiveFromBank({ playerId: 's1', amount: 200_000, reason: MONEY_REASONS.SALARY });
+
+    // Then
+    assert.equal(observer.pnl.size, 1);
+    assert.equal(observer.pnl.get('s1').get(MONEY_REASONS.SALARY), 200_000);
+  });
+
+  it('관찰자가 없어도 정상 동작한다', () => {
+    // Given / When / Then
+    const { treasury, byId } = createTreasury();
+    treasury.receiveFromBank({ playerId: 's1', amount: 100, reason: MONEY_REASONS.SALARY });
+    assert.equal(byId('s1').cash, 1_000_100);
   });
 });

@@ -155,3 +155,45 @@ test('안내 시간표: 남은 시간 글자는 초 단위로 읽기 쉽게 만�
   assert.equal(remainingLabel(3500), '3.5초 후 닫힘');
   assert.equal(remainingLabel(2000), '2초 후 닫힘');
 });
+
+test('안내 시간표: 증권거래소 라운드 틱(뉴스·국면·상장폐지)도 카드로 뜬다', () => {
+  // Given 시장 사건은 좌석이 없으므로 언제나 `mine: false`다
+  // (종류가 실제로 정의돼 있어야 한다 — undefined면 기본값으로 새어 통과해 버린다)
+  assert.deepEqual(
+    { news: NOTICE_KINDS.NEWS, cycle: NOTICE_KINDS.CYCLE, delist: NOTICE_KINDS.DELIST },
+    { news: 'news', cycle: 'cycle', delist: 'delist' },
+  );
+  const kinds = [NOTICE_KINDS.NEWS, NOTICE_KINDS.CYCLE, NOTICE_KINDS.DELIST];
+
+  for (const kind of kinds) {
+    // When
+    const timing = noticeTiming({ kind });
+
+    // Then 카드로 뜨고, 페일세이프가 읽는 시간보다 길며, LINGER 기준(6초)을 넘지 않는다
+    assert.equal(timing.mode, 'card', `${kind}는 카드여야 한다`);
+    assert.ok(timing.readMs >= 1500, `${kind} readMs=${timing.readMs}`);
+    assert.ok(timing.failsafeMs > timing.readMs, `${kind} 페일세이프가 더 길어야 한다`);
+    assert.ok(timing.failsafeMs <= FAILSAFE_MAX_MS, `${kind} 페일세이프 상한`);
+  }
+});
+
+test('안내 시간표: 한 라운드 틱 연출을 모두 합쳐도 6초를 넘지 않는다', () => {
+  // Given 한 틱에 최대로 겹칠 수 있는 연출(뉴스 + 국면 전환 + 상장폐지)
+  // When
+  const total = [NOTICE_KINDS.NEWS, NOTICE_KINDS.CYCLE, NOTICE_KINDS.DELIST]
+    .map((kind) => noticeTiming({ kind }).readMs)
+    .reduce((sum, ms) => sum + ms, 0);
+
+  // Then 라운드 틱이 턴을 끌지 않는다(SPEC 12장의 연출 예산)
+  assert.ok(total <= 6000, `합계 ${total}ms`);
+});
+
+test('안내 시간표: 재생이 밀리면 시장 안내도 한 줄로 줄어든다', () => {
+  // Given 빨리 감기
+  // When
+  const timing = noticeTiming({ kind: NOTICE_KINDS.NEWS, fastForward: true });
+
+  // Then 정보는 남기고 카드만 줄인다
+  assert.equal(timing.mode, 'line');
+  assert.equal(timing.readMs, LINE_READ_MS);
+});

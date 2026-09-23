@@ -14,6 +14,8 @@ import { gameOverReasonLabel } from '../domain/labels.js';
 import { createTurnAnnouncer } from '../domain/announceThrottle.js';
 import { playTicketCard } from '../views/modals/ticketOverlay.js';
 import { playTollNotice } from '../views/modals/tollOverlay.js';
+import { playCycleBanner, playDelistingCard, playNewsCard } from '../views/modals/newsOverlay.js';
+import { orderKindLabel, rejectReasonLabel, tradingCloseReasonLabel } from '../domain/marketLabels.js';
 import { playInfoNotice } from '../views/modals/noticeCard.js';
 import { NOTICE_KINDS } from '../domain/noticeTiming.js';
 import { opponentNoticeOf } from '../domain/opponentNotice.js';
@@ -37,6 +39,7 @@ export function createPlaybackEngine({
   /** 상대 행동 알림 줄(없으면 알리지 않는다). */
   opponentToasts = null,
   onGameOver = () => {},
+  notify = () => {},
   /** 메시지가 도착한 즉시(연출 전에) 최신 뷰를 알린다 — 어긋난 결정 모달을 닫기 위한 안전망. */
   onViewArrived = () => {},
 }) {
@@ -307,6 +310,74 @@ export function createPlaybackEngine({
         await flashScreen('crimson');
         players.pulse(event.playerId);
         await wait(scaled(DURATIONS.bankrupt));
+        break;
+
+      /* ── 증권거래소(투자 모드 STOCKS에서만 온다) ─────────── */
+
+      case 'CYCLE_CHANGED':
+        // 뉴스와 뜻이 다른 사건이므로 카드가 아니라 배너로 구분해 보여 준다.
+        await playCycleBanner(event);
+        break;
+
+      case 'NEWS_PUBLISHED':
+        await playNewsCard(event);
+        break;
+
+      case 'PRICES_UPDATED':
+        // 시세 숫자는 큐가 비고 최신 뷰가 반영될 때 카운트업으로 움직인다(marketView).
+        // 여기서는 뉴스 카드와 시세 갱신이 "이어지는 두 장면"으로 읽히게 짧은 박자만 둔다.
+        await wait(scaled(220));
+        break;
+
+      case 'INSTRUMENT_DELISTED':
+        await Promise.all([
+          flashScreen('crimson'),
+          playDelistingCard({ name: event.name, price: event.price }),
+        ]);
+        break;
+
+      case 'HOLDINGS_WIPED':
+        players.pulse(event.playerId);
+        // 현금은 움직이지 않는다 — 주식 수량이 사라졌다는 사실만 말한다.
+        await floatAmount(cardPoint(event.playerId), `−${event.quantity}주`, { tone: 'minus' });
+        break;
+
+      case 'DIVIDEND_PAID':
+      case 'DEPOSIT_INTEREST_PAID':
+        await playMoneyIn(event.playerId, event.amount);
+        break;
+
+      case 'ORDER_FILLED':
+        // 금액 연출은 함께 오는 MONEY_LOST / MONEY_GAINED가 담당한다(두 번 띄우지 않는다).
+        players.pulse(event.playerId);
+        await wait(scaled(120));
+        break;
+
+      case 'TRADING_OPENED':
+        if (isLocalSeat(event.playerId)) {
+          announce(`${nameOf(event.playerId)}의 거래 창구가 열렸습니다.`);
+        }
+        break;
+
+      case 'TRADING_CLOSED':
+        if (isLocalSeat(event.playerId) && event.reason === 'BUDGET_EXHAUSTED') {
+          notify({ tone: 'info', message: tradingCloseReasonLabel(event.reason) });
+        }
+        break;
+
+      case 'QUEUED_ORDER_EXECUTED':
+        if (isLocalSeat(event.playerId)) {
+          notify({ tone: 'success', message: `예약한 ${orderKindLabel(event.kind)} 주문이 체결되었습니다.` });
+        }
+        break;
+
+      case 'QUEUED_ORDER_REJECTED':
+        if (isLocalSeat(event.playerId)) {
+          notify({
+            tone: 'info',
+            message: `예약 주문이 실행되지 않았습니다 — ${rejectReasonLabel(event.reasonCode)}.`,
+          });
+        }
         break;
 
       case 'GAME_OVER':

@@ -130,6 +130,49 @@ export function hostTokenOf(code, hostSeatId) {
   return tokenOf(code, hostSeatId);
 }
 
+/* ── 첫 사용 안내(튜토리얼) ─────────────────────────────────── */
+
+const TUTORIAL_KEY = 'wdt.tutorial.seen';
+
+/**
+ * 이미 읽은 안내 카드 id 목록. 저장소를 못 읽어도(프라이빗 모드 등) 화면이 죽지 않게
+ * 빈 목록으로 떨어진다 — 그러면 안내가 한 번 더 뜨는 것이 최악이다(기능은 멀쩡하다).
+ */
+export function seenTutorials() {
+  try {
+    const raw = window.localStorage.getItem(TUTORIAL_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+  } catch (error) {
+    console.error('[storage] 안내 기록을 읽지 못했습니다', error.name);
+    return [];
+  }
+}
+
+/** 안내 카드 하나를 읽은 것으로 표시한다. */
+export function markTutorialSeen(id) {
+  if (typeof id !== 'string' || id.length === 0) {
+    return;
+  }
+  const seen = new Set(seenTutorials());
+  seen.add(id);
+  try {
+    window.localStorage.setItem(TUTORIAL_KEY, JSON.stringify([...seen]));
+  } catch (error) {
+    console.error('[storage] 안내 기록을 저장하지 못했습니다', error.name);
+  }
+}
+
+/** 안내 카드 전부를 읽은 것으로 표시한다("다시 보지 않기"). */
+export function markAllTutorialsSeen(ids) {
+  for (const id of Array.isArray(ids) ? ids : []) {
+    markTutorialSeen(id);
+  }
+}
+
 /**
  * SSE presence 쿼리 문자열(`seat-1:token,seat-3:token`).
  * API.md 2장 규격: 최대 4쌍, 1000자.

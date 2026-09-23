@@ -5,6 +5,7 @@
 import { button, clear, el, setText } from '../dom.js';
 import { isHostSeatMine, isMySeat } from '../store.js';
 import { validateName } from './homeView.js';
+import { chartIcon } from './icons.js';
 
 const ROUND_LIMIT_OPTIONS = [
   { value: null, label: '무제한' },
@@ -12,12 +13,28 @@ const ROUND_LIMIT_OPTIONS = [
   { value: 30, label: '30라운드' },
 ];
 
+/** 투자 모드(`options.finance.investmentMode`). 서버가 받는 값은 지금 이 둘뿐이다(API.md 변경 23). */
+const INVESTMENT_MODE_OPTIONS = [
+  { value: 'OFF', label: '끔' },
+  { value: 'STOCKS', label: '주식' },
+];
+
+const INVESTMENT_MODE_LABELS = Object.freeze({ OFF: '끔', STOCKS: '주식' });
+
+const INVESTMENT_MODE_NOTE =
+  '증권거래소가 열립니다 — 자기 턴 시작에 주식·예금을 사고팔고, 라운드마다 뉴스로 시세가 움직입니다.';
+
+function investmentModeLabel(mode) {
+  return INVESTMENT_MODE_LABELS[mode] ?? String(mode ?? '끔');
+}
+
 export function createLobbyView({
   onAddLocalPlayer,
   onLeaveSeat,
   onKickSeat,
   onAddComputer,
   onSetRoundLimit,
+  onSetInvestmentMode,
   onStart,
   onExit,
 }) {
@@ -174,9 +191,21 @@ export function createLobbyView({
     if (!room) {
       return;
     }
+    const mode = room.options?.finance?.investmentMode ?? 'OFF';
+
     if (!isHostSeatMine(state)) {
       hostToolsNode.appendChild(
         el('p', { class: 'empty-note', text: '호스트가 게임을 시작하면 자동으로 보드가 열립니다.' }),
+      );
+      // 호스트가 아니어도 이 판의 규칙은 알아야 한다(시작 뒤에는 바꿀 수 없다).
+      hostToolsNode.appendChild(
+        el('div', { class: 'tool-row tool-row--readonly' }, [
+          el('div', { class: 'tool-label' }, [
+            el('span', { class: 'tool-title' }, [chartIcon(), ' 투자 모드']),
+            el('span', { class: 'tool-note', text: INVESTMENT_MODE_NOTE }),
+          ]),
+          el('span', { class: ['badge', mode === 'OFF' ? 'badge--muted' : 'badge--gold'], text: investmentModeLabel(mode) }),
+        ]),
       );
       setText(startHintNode, '');
       return;
@@ -222,14 +251,25 @@ export function createLobbyView({
       ]),
     );
 
-    // 다음 브랜치에서 붙일 증권 기능 자리. 지금은 눌리지 않는 예약 행으로 보여 준다.
+    // 투자 모드(증권거래소). 대기실에서만 바꿀 수 있고 시작 시점 값이 판 내내 고정된다.
+    const modeButtons = INVESTMENT_MODE_OPTIONS.map((option) =>
+      button(
+        {
+          class: ['btn', 'btn--chip', mode === option.value ? 'btn--chip-on' : null],
+          'aria-pressed': String(mode === option.value),
+          disabled: state.busy,
+          on: { click: () => onSetInvestmentMode(option.value) },
+        },
+        option.label,
+      ),
+    );
     hostToolsNode.appendChild(
-      el('div', { class: 'tool-row tool-row--reserved' }, [
+      el('div', { class: 'tool-row tool-row--finance' }, [
         el('div', { class: 'tool-label' }, [
-          el('span', { class: 'tool-title', text: '투자 모드' }),
-          el('span', { class: 'tool-note', text: '도시 지분을 사고파는 증권 규칙 — 다음 업데이트' }),
+          el('span', { class: 'tool-title' }, [chartIcon(), ' 투자 모드']),
+          el('span', { class: 'tool-note', text: INVESTMENT_MODE_NOTE }),
         ]),
-        button({ class: 'btn btn--chip', disabled: true, 'aria-disabled': 'true' }, '준비 중'),
+        el('div', { class: 'chip-row' }, modeButtons),
       ]),
     );
 

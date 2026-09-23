@@ -30,5 +30,9 @@
  * @property {(params: {playerId: string, assetId: string, quantity?: number}) => LiquidationResult} liquidate
  * @property {(playerId: string) => LiquidationResult & {releasedIndexes?: number[]}} releaseAllOf
  *   파산 청산. 그 좌석의 자산을 전부 비운다
+ * @property {((params: {playerId: string, assetId: string, owed: number}) => number)} [quantityCovering]
+ *   부족액 `owed`를 덮는 **최소 수량**. 정리 매각은 수수료가 면제되고 창구 한도를 보지 않으므로,
+ *   "강제 지불을 메운다"는 전제를 넘어서는 대량 매각을 막기 위해 `Liquidator`가 이 값으로 상한을 둔다.
+ *   나눌 수 없는 자산(부동산 한 칸)은 구현하지 않아도 된다 — 그러면 상한을 두지 않는다.
  */
 export {};

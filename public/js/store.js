@@ -105,6 +105,23 @@ export function isMyTurn(state) {
   return seatOf(state, seatId)?.autopilot !== true;
 }
 
+/**
+ * 지금 **결정을 내릴** 좌석(API.md 변경 18). 오늘은 `currentSeatId`와 같지만,
+ * 앞으로 턴 소유자가 아닌 좌석이 결정하는 구간이 생기므로 "내가 조작할 수 있는지"는 이 값으로 본다.
+ */
+export function actingSeatId(state) {
+  return state.view?.actingSeatId ?? state.view?.currentSeatId ?? null;
+}
+
+/** 지금 결정할 좌석이 이 기기 좌석이고 자동 진행도 아닌지(거래 창구 조작의 기준). */
+export function isMyActingTurn(state) {
+  const seatId = actingSeatId(state);
+  if (!seatId || !isMySeat(state, seatId) || state.view?.isOver === true) {
+    return false;
+  }
+  return seatOf(state, seatId)?.autopilot !== true;
+}
+
 /** 내 좌석이지만 자동 진행에 맡겨져 있어 조작이 막힌 차례인지. */
 export function isMySeatOnAutopilot(state) {
   const seatId = state.view?.currentSeatId;

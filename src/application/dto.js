@@ -79,6 +79,11 @@ function toSpaceDto(board, index) {
  */
 export function toGameViewDto(game) {
   const board = game.board;
+  const actingSeatId = game.actingSeatId;
+  // 총자산 내역을 좌석마다 한 번만 계산한다(자산군이 늘어도 N+1이 되지 않게).
+  const netWorthBySeat = new Map(
+    game.players.map((player) => [player.id, game.netWorthBreakdownOf(player.id)]),
+  );
   return {
     version: game.version,
     phase: game.phase,
@@ -87,10 +92,12 @@ export function toGameViewDto(game) {
     currentSeatId: game.currentPlayerId,
     // 지금 결정을 내릴 좌석. 오늘은 `currentSeatId`와 항상 같고, 앞으로 경매처럼
     // 턴 소유자가 아닌 좌석이 행동하는 구간에서만 달라진다.
-    actingSeatId: game.actingSeatId,
+    actingSeatId,
     jackpot: game.jackpot,
     isOver: game.isOver(),
-    players: game.players.map((player) => ({
+    players: game.players.map((player) => {
+      const netWorth = netWorthBySeat.get(player.id);
+      return {
       seatId: player.id,
       name: player.name,
       cash: player.cash,
@@ -105,10 +112,17 @@ export function toGameViewDto(game) {
       resortCount: board.resortCountOf(player.id),
       // 순위와 같은 함수(`NetWorth`)를 쓴다 — 예전엔 같은 공식이 여기 복제돼 있어서
       // 자산군이 늘어나면 화면과 순위가 어긋날 수밖에 없었다.
-      totalAssets: game.netWorthOf(player.id),
-    })),
+      totalAssets: netWorth.total,
+      // 총자산 내역(현금/부동산/주식/예금/−대출). 투자 모드가 꺼지면 주식·예금이 항상 0이다.
+      stockValue: netWorth.stock,
+      depositBalance: netWorth.deposit,
+      netWorth,
+      };
+    }),
     board: Array.from({ length: board.size }, (_unused, index) => toSpaceDto(board, index)),
     pending: game.pendingDecision,
+    // 증권거래소 공개 스냅샷(투자 모드가 꺼지면 null). 비밀 정보는 담지 않는다.
+    market: game.marketView({ actingSeatId }),
     rankings: game.isOver() ? game.rankings() : null,
   };
 }

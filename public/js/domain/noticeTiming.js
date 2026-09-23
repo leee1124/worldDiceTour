@@ -22,6 +22,10 @@ export const NOTICE_KINDS = Object.freeze({
   SALARY: 'salary',
   LAP: 'lap',
   JACKPOT: 'jackpot',
+  // 증권거래소 라운드 틱. 좌석이 없는 **전체 공지**라 언제나 `mine: false`로 온다.
+  NEWS: 'news',
+  CYCLE: 'cycle',
+  DELIST: 'delist',
 });
 
 /** 남·컴퓨터 차례에 보여 줄 때의 최소 읽는 시간. */
@@ -32,6 +36,10 @@ export const MIN_READ_MS = Object.freeze({
   salary: 2000,
   lap: 2000,
   jackpot: 2000,
+  // 시장 공지는 매 라운드 뜬다. 한 틱에 셋이 겹쳐도 6초를 넘지 않게 짧게 잡는다.
+  news: 2000,
+  cycle: 1600,
+  delist: 2000,
 });
 
 /** 내 좌석의 일이면 더 오래 보여 준다(내 돈이 오간 일은 확인할 시간이 필요하다). */
@@ -42,6 +50,10 @@ export const MINE_READ_MS = Object.freeze({
   salary: 2000,
   lap: 2000,
   jackpot: 2500,
+  // 시장 공지는 '내 일'이 될 수 없지만, 표를 비대칭으로 두지 않는다.
+  news: 2000,
+  cycle: 1600,
+  delist: 2000,
 });
 
 /** 모르는 종류가 와도 최소 이만큼은 보여 준다. */

@@ -1,4 +1,10 @@
 import { ALL_COMMAND_TYPES, COMMAND_TYPES } from '../domain/game/commands.js';
+import { DEPOSIT_CAP, DEPOSIT_UNIT } from '../domain/market/DepositAccount.js';
+import { ORDER_ID_PATTERN, ORDER_KINDS } from '../domain/market/OrderQueue.js';
+import { MAX_QUANTITY, MIN_QUANTITY } from '../domain/market/TradingDesk.js';
+import { MAX_POSITION_PER_INSTRUMENT } from '../domain/market/Holdings.js';
+import { DEPOSIT_ASSET_KIND, STOCK_ASSET_KIND } from '../domain/market/MarketAssets.js';
+import { PROPERTY_ASSET_KIND } from '../domain/game/payment/PropertyAssets.js';
 import { BUILDING_TYPES } from '../domain/game/City.js';
 import { CASINO_GAMES, HIGH_LOW_SEVEN_CHOICES, ODD_EVEN_CHOICES } from '../domain/game/Casino.js';
 import { BOARD_SIZE } from '../domain/game/data/board.js';
@@ -13,9 +19,34 @@ export const NAME_PATTERN = /^[가-힣a-zA-Z0-9 ]{1,10}$/;
 export const SEAT_ID_PATTERN = /^seat-\d{1,3}$/;
 /** 좌석 토큰(32바이트 hex). */
 export const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+/** 종목 식별자. 존재 여부는 도메인이 본다(컨트롤러는 상장 목록을 모른다 — 형식만). */
+export const INSTRUMENT_ID_PATTERN = /^[A-Z]{2,6}$/;
+/**
+ * 예약 주문 식별자. 단일 출처는 도메인 `OrderQueue`이며 여기서는 다시 내보내기만 한다
+ * (`export … from`만 쓰면 이 모듈 안에 지역 바인딩이 생기지 않아 사용 지점이 터진다).
+ */
+export { ORDER_ID_PATTERN };
+/** 정리 매각 자산 식별자(칸 번호·종목 id·'CASH'를 모두 담는다). */
+export const ASSET_ID_PATTERN = /^[A-Za-z0-9_-]{1,16}$/;
 
 const BUILDING_LIST = Object.values(BUILDING_TYPES);
 const CASINO_GAME_LIST = Object.values(CASINO_GAMES);
+/**
+ * 정리 페이즈에서 팔 수 있는 자산군.
+ * 아직 없는 자산군(코인·파생)은 **거부**한다 — 켤 수 없는 값을 받아 두지 않는다.
+ */
+const SELLABLE_ASSET_KINDS = Object.freeze([
+  PROPERTY_ASSET_KIND,
+  STOCK_ASSET_KIND,
+  DEPOSIT_ASSET_KIND,
+]);
+
+/** 자산군별 `SELL_ASSET.quantity` 상한(수량의 뜻이 자산군마다 다르다). */
+const SELL_QUANTITY_MAX = Object.freeze({
+  [PROPERTY_ASSET_KIND]: 1,
+  [STOCK_ASSET_KIND]: MAX_POSITION_PER_INSTRUMENT,
+  [DEPOSIT_ASSET_KIND]: DEPOSIT_CAP,
+});
 
 /** 오류 메시지에 실을 값의 최대 길이. */
 const MAX_DETAIL_LENGTH = 120;
@@ -92,7 +123,9 @@ export function extractToken(headers) {
 }
 
 function requireInteger(value, { min, max, field }) {
-  if (!Number.isInteger(value) || value < min || value > max) {
+  // `Number.isInteger`는 `1e21`이나 `2^53+1`도 참이다. 상한이 없는 필드가 새로 생기는 순간
+  // 그런 값이 도메인으로 내려가므로 여기서부터 안전 정수만 받는다(RoomSerializer와 같은 기준).
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw invalid(`${field} 범위 오류: ${safeText(value)}`);
   }
   return value;
@@ -229,9 +262,98 @@ function parseCommandPayload(type, payload) {
       return { destination: requireBoardIndex(payload.destination, 'destination') };
     case COMMAND_TYPES.CASINO_BET:
       return parseCasinoBet(payload);
+    case COMMAND_TYPES.BUY_STOCK:
+    case COMMAND_TYPES.SELL_STOCK:
+      return parseStockOrder(payload);
+    case COMMAND_TYPES.DEPOSIT:
+    case COMMAND_TYPES.WITHDRAW:
+      return { amount: requireDepositAmount(payload.amount) };
+    case COMMAND_TYPES.QUEUE_ORDER:
+      return parseQueuedOrder(payload);
+    case COMMAND_TYPES.CANCEL_QUEUED_ORDER:
+      return { orderId: requirePattern(payload.orderId, ORDER_ID_PATTERN, 'orderId') };
+    case COMMAND_TYPES.SELL_ASSET:
+      return parseSellAsset(payload);
     default:
       return {};
   }
+}
+
+/** 종목 주문: 형식만 본다(상장 여부·보유 수량은 도메인이 판단한다). */
+function parseStockOrder(payload) {
+  return {
+    instrumentId: requirePattern(payload.instrumentId, INSTRUMENT_ID_PATTERN, 'instrumentId'),
+    quantity: requireInteger(payload.quantity, {
+      min: MIN_QUANTITY,
+      max: MAX_QUANTITY,
+      field: 'quantity',
+    }),
+  };
+}
+
+/** 예치·인출 금액: 단위와 범위를 컨트롤러에서 먼저 막는다(도메인도 다시 검증한다). */
+function requireDepositAmount(value) {
+  const amount = requireInteger(value, {
+    min: DEPOSIT_UNIT,
+    max: DEPOSIT_CAP,
+    field: 'amount',
+  });
+  if (amount % DEPOSIT_UNIT !== 0) {
+    throw invalid(`amount 단위 오류: ${safeText(value)}`);
+  }
+  return amount;
+}
+
+/**
+ * 예약 주문: 종류에 따라 **필요한 필드만** 받는다.
+ * 주식 주문에 금액을, 예금 주문에 종목을 섞어 보내면 거부한다 — 뒤섞인 페이로드가 도메인까지
+ * 내려가면 "무엇을 예약했는지"가 모호해진다.
+ */
+function parseQueuedOrder(payload) {
+  const kind = payload.kind;
+  if (kind === ORDER_KINDS.BUY_STOCK || kind === ORDER_KINDS.SELL_STOCK) {
+    if (payload.amount !== undefined) {
+      throw invalid('주식 예약 주문에는 amount를 넣을 수 없습니다');
+    }
+    return { kind, ...parseStockOrder(payload) };
+  }
+  if (kind === ORDER_KINDS.DEPOSIT || kind === ORDER_KINDS.WITHDRAW) {
+    if (payload.instrumentId !== undefined || payload.quantity !== undefined) {
+      throw invalid('예금 예약 주문에는 instrumentId/quantity를 넣을 수 없습니다');
+    }
+    return { kind, amount: requireDepositAmount(payload.amount) };
+  }
+  throw invalid(`예약 주문 종류 오류: ${safeText(kind)}`);
+}
+
+/** 정리 매각: 자산군 화이트리스트 + id 형식 + (선택) 수량. */
+function parseSellAsset(payload) {
+  if (!SELLABLE_ASSET_KINDS.includes(payload.assetKind)) {
+    throw invalid(`assetKind 값 오류: ${safeText(payload.assetKind)}`);
+  }
+  const assetId = requirePattern(payload.assetId, ASSET_ID_PATTERN, 'assetId');
+  if (payload.quantity === undefined || payload.quantity === null) {
+    // 생략하면 전량 매각이다(도메인이 보유량을 안다).
+    return { assetKind: payload.assetKind, assetId, quantity: null };
+  }
+  return {
+    assetKind: payload.assetKind,
+    assetId,
+    // 자산군마다 수량의 뜻이 다르다: 주식은 주 수(보유 상한), 예금은 원 단위 금액(예금 한도),
+    // 부동산은 한 칸이 1건이다. 컨트롤러가 첫 방어선이므로 자산군에 맞는 상한을 쓴다.
+    quantity: requireInteger(payload.quantity, {
+      min: 1,
+      max: SELL_QUANTITY_MAX[payload.assetKind],
+      field: 'quantity',
+    }),
+  };
+}
+
+function requirePattern(value, pattern, field) {
+  if (typeof value !== 'string' || !pattern.test(value)) {
+    throw invalid(`${field} 형식 오류: ${safeText(value)}`);
+  }
+  return value;
 }
 
 function parseCasinoBet(payload) {

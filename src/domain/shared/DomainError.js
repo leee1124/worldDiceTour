@@ -15,23 +15,40 @@ export const DOMAIN_ERROR_CODES = Object.freeze({
   ROOM_FULL: 'ROOM_FULL',
   SEAT_NOT_FOUND: 'SEAT_NOT_FOUND',
   NOT_ENOUGH_SEATS: 'NOT_ENOUGH_SEATS',
+  /**
+   * 거래 한도 위반(창구 주문 수·명목금액·종목 보유 상한·예금 한도·예약 주문 수).
+   *
+   * "형식이 틀렸다"(`INVALID_ARGUMENT`)도 "돈이 없다"(`INSUFFICIENT_CASH`)도 아니라
+   * **규칙이 허용하는 양을 넘었다**는 뜻이므로 별도 사유다. 화면이 "이번 창구에서는 더 살 수 없습니다"를
+   * 정확히 안내할 수 있어야 하기 때문이다.
+   */
+  TRADE_LIMIT: 'TRADE_LIMIT',
 });
 
 export class DomainError extends Error {
   #code;
+  #details;
 
   /**
    * @param {string} code DOMAIN_ERROR_CODES 중 하나
    * @param {string} message 내부 진단용 메시지(클라이언트로 그대로 보내지 않는다)
+   * @param {string|null} [details] 같은 사유 안에서의 **세부 종류**(기계가 읽는 값).
+   *   호출자가 사유를 더 잘게 구분해야 할 때 쓴다 — 예전에는 한국어 메시지를 정규식으로
+   *   분류했는데, 문구를 다듬는 것만으로 분기가 조용히 바뀌었다. 클라이언트로는 나가지 않는다.
    */
-  constructor(code, message) {
+  constructor(code, message, details = null) {
     super(message);
     this.name = 'DomainError';
     this.#code = code;
+    this.#details = details;
   }
 
   get code() {
     return this.#code;
+  }
+
+  get details() {
+    return this.#details;
   }
 
   static invalidArgument(message) {
@@ -72,5 +89,9 @@ export class DomainError extends Error {
 
   static notEnoughSeats(message) {
     return new DomainError(DOMAIN_ERROR_CODES.NOT_ENOUGH_SEATS, message);
+  }
+
+  static tradeLimit(message, details = null) {
+    return new DomainError(DOMAIN_ERROR_CODES.TRADE_LIMIT, message, details);
   }
 }

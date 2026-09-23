@@ -1,6 +1,12 @@
+import { MARKET_EVENT_TYPES } from '../market/events.js';
+
 /**
  * 도메인 이벤트 종류. 커맨드 처리 결과로 발생하며 UI 로그/연출의 입력이 된다.
  * 각 이벤트의 필드는 docs/API.md에 문서화되어 있다.
+ *
+ * 서브시스템은 **자기 이벤트 목록을 스스로 소유**하고 여기서 펼쳐 담긴다(`market/events.js`).
+ * 그래서 새 서브시스템이 붙어도 이 파일은 한 줄만 늘어나고, 클라이언트에게는 여전히
+ * 한 장의 카탈로그로 보인다.
  */
 export const EVENT_TYPES = Object.freeze({
   TURN_STARTED: 'TURN_STARTED',
@@ -48,6 +54,8 @@ export const EVENT_TYPES = Object.freeze({
   TURN_ENDED: 'TURN_ENDED',
   ROUND_ADVANCED: 'ROUND_ADVANCED',
   GAME_OVER: 'GAME_OVER',
+  // 증권거래소(투자 모드 STOCKS) — 목록의 주인은 `market/events.js`다.
+  ...MARKET_EVENT_TYPES,
 });
 
 /** 게임 종료 사유. */

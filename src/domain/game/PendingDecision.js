@@ -13,17 +13,44 @@ import { SPACE_KINDS } from './data/board.js';
  * @param {string} context.phase 현재 페이즈
  * @param {import('./Player.js').Player|undefined} context.player 지금 차례인 좌석
  * @param {import('./Board.js').Board} context.board
- * @param {{buildIndex:number|null, acquireIndex:number|null, casinoRoundsLeft:number}} context.turn
+ * @param {{buildIndex:number|null, acquireIndex:number|null, casinoRoundsLeft:number, afterTrade:string|null}} context.turn
  * @param {import('./Casino.js').Casino} context.casino
  * @param {import('./payment/PaymentFlow.js').PaymentFlow} context.payment
  * @param {import('./payment/Liquidator.js').Liquidator} context.liquidator
+ * @param {import('../market/Market.js').Market|null} [context.market] 투자 모드가 꺼지면 null
  * @returns {object|null} 결정이 없으면 null
  */
-export function buildPendingDecision({ phase, player, board, turn, casino, payment, liquidator }) {
+export function buildPendingDecision({
+  phase,
+  player,
+  board,
+  turn,
+  casino,
+  payment,
+  liquidator,
+  market = null,
+}) {
   if (!player) {
     return null;
   }
   switch (phase) {
+    case PHASES.AWAIT_TRADE: {
+      // 창구가 열렸다면 시장이 있다는 뜻이다. 숫자·한도는 시장이 안다(여기는 조립만).
+      return {
+        kind: 'TRADE',
+        cash: player.cash,
+        deposit: market?.depositOf(player.id) ?? 0,
+        afterTrade: turn.afterTrade ?? 'ROLL',
+        holdings: (market?.holdingsOf(player.id) ?? []).map((position) => ({
+          ...position,
+          marketValue: market?.instrumentOf(position.instrumentId)?.valueOf(position.qty) ?? 0,
+        })),
+        budget: (market?.budgetOf(player.id) ?? null)?.viewModel({
+          seatId: player.id,
+          open: market?.openSeatId === player.id,
+        }),
+      };
+    }
     case PHASES.AWAIT_BUY: {
       const city = board.cityAt(player.position);
       return { kind: 'BUY', index: city.index, name: city.name, price: city.price };
@@ -70,7 +97,10 @@ export function buildPendingDecision({ phase, player, board, turn, casino, payme
       return { kind: 'TRAVEL', forbiddenIndexes: forbiddenTravelIndexes(board, player) };
     case PHASES.AWAIT_LIQUIDATION: {
       // 목록과 순서는 AssetRegistry/Liquidator가 정한다 — 자산군이 늘어도 여기는 안 바뀐다.
-      const sellable = liquidator.sellableOf(player.id);
+      // 부족액을 함께 넘겨 각 항목의 "팔 수 있는 최대"를 서버가 계산하게 한다.
+      const sellable = liquidator.sellableOf(player.id, {
+        owed: payment.amountDue - player.cash,
+      });
       return {
         kind: 'LIQUIDATION',
         amountDue: payment.amountDue,

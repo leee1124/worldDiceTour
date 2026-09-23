@@ -30,6 +30,29 @@ export class NetWorth {
   }
 
   /**
+   * 총자산 **내역**(화면의 "현금 / 부동산 / 주식 / 예금 / −대출" 분해).
+   *
+   * 합계는 `of()`와 정확히 같은 값이다 — 자산군별 평가액을 레지스트리에서 그대로 받아 더하므로
+   * 내역과 합계가 어긋날 수 없다. 등록되지 않은 자산군은 0으로 나온다(투자 모드 OFF).
+   * @param {import('../Player.js').Player|null} player
+   */
+  breakdownOf(player) {
+    const empty = { cash: 0, property: 0, stock: 0, deposit: 0, loanDebt: 0, total: 0 };
+    if (!player || player.eliminated) {
+      return empty;
+    }
+    const byKind = this.#registry.breakdownOf(player.id);
+    const breakdown = {
+      cash: player.cash,
+      property: byKind.PROPERTY ?? 0,
+      stock: byKind.STOCK ?? 0,
+      deposit: byKind.DEPOSIT ?? 0,
+      loanDebt: player.loanDebt,
+    };
+    return { ...breakdown, total: this.of(player) };
+  }
+
+  /**
    * 총자산 순위. 같은 상태면 언제나 같은 순위가 나온다(종료 모달이 흔들리지 않는다).
    * @param {import('../Player.js').Player[]} players 좌석 순서(입력 순서)
    */

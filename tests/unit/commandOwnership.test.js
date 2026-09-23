@@ -27,12 +27,27 @@ describe('COMMAND_OWNERSHIP(행동 주체 표)', () => {
     );
   });
 
-  it('지금은 모든 커맨드가 현재 턴 플레이어 소유다', () => {
-    // Given / When
-    const values = new Set(Object.values(COMMAND_OWNERSHIP));
+  it('예약 주문만 자기 좌석 상시 허용이고 나머지는 모두 현재 턴 플레이어 소유다', () => {
+    // Given (게임 상태를 바꾸지 않는 커맨드만 상시 허용이 될 자격이 있다 — 예약 큐만 바꾼다)
+    const ownSeatAnytime = ALL_COMMAND_TYPES.filter(
+      (type) => COMMAND_OWNERSHIP[type] === COMMAND_OWNERSHIPS.OWN_SEAT_ANYTIME,
+    );
 
-    // Then
-    assert.deepEqual([...values], [COMMAND_OWNERSHIPS.CURRENT_PLAYER]);
+    // When / Then
+    assert.deepEqual(ownSeatAnytime.sort(), [
+      COMMAND_TYPES.CANCEL_QUEUED_ORDER,
+      COMMAND_TYPES.QUEUE_ORDER,
+    ]);
+    for (const type of ALL_COMMAND_TYPES) {
+      if (ownSeatAnytime.includes(type)) {
+        continue;
+      }
+      assert.equal(
+        COMMAND_OWNERSHIP[type],
+        COMMAND_OWNERSHIPS.CURRENT_PLAYER,
+        `${type}이 현재 턴 플레이어 소유가 아니다`,
+      );
+    }
   });
 
   it('남의 차례에 보낸 커맨드는 NOT_YOUR_TURN으로 거부된다', () => {

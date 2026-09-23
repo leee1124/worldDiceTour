@@ -140,8 +140,27 @@ describe('Game 자산군 확장(AssetProvider 등록만으로)', () => {
     // Then
     assert.equal(pending.canSell, true);
     assert.deepEqual(pending.sellable, [
-      { assetKind: 'DEPOSIT', assetId: 'main', name: '정기예금', refund: 300_000 },
-      { index: 1, name: '하노이', refund: 30_000, assetKind: 'PROPERTY', assetId: '1' },
+      {
+        assetKind: 'DEPOSIT',
+        assetId: 'main',
+        name: '정기예금',
+        refund: 300_000,
+        // 이 테스트의 가짜 예금 자산군은 수량을 1로 보고한다(금액이 아니라 건수).
+        heldQuantity: 1,
+        maxQuantity: 1,
+      },
+      {
+        index: 1,
+        name: '하노이',
+        label: '하노이',
+        refund: 30_000,
+        quantity: 1,
+        maxQuantity: 1,
+        heldQuantity: 1,
+        unitValue: 30_000,
+        assetKind: 'PROPERTY',
+        assetId: '1',
+      },
     ]);
     // 모든 항목은 자산군을 스스로 밝힌다 → 클라이언트가 `assetKind`로 분기할 수 있다.
     assert.deepEqual(

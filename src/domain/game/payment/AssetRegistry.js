@@ -43,11 +43,20 @@ export class AssetRegistry {
    * 자동매각이 "자산군 순서 → 환급액 낮은 것 → 목록 순서"로 안정적으로 정렬할 수 있다.
    * @returns {Array<import('../../shared/AssetProvider.js').SellableAsset & {priority:number, order:number}>}
    */
-  sellableOf(playerId) {
+  sellableOf(playerId, { owed = null } = {}) {
     const assets = [];
     for (const provider of this.#providers) {
       for (const asset of provider.listOf(playerId)) {
-        assets.push({ ...asset, priority: provider.liquidationPriority, order: assets.length });
+        // 정리 매각은 부족액을 덮는 수량까지만 허용된다(`Liquidator.sell`). 화면이 그보다 큰
+        // 수량을 고르게 두면 플레이어가 스테퍼를 끝까지 올려 거부당하므로, **팔 수 있는 최대**를
+        // 서버가 계산해 알려 준다(규칙은 서버가 안다).
+        const sellable = coveringQuantity({ provider, playerId, asset, owed });
+        assets.push({
+          ...asset,
+          view: { ...asset.view, heldQuantity: asset.quantity, maxQuantity: sellable },
+          priority: provider.liquidationPriority,
+          order: assets.length,
+        });
       }
     }
     return assets;
@@ -56,6 +65,18 @@ export class AssetRegistry {
   /** 총자산 평가액(모든 자산군 합계). */
   valueOf(playerId) {
     return this.#providers.reduce((sum, provider) => sum + provider.valueOf(playerId), 0);
+  }
+
+  /**
+   * 자산군별 평가액 `{ kind: value }`.
+   * 화면의 총자산 내역이 쓰며, 합계는 언제나 `valueOf`와 같다(같은 제공자에게 묻기 때문이다).
+   */
+  breakdownOf(playerId) {
+    const byKind = {};
+    for (const provider of this.#providers) {
+      byKind[provider.kind] = provider.valueOf(playerId);
+    }
+    return byKind;
   }
 
   /** 한 건 매각. */
@@ -79,6 +100,15 @@ export class AssetRegistry {
     }
     return { intents, events, releasedIndexes };
   }
+}
+
+/** 그 자산에서 부족액을 덮는 최대 수량(모르면 보유 전량). */
+function coveringQuantity({ provider, playerId, asset, owed }) {
+  if (owed === null || owed <= 0 || typeof provider.quantityCovering !== 'function') {
+    return asset.quantity;
+  }
+  const needed = provider.quantityCovering({ playerId, assetId: asset.assetId, owed });
+  return Math.max(1, Math.min(asset.quantity, needed));
 }
 
 function assertProvider(provider) {

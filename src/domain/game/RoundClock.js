@@ -37,6 +37,8 @@ export class RoundClock {
   #roundLimit;
   /** @type {RoundTickHook[]} */
   #tickHooks = [];
+  /** @type {RoundTickHook[]} */
+  #postTickHooks = [];
 
   constructor({ round = 1, turnIndex = 0, roundLimit = null } = {}) {
     if (!Number.isInteger(round) || round < 1) {
@@ -70,22 +72,44 @@ export class RoundClock {
     return this.#tickHooks.map((hook) => hook.name);
   }
 
+  /** 등록된 사후 훅 이름(실행 순서). */
+  get postTickHookNames() {
+    return this.#postTickHooks.map((hook) => hook.name);
+  }
+
   /**
    * 라운드 틱 훅을 등록한다. 등록 순서대로 실행된다.
    * @param {RoundTickHook} hook
    */
   registerTick(hook) {
-    if (!hook || typeof hook.name !== 'string' || hook.name.length === 0) {
-      throw DomainError.invalidArgument('틱 훅에는 이름이 필요합니다');
-    }
-    if (typeof hook.run !== 'function') {
-      throw DomainError.invalidArgument(`틱 훅에 run이 없습니다: ${hook.name}`);
-    }
-    if (this.#tickHooks.some((registered) => registered.name === hook.name)) {
-      throw DomainError.invalidState(`이미 등록된 틱 훅입니다: ${hook.name}`);
-    }
+    assertHook(hook, this.#tickHooks, '틱 훅');
     this.#tickHooks.push(hook);
     return this;
+  }
+
+  /**
+   * **틱의 돈이 반영된 뒤** 돌아가는 사후 훅을 등록한다.
+   *
+   * 라운드별 자산 스냅샷처럼 "이 라운드가 끝난 결과"를 읽어야 하는 구독자를 위한 자리다.
+   * 틱 훅은 `{intents, events}`만 돌려주고 적용은 호출자(Game)가 하므로, 틱 훅 안에서 현금을 읽으면
+   * **이자·배당이 반영되기 전 값**을 보게 된다. 그래서 훅 목록을 둘로 나눈다.
+   *
+   * 사후 훅은 돈을 만들지 않는다(반환값을 쓰지 않는다).
+   */
+  registerPostTick(hook) {
+    assertHook(hook, this.#postTickHooks, '사후 틱 훅');
+    this.#postTickHooks.push(hook);
+    return this;
+  }
+
+  /**
+   * 사후 훅을 돌린다. 호출자(Game)가 틱의 intents를 적용한 **뒤에** 부른다.
+   * @param {{round:number, players:object[]}} context
+   */
+  runPostTick(context) {
+    for (const hook of this.#postTickHooks) {
+      hook.run(context);
+    }
   }
 
   /**
@@ -118,7 +142,8 @@ export class RoundClock {
       events.push(...(result.events ?? []));
       intents.push(...(result.intents ?? []));
     }
-    return done(TURN_OUTCOMES.BEGIN_TURN, null, events, intents);
+    // `ticked`는 "이 전이에서 라운드 틱이 실제로 돌았는지"다 — 호출자가 사후 훅을 돌릴지 판단한다.
+    return done(TURN_OUTCOMES.BEGIN_TURN, null, events, intents, true);
   }
 
   /**
@@ -138,6 +163,18 @@ export class RoundClock {
   }
 }
 
-function done(outcome, reason = null, events = [], intents = []) {
-  return { outcome, reason, events, intents };
+function done(outcome, reason = null, events = [], intents = [], ticked = false) {
+  return { outcome, reason, events, intents, ticked };
+}
+
+function assertHook(hook, registered, label) {
+  if (!hook || typeof hook.name !== 'string' || hook.name.length === 0) {
+    throw DomainError.invalidArgument(`${label}에는 이름이 필요합니다`);
+  }
+  if (typeof hook.run !== 'function') {
+    throw DomainError.invalidArgument(`${label}에 run이 없습니다: ${hook.name}`);
+  }
+  if (registered.some((entry) => entry.name === hook.name)) {
+    throw DomainError.invalidState(`이미 등록된 ${label}입니다: ${hook.name}`);
+  }
 }

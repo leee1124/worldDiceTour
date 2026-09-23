@@ -3,13 +3,26 @@
  * 호스트 도구(오프라인 좌석 자동 진행 전환)와 자기 좌석의 "직접 플레이로 복귀"도 여기서 제공한다.
  */
 
-import { button, clear, el, setText, svg, toggleClass } from '../dom.js';
+import { button, clear, el, setHidden, setText, svg, toggleClass } from '../dom.js';
 import { formatWon } from '../format.js';
 import { lapLabel } from '../domain/buildRules.js';
 import { playerCellLabel } from '../domain/locationLabel.js';
+import { netWorthRows } from '../domain/marketModel.js';
 import { countTo } from '../animation/timing.js';
 import { centerOf } from '../animation/effects.js';
 import { isHostSeatMine, isMySeat, slotOf, spaceOf } from '../store.js';
+
+/** 폰에서는 총자산 내역을 접어 둔다(카드가 길어지면 보드가 밀린다). */
+const PHONE_QUERY = '(max-width: 68rem)';
+
+function breakdownStartsOpen() {
+  try {
+    return !window.matchMedia(PHONE_QUERY).matches;
+  } catch (error) {
+    console.error('[players] 화면 폭을 확인하지 못했습니다', error.name);
+    return true;
+  }
+}
 
 function badge(text, tone) {
   return el('span', { class: ['badge', `badge--${tone}`], text });
@@ -27,6 +40,8 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
   /** @type {Map<string, number>} */
   const lastCash = new Map();
   let renderedSeatIds = '';
+  /** 총자산 내역을 펼쳐 둘지(패널 전체가 같은 상태를 쓴다 — 카드마다 다르면 비교가 어렵다). */
+  let breakdownOpen = breakdownStartsOpen();
 
   function buildCard(state, player) {
     const slot = slotOf(state, player.seatId);
@@ -69,6 +84,22 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
       ],
     );
 
+    // 총자산이 무엇으로 이뤄졌는지(현금 / 부동산 / 주식 / 예금 / −대출)를 누르면 펼친다.
+    const breakdown = el('div', { class: 'player-breakdown' });
+    const breakdownToggle = button(
+      {
+        class: 'player-breakdown-toggle',
+        'aria-expanded': String(breakdownOpen),
+        on: {
+          click: () => {
+            breakdownOpen = !breakdownOpen;
+            syncBreakdowns();
+          },
+        },
+      },
+      [el('span', { class: 'player-breakdown-toggle-text' })],
+    );
+
     const root = el('article', { class: 'player-card', dataset: { seat: player.seatId, slot: slot.color } }, [
       head,
       el('div', { class: 'player-money' }, [
@@ -77,12 +108,46 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
         el('span', { class: 'player-money-label', text: '총자산' }),
         assets,
       ]),
+      breakdownToggle,
+      breakdown,
       badges,
       tools,
     ]);
 
-    cards.set(player.seatId, { root, cash, assets, badges, tools, holdings, location, head });
+    cards.set(player.seatId, {
+      root,
+      cash,
+      assets,
+      badges,
+      tools,
+      holdings,
+      location,
+      head,
+      breakdown,
+      breakdownToggle,
+    });
     return root;
+  }
+
+  /** 펼침 상태를 모든 카드에 한 번에 반영한다. */
+  function syncBreakdowns() {
+    for (const card of cards.values()) {
+      card.breakdownToggle.setAttribute('aria-expanded', String(breakdownOpen));
+      setText(card.breakdownToggle.querySelector('.player-breakdown-toggle-text'), breakdownOpen ? '내역 접기 ▴' : '총자산 내역 ▾');
+      setHidden(card.breakdown, !breakdownOpen);
+    }
+  }
+
+  function renderBreakdown(node, player) {
+    clear(node);
+    for (const row of netWorthRows(player)) {
+      node.appendChild(
+        el('div', { class: ['nw-row', `nw-row--${row.tone}`] }, [
+          el('span', { class: 'nw-key', text: row.label }),
+          el('span', { class: 'nw-value', text: formatWon(row.amount) }),
+        ]),
+      );
+    }
   }
 
   function renderBadges(node, state, player, seat) {
@@ -171,6 +236,7 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
           listNode.appendChild(buildCard(state, player));
         }
         renderedSeatIds = seatKey;
+        syncBreakdowns();
       }
 
       for (const player of view.players) {
@@ -191,6 +257,13 @@ export function createPlayersView({ onSetAutopilot, onShowHoldings = () => {} })
         }
 
         setText(card.assets, formatWon(player.totalAssets));
+        // 투자 모드가 꺼진 방에는 `netWorth`가 오지 않는다(응답이 예전과 같다) — 내역 줄도 만들지 않는다.
+        const showBreakdown = Boolean(view.market) && Boolean(player.netWorth);
+        setHidden(card.breakdownToggle, !showBreakdown);
+        setHidden(card.breakdown, !showBreakdown || !breakdownOpen);
+        if (showBreakdown) {
+          renderBreakdown(card.breakdown, player);
+        }
         // 카드마다 "지금 어느 칸에 서 있는지"를 글자로 적어 둔다.
         // 칸 이름은 **찾지 못하면 null**로 넘긴다(대체 문구는 locationLabel이 한 곳에서 만든다).
         setText(

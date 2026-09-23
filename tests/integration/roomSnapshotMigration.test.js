@@ -82,7 +82,7 @@ describe('저장 스키마 마이그레이션(구버전 방 파일 호환)', () 
     assert.equal(room.game.rankings().length, 4);
   });
 
-  it('구버전 방을 불러오면 schemaVersion 2 + 금융 옵션 기본값으로 올라온다', () => {
+  it('구버전 방을 불러오면 현재 스키마 + 금융 옵션 기본값으로 올라온다', () => {
     // Given
     const snapshot = JSON.parse(legacy('playing'));
     assert.equal(snapshot.options.finance, undefined, '픽스처에는 금융 옵션이 없어야 한다');
@@ -92,7 +92,7 @@ describe('저장 스키마 마이그레이션(구버전 방 파일 호환)', () 
     const upgraded = room.toSnapshot();
 
     // Then
-    assert.equal(upgraded.schemaVersion, 2);
+    assert.equal(upgraded.schemaVersion, CURRENT_ROOM_SCHEMA_VERSION);
     assert.deepEqual(upgraded.options, {
       roundLimit: 30,
       finance: DEFAULT_FINANCE_OPTIONS,
@@ -113,7 +113,7 @@ describe('저장 스키마 마이그레이션(구버전 방 파일 호환)', () 
     assert.equal(report.breakdownBalanced, false, '과거 순유입의 사유는 되살릴 수 없다');
   });
 
-  it('v1 → v2 왕복: 승급한 방을 다시 저장하면 그대로 다시 읽힌다', () => {
+  it('v1 → 현재 버전 왕복: 승급한 방을 다시 저장하면 그대로 다시 읽힌다', () => {
     // Given
     const room = deserializeRoom(JSON.parse(legacy('playing')), new SeededRandomSource(1));
 
@@ -122,7 +122,7 @@ describe('저장 스키마 마이그레이션(구버전 방 파일 호환)', () 
     const again = parseRoomJson(text, new SeededRandomSource(1));
 
     // Then
-    assert.equal(JSON.parse(text).schemaVersion, 2);
+    assert.equal(JSON.parse(text).schemaVersion, CURRENT_ROOM_SCHEMA_VERSION);
     assert.deepEqual(again.toSnapshot(), room.toSnapshot());
   });
 });
@@ -140,7 +140,7 @@ describe('migrateRoomSnapshot(스키마 승급)', () => {
     seatSequence: 1,
   });
 
-  it('schemaVersion이 없으면 1로 보고 2로 올린다', () => {
+  it('schemaVersion이 없으면 1로 보고 현재 버전까지 올린다', () => {
     // Given
     const raw = v1();
 
@@ -148,7 +148,7 @@ describe('migrateRoomSnapshot(스키마 승급)', () => {
     const migrated = migrateRoomSnapshot(raw);
 
     // Then
-    assert.equal(migrated.schemaVersion, 2);
+    assert.equal(migrated.schemaVersion, CURRENT_ROOM_SCHEMA_VERSION);
     assert.deepEqual(migrated.options, { roundLimit: 20, finance: DEFAULT_FINANCE_OPTIONS });
     assert.equal(migrated.code, 'AB2C', '다른 필드는 그대로 옮긴다');
     assert.deepEqual(raw, v1(), '입력을 변형하지 않는다');
@@ -202,7 +202,7 @@ describe('migrateRoomSnapshot(스키마 승급)', () => {
     // Given (목록을 잘못 적으면 while 루프가 영원히 돌아 서버 부팅이 멈춘다 —
     //        그 실수는 예외로 드러나야 한다. 단계 목록이 실제로 전진하는지 계약으로 고정한다.)
     // When / Then
-    assert.equal(CURRENT_ROOM_SCHEMA_VERSION, 2);
+    assert.equal(CURRENT_ROOM_SCHEMA_VERSION, 3);
     const migrated = migrateRoomSnapshot(v1());
     assert.equal(migrated.schemaVersion, CURRENT_ROOM_SCHEMA_VERSION, '단계가 버전을 남겨야 한다');
   });

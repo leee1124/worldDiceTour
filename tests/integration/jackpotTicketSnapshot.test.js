@@ -2,7 +2,11 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { deserializeRoom, validateRoomSnapshot } from '../../src/infrastructure/RoomSerializer.js';
+import {
+  deserializeRoom,
+  migrateRoomSnapshot,
+  validateRoomSnapshot,
+} from '../../src/infrastructure/RoomSerializer.js';
 import { SeededRandomSource } from '../../src/infrastructure/SeededRandomSource.js';
 import { COMMAND_TYPES } from '../../src/domain/game/commands.js';
 import { EVENT_TYPES } from '../../src/domain/game/events.js';
@@ -27,7 +31,9 @@ describe('잭팟 수령 티켓과 저장 스냅샷', () => {
     snapshot.game.deck.drawPile = TICKETS.map((ticket) => ticket.id);
 
     // When / Then
-    validateRoomSnapshot(snapshot);
+    // 이 픽스처는 증권거래소가 들어오기 전(스키마 2) 저장 파일이다.
+    // `validateRoomSnapshot`은 **승급을 마친** 스냅샷을 검사하는 함수이므로 먼저 승급한다.
+    validateRoomSnapshot(migrateRoomSnapshot(snapshot));
     const room = deserializeRoom(snapshot, new SeededRandomSource(7));
     assert.deepEqual(room.game.toSnapshot().deck.drawPile, TICKETS.map((ticket) => ticket.id));
   });

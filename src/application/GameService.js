@@ -1,6 +1,12 @@
 import { isValidRoomCode } from '../domain/room/RoomCode.js';
 import { AppError } from './errors.js';
 import { KeyedMutex } from './KeyedMutex.js';
+import { TokenBucketLimiter } from './RateLimiter.js';
+import {
+  TRADE_COMMAND_TYPES,
+  TRADE_RATE_CAPACITY,
+  TRADE_RATE_WINDOW_MS,
+} from './tradeCommands.js';
 import { toGameViewDto, toRoomDto } from './dto.js';
 
 /**
@@ -17,8 +23,26 @@ export class GameService {
   #autoDriver = null;
   #presence;
   #mutex;
+  #tradeLimiter;
 
-  constructor({ repository, random, authenticator, publisher, clock, logger, presence, mutex }) {
+  /**
+   * @param {{tradeLimiter?: {tryConsume: (key: string) => boolean}}} params
+   *   `tradeLimiter`는 **사람이 보낸 거래 커맨드**의 좌석당 레이트 리밋이다(설계서 §7).
+   *   커맨드마다 방 파일을 저장하므로, 한 좌석이 주문을 쏟아부어 디스크를 붙잡는 것을 막는다.
+   *   서버가 대신 두는 좌석(`executeAsServer`)은 제한하지 않는다 — 드라이버는 스팸을 내지 않고,
+   *   막히면 자동 진행이 멈춘다.
+   */
+  constructor({
+    repository,
+    random,
+    authenticator,
+    publisher,
+    clock,
+    logger,
+    presence,
+    mutex,
+    tradeLimiter,
+  }) {
     this.#repository = repository;
     this.#random = random;
     this.#authenticator = authenticator;
@@ -27,6 +51,12 @@ export class GameService {
     this.#logger = logger ?? console;
     this.#presence = presence ?? { onlineSeatIds: () => [] };
     this.#mutex = mutex ?? new KeyedMutex();
+    this.#tradeLimiter =
+      tradeLimiter ??
+      new TokenBucketLimiter({
+        capacity: TRADE_RATE_CAPACITY,
+        windowMs: TRADE_RATE_WINDOW_MS,
+      });
   }
 
   attachAutoPlayerDriver(driver) {
@@ -49,6 +79,7 @@ export class GameService {
     }
     // 서버가 대신 두는 좌석을 사람이 동시에 조종하면 두 커맨드가 경합한다(이중 조종).
     this.#guard(() => room.assertManualControl(resolvedSeatId));
+    this.#assertTradeRate(code, resolvedSeatId, type);
     return this.#run(room, resolvedSeatId, type, payload);
   }
 
@@ -69,10 +100,12 @@ export class GameService {
     if (!seat?.isAutoControlled()) {
       throw new AppError('ERR003', `자동 진행 좌석이 아닙니다: ${seatId}`);
     }
-    if (expectedVersion !== undefined && room.game?.version !== expectedVersion) {
+    // `stateVersion`으로 비교한다 — 예약 주문처럼 게임 상태를 바꾸지 않는 커맨드가
+    // 대행 결정을 무효화하면, 남의 턴에 그것만 반복해 방의 진행을 멈출 수 있다.
+    if (expectedVersion !== undefined && room.game?.stateVersion !== expectedVersion) {
       throw new AppError(
         'ERR005',
-        `자동 진행 버전 불일치: 기대 ${expectedVersion}, 실제 ${room.game?.version}`,
+        `자동 진행 버전 불일치: 기대 ${expectedVersion}, 실제 ${room.game?.stateVersion}`,
       );
     }
     return this.#run(room, seatId, type, payload);
@@ -93,7 +126,8 @@ export class GameService {
       return null;
     }
     const view = toGameViewDto(room.game);
-    return { seatId: seat.id, view, version: view.version };
+    // 드라이버가 되돌려 줄 토큰은 `stateVersion`이다(위 `executeAsServer` 주석 참고).
+    return { seatId: seat.id, view, version: room.game.stateVersion };
   }
 
   /**
@@ -134,6 +168,18 @@ export class GameService {
       this.#autoDriver?.schedule(room.code);
     }
     return { view, events };
+  }
+
+  /**
+   * 거래 커맨드의 좌석당 레이트 리밋. 상태를 바꾸기 **전에** 검사하므로 거부돼도 방은 그대로다.
+   */
+  #assertTradeRate(code, seatId, type) {
+    if (!TRADE_COMMAND_TYPES.has(type)) {
+      return;
+    }
+    if (!this.#tradeLimiter.tryConsume(`${code}:${seatId}`)) {
+      throw new AppError('ERR019', `거래 요청이 너무 잦습니다: ${code}/${seatId} ${type}`);
+    }
   }
 
   async #loadRoom(code) {
