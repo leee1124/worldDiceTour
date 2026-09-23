@@ -5,7 +5,7 @@ import { SECTORS } from './data/instruments.js';
 export const NUDGE_BP = Object.freeze({
   LANDMARK_BUILT: 300,
   EXPENSIVE_PURCHASE: 100,
-  JACKPOT_WON: 500,
+  JACKPOT_WON: 800,
   JACKPOT_MILESTONE: 200,
   RESORT_TOLL: 100,
   TRAVEL: 200,

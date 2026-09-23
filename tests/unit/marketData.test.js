@@ -46,14 +46,14 @@ const EXPECTED_LISTED = [
 const EXPECTED_NEWS = {
   NE1: { phase: 'EXPANSION', headline: '국제선 좌석이 모자란다', sectors: { AIRLINE: 600, HOTEL: 400 } },
   NE2: { phase: 'EXPANSION', headline: '신도시 착공식이 줄줄이', sectors: { CONSTRUCTION: 700, ENERGY: 200 } },
-  NE3: { phase: 'EXPANSION', headline: '연휴 특수, 객실 만실', sectors: { HOTEL: 600, ENTERTAINMENT: 300 } },
+  NE3: { phase: 'EXPANSION', headline: '연휴 특수, 객실 만실', sectors: { HOTEL: 600, ENTERTAINMENT: 200 } },
   NE4: { phase: 'EXPANSION', headline: '전력 수요 최고치 경신', sectors: { ENERGY: 500, CONSTRUCTION: 100 } },
   NE5: { phase: 'EXPANSION', headline: '경기가 좋으면 금리도 오른다', sectors: { CONSTRUCTION: -200, AIRLINE: -100 }, rate: 25 },
-  NE6: { phase: 'EXPANSION', headline: '관광 박람회 대성황', sectors: { HOTEL: 500, AIRLINE: 300, ENTERTAINMENT: 200 } },
+  NE6: { phase: 'EXPANSION', headline: '관광 박람회 대성황', sectors: { HOTEL: 500, AIRLINE: 300, ENTERTAINMENT: 100 } },
 
   NO1: { phase: 'OVERHEAT', headline: '빈 땅에도 웃돈이 붙는다', sectors: { CONSTRUCTION: 1_200, ENERGY: 200 } },
   NO2: { phase: 'OVERHEAT', headline: '금리 인상, 이번엔 폭이 크다', sectors: { CONSTRUCTION: -600, HOTEL: -400 }, rate: 50 },
-  NO3: { phase: 'OVERHEAT', headline: '카지노 매출 사상 최대', sectors: { ENTERTAINMENT: 1_500 } },
+  NO3: { phase: 'OVERHEAT', headline: '카지노 매출 사상 최대', sectors: { ENTERTAINMENT: 1_000 } },
   NO4: { phase: 'OVERHEAT', headline: '연료비 급등에 항공사 비명', sectors: { AIRLINE: -800, ENERGY: 900 } },
   NO5: { phase: 'OVERHEAT', headline: '분양 경쟁률 세 자릿수', sectors: { CONSTRUCTION: 1_000, HOTEL: 300 } },
   NO6: { phase: 'OVERHEAT', headline: '거품 경고 보고서 공개', all: -300, rate: 25 },
@@ -62,14 +62,14 @@ const EXPECTED_NEWS = {
   NR2: { phase: 'RECESSION', headline: '공사 중단 현장이 늘어난다', sectors: { CONSTRUCTION: -1_200 } },
   NR3: { phase: 'RECESSION', headline: '금리 인하, 급한 불 끄기', sectors: { CONSTRUCTION: 400, HOTEL: 200 }, rate: -50 },
   NR4: { phase: 'RECESSION', headline: '전기 사용량 감소', sectors: { ENERGY: -600 } },
-  NR5: { phase: 'RECESSION', headline: '지갑 닫힌 주말', sectors: { ENTERTAINMENT: -1_400, HOTEL: -400 } },
+  NR5: { phase: 'RECESSION', headline: '불황에 붐비는 카지노', sectors: { ENTERTAINMENT: 400, HOTEL: -400 } },
   NR6: { phase: 'RECESSION', headline: '구조조정 발표 잇따라', all: -500, rate: -25 },
 
   NV1: { phase: 'RECOVERY', headline: '예약률이 바닥을 지났다', sectors: { AIRLINE: 500, HOTEL: 400 } },
   NV2: { phase: 'RECOVERY', headline: '멈췄던 공사가 재개된다', sectors: { CONSTRUCTION: 600 } },
   NV3: { phase: 'RECOVERY', headline: '저금리, 돈이 위험자산으로', all: 200, rate: -25 },
   NV4: { phase: 'RECOVERY', headline: '연료값 안정세', sectors: { AIRLINE: 600, ENERGY: -300 } },
-  NV5: { phase: 'RECOVERY', headline: '주말 나들이 재개', sectors: { ENTERTAINMENT: 700, HOTEL: 300 } },
+  NV5: { phase: 'RECOVERY', headline: '주말 나들이 재개', sectors: { ENTERTAINMENT: 1_000, HOTEL: 300 } },
   NV6: { phase: 'RECOVERY', headline: '금리 동결, 지켜보기', all: 0 },
 };
 

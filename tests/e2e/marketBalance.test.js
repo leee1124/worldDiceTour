@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { Market } from '../../src/domain/market/Market.js';
 import { MarketSimulation, ROUNDS_PER_LAP } from '../../src/domain/market/MarketSimulation.js';
 import { SeededRandomSource } from '../../src/infrastructure/SeededRandomSource.js';
 
@@ -57,11 +58,11 @@ describe('밸런스: 분산투자는 장기적으로 오른다(오너 목표)', 
     );
   });
 
-  it('그래도 도박은 아니다 — 25라운드 손실 확률이 10%~35%다', () => {
+  it('그래도 도박은 아니다 — 25라운드 손실 확률이 5%~35%다(경기 방어 종목이 섞이면 5%대까지 내려간다)', () => {
     // Given (확실한 것도, 카지노도 아니어야 한다)
     // When / Then
     assert.ok(
-      summary.portfolio.lossRate >= 0.1 && summary.portfolio.lossRate <= 0.35,
+      summary.portfolio.lossRate >= 0.05 && summary.portfolio.lossRate <= 0.35,
       `손실 확률: ${percent(summary.portfolio.lossRate)}`,
     );
   });
@@ -133,20 +134,31 @@ describe('밸런스: 분산투자가 한 종목보다 안전하다(교육 목표
     }
   });
 
-  it('상장폐지·재상장 경로는 긴 시계열에서 실제로 도달한다', () => {
-    // Given (100라운드까지 늘리면 꼬리가 실현된다 — 규칙이 죽은 코드가 아님을 증명한다)
-    const long = MarketSimulation.summarize({
-      seeds: SEEDS.slice(0, 200),
-      rounds: 100,
-      randomFactory: (seed) => new SeededRandomSource(seed),
-    });
+  it('상장폐지 경로는 최악의 시세가 이어지면 실제로 도달한다(규칙이 죽은 코드가 아니다)', () => {
+    // Given — 카지노 종목이 경기 방어 종목이 된 뒤로는 무작위 시드로 25~200라운드를 돌려도 상장폐지가
+    //        거의 나오지 않는다(400라운드에 2%). 그래서 "우연히 나오길" 기대하는 대신, 매 라운드 최악의
+    //        충격만 뽑는 적대적 난수원으로 하한(기준가 20%)에 도달함을 결정적으로 증명한다.
+    //        (지분 소각·재상장의 세부 동작은 tests/unit/market.test.js가 단위로 고정한다.)
+    const worstCase = { nextInt: (min) => min };
+    const market = Market.create();
 
-    // When
-    const anyDelisted = Object.values(long.perInstrument).some((stats) => stats.delistRate > 0);
+    // When — 최대 60라운드까지만 돌린다(그 안에 못 닿으면 규칙이 도달 불가능하다는 뜻)
+    let delistedAt = null;
+    for (let round = 2; round <= 61 && delistedAt === null; round += 1) {
+      const { events } = market.roundTick({ round, random: worstCase, players: [] });
+      if (events.some((event) => event.type === 'INSTRUMENT_DELISTED')) {
+        delistedAt = round;
+      }
+    }
 
     // Then
-    assert.ok(anyDelisted, '긴 시계열에서도 상장폐지가 한 번도 일어나지 않았다');
+    assert.ok(delistedAt !== null, '최악의 시세가 60라운드 이어져도 상장폐지가 일어나지 않았다');
+    assert.ok(
+      market.viewModel().instruments.length === 5,
+      '상장폐지 뒤에도 예비 종목이 올라와 5종목이 유지되어야 한다',
+    );
   });
+
 });
 
 describe('밸런스: 폭주하는 종목이 없다', () => {
@@ -171,5 +183,72 @@ describe('밸런스: 폭주하는 종목이 없다', () => {
       medianPerLap < summary.portfolio.perLapReturn,
       '중앙값이 평균보다 높다면 분포 계산이 잘못됐다',
     );
+  });
+});
+
+describe('카지노·엔터 종목(무배당 고위험)의 위험 대비 보상', () => {
+  // 오너 피드백(2026-09-23): "카지노는 떨어지기만 함? 2,800원까지 떨어지냐 배당도 없는데"
+  // 무배당·최고 변동성이라는 성격은 유지하되, 감수할 가치가 있는 위험이어야 한다.
+  const ent = summary.perInstrument.ENT;
+
+  it('손실 확률이 30% 아래로 내려온다(이전 34%)', () => {
+    // Given / When / Then
+    assert.ok(ent.lossRate < 0.3, `ENT 손실 확률 ${percent(ent.lossRate)}`);
+  });
+
+  it('무배당의 대가로 평균 가격 수익률이 5종목 평균보다 높다', () => {
+    const ids = Object.keys(summary.perInstrument);
+    const mean = ids.reduce((sum, id) => sum + summary.perInstrument[id].meanReturn, 0) / ids.length;
+    assert.ok(ent.meanReturn > mean, `ENT ${percent(ent.meanReturn)} vs 평균 ${percent(mean)}`);
+  });
+
+  it('그래도 단일 종목 몰빵은 분산보다 위험하다(경기 방어 종목이라도 예외 없음)', () => {
+    // ENT는 경기 방어 종목이 되어 더는 "최고 위험"이 아니다(그건 AIR). 대신 진폭이 가장 크므로(ENT > NRG는 별도 테스트)
+    // 한 종목에 몰아넣는 것은 분산보다 손실 확률이 높아야 한다.
+    assert.ok(ent.lossRate > summary.portfolio.lossRate * 2, `ENT ${percent(ent.lossRate)} vs 분산 ${percent(summary.portfolio.lossRate)}`);
+  });
+});
+
+describe('카지노·엔터 종목은 경기 방어적이다(오너 지적 2026-09-23: "카지노는 원래 불황기에 더 잘되지 않나")', () => {
+  // 실제 Market.roundTick()을 돌려 국면별로 각 종목의 라운드 수익률 평균을 잰다.
+  // 현실 경제의 사행 산업처럼 "불황을 완전히 거스르진 않지만 다른 업종보다 훨씬 덜 꺾인다"를 고정한다.
+  const byPhase = {};
+  for (let seed = 1; seed <= 120; seed += 1) {
+    const random = new SeededRandomSource(seed * 7_919);
+    const market = Market.create();
+    const prev = Object.fromEntries(market.viewModel().instruments.map((i) => [i.id, i.price]));
+    for (let round = 2; round <= 26; round += 1) {
+      market.roundTick({ round, random, players: [] });
+      const phase = market.cyclePhase;
+      for (const item of market.viewModel().instruments) {
+        if (item.state !== 'LISTED' || !(item.id in prev)) {
+          prev[item.id] = item.price;
+          continue;
+        }
+        ((byPhase[phase] ??= {})[item.id] ??= []).push(item.price / prev[item.id] - 1);
+        prev[item.id] = item.price;
+      }
+    }
+  }
+  const meanOf = (phase, id) => {
+    const list = byPhase[phase]?.[id] ?? [];
+    return list.reduce((sum, value) => sum + value, 0) / Math.max(1, list.length);
+  };
+  const others = ['AIR', 'CON', 'HOT', 'NRG'];
+
+  it('침체 국면에서 다른 네 종목보다 훨씬 덜 떨어진다(방어)', () => {
+    // Given / When / Then
+    const ent = meanOf('RECESSION', 'ENT');
+    for (const id of others) {
+      const other = meanOf('RECESSION', id);
+      assert.ok(other < 0, `${id}는 침체에서 떨어져야 한다: ${percent(other)}`);
+      assert.ok(ent > other + 0.01, `ENT ${percent(ent)}가 ${id} ${percent(other)}보다 1%p 이상 덜 떨어져야 한다`);
+    }
+  });
+
+  it('호황 국면에서는 오히려 가장 평범하다(호황엔 다들 여행을 가지 카지노에 몰리지 않는다)', () => {
+    const ent = meanOf('EXPANSION', 'ENT');
+    const best = Math.max(...others.map((id) => meanOf('EXPANSION', id)));
+    assert.ok(ent < best, `호황에서 ENT ${percent(ent)}가 최고 종목 ${percent(best)}보다 낮아야 한다`);
   });
 });
