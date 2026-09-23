@@ -3,7 +3,7 @@
  *
  * 보드 칸에서는 "무엇이 지어졌는지"가 한눈에 보여야 한다 — 그래서 지은 건물만 아이콘으로
  * 찍지 않고, **별장·빌딩·호텔 세 칸을 늘 그려 두고** 지은 것만 채운다(빈 칸은 옅은 윤곽).
- * 랜드마크는 세 칸을 대신하는 전용 표시다.
+ * 관광명소는 세 칸을 대신하는 전용 표시다.
  *
  * 이 모듈은 DOM을 모른다 — 보드 칸(boardView)과 칸 상세 시트(cellSheet)가 같은 표를 쓴다.
  */
@@ -36,7 +36,7 @@ export function buildingShortLabel(type) {
 export function buildingSlotView(space = {}) {
   const landmark = Boolean(space.landmark);
   if (landmark) {
-    // 랜드마크는 세 건물을 모두 흡수한 최종 형태다 — 슬롯 대신 리본 하나로 보여 준다.
+    // 관광명소는 세 건물을 모두 흡수한 최종 형태다 — 슬롯 대신 리본 하나로 보여 준다.
     return { landmark: true, builtCount: BUILDING_ORDER.length, slots: [] };
   }
   if (!BUILDABLE_KINDS.includes(space.kind)) {

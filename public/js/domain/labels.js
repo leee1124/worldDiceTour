@@ -5,12 +5,12 @@
 
 const lookup = (table, key, fallback) => table[key] ?? fallback ?? String(key ?? '');
 
-/** 건물 3종 + 랜드마크. */
+/** 건물 3종 + 관광명소. */
 export const BUILDING_LABELS = Object.freeze({
   VILLA: '별장',
   BUILDING: '빌딩',
   HOTEL: '호텔',
-  LANDMARK: '랜드마크',
+  LANDMARK: '관광명소',
 });
 
 export const BUILDING_ORDER = Object.freeze(['VILLA', 'BUILDING', 'HOTEL']);

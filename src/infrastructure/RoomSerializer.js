@@ -302,7 +302,7 @@ function validateBoardSnapshot(board, { seatIds }) {
     assert(isBoardIndex(city.index), `칸 번호 오류: ${describe(city.index)}`);
     assert(city.ownerId === null || seatIds.has(city.ownerId), `칸 소유자 오류: ${describe(city.ownerId)}`);
     assert(Array.isArray(city.buildings), '건물 목록 오류');
-    assert(typeof city.landmark === 'boolean', '랜드마크 값 오류');
+    assert(typeof city.landmark === 'boolean', '관광명소 값 오류');
   }
 }
 

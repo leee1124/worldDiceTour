@@ -38,7 +38,7 @@ describe('City(도시/휴양지 칸)', () => {
   });
 
   describe('건설비', () => {
-    it('별장 30%, 빌딩 60%, 호텔 90%, 랜드마크 100%다', () => {
+    it('별장 30%, 빌딩 60%, 호텔 90%, 관광명소 100%다', () => {
       // Given
       const city = seoul({ ownerId: 'p1' });
 
@@ -85,7 +85,7 @@ describe('City(도시/휴양지 칸)', () => {
       assert.equal(city.hasBuilding(BUILDING), false);
     });
 
-    it('3종이 모두 있으면 랜드마크만 제안한다', () => {
+    it('3종이 모두 있으면 관광명소만 제안한다', () => {
       // Given
       const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL] });
 
@@ -93,7 +93,7 @@ describe('City(도시/휴양지 칸)', () => {
       assert.deepEqual(city.buildableTypes({ lap: 3 }), [LANDMARK]);
     });
 
-    it('3종을 완성하는 기회에서 랜드마크를 함께 지을 수 없다', () => {
+    it('3종을 완성하는 기회에서 관광명소를 함께 지을 수 없다', () => {
       // Given
       const city = seoul({ ownerId: 'p1' });
 
@@ -102,7 +102,7 @@ describe('City(도시/휴양지 칸)', () => {
       assert.equal(city.landmark, false);
     });
 
-    it('랜드마크를 지으면 더 건설할 수 없다', () => {
+    it('관광명소를 지으면 더 건설할 수 없다', () => {
       // Given
       const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL] });
 
@@ -213,7 +213,7 @@ describe('City(도시/휴양지 칸)', () => {
       assert.deepEqual(city.buildings, []);
     });
 
-    it('3종을 갖춘 도시는 바퀴와 무관하게 랜드마크만 제안한다(인수로 넘겨받은 도시)', () => {
+    it('3종을 갖춘 도시는 바퀴와 무관하게 관광명소만 제안한다(인수로 넘겨받은 도시)', () => {
       // Given (2바퀴 플레이어가 3종이 지어진 도시를 인수한 상황)
       const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL] });
 
@@ -260,7 +260,7 @@ describe('City(도시/휴양지 칸)', () => {
       assert.equal(all, 320_000);
     });
 
-    it('랜드마크는 3.5배 고정이다', () => {
+    it('관광명소는 3.5배 고정이다', () => {
       // Given
       const city = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL], landmark: true });
 
@@ -308,7 +308,7 @@ describe('City(도시/휴양지 칸)', () => {
       assert.equal(city.acquisitionPrice(), 2_080_000);
     });
 
-    it('랜드마크 도시와 휴양지는 인수할 수 없다', () => {
+    it('관광명소 도시와 휴양지는 인수할 수 없다', () => {
       // Given
       const landmarkCity = seoul({ ownerId: 'p1', buildings: [VILLA, BUILDING, HOTEL], landmark: true });
       const resort = jeju({ ownerId: 'p1' });

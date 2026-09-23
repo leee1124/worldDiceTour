@@ -83,7 +83,7 @@ describe('GameViewDto(바퀴 수와 건설 선택지)', () => {
     assert.deepEqual(pending.lockedOptions, []);
   });
 
-  it('랜드마크 업그레이드 기회에는 잠긴 건물이 없다', () => {
+  it('관광명소 업그레이드 기회에는 잠긴 건물이 없다', () => {
     // Given
     const game = buildGame({
       laps: { s1: 1 },

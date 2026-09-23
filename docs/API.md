@@ -336,10 +336,10 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `board[].price` | 매입가(소유 가능 칸만) |
 | `board[].ownerId` | 소유 좌석 id 또는 `null` |
 | `board[].buildings` | `["VILLA","BUILDING","HOTEL"]` 중 지어진 것(정해진 순서) |
-| `board[].landmark` | 랜드마크 완성 여부 |
+| `board[].landmark` | 관광명소 완성 여부 |
 | `board[].invested` | 매입가 + 정가 기준 건설비 합계. 매각 환급은 이 값의 50% |
 | `board[].toll` | 지금 이 칸에 걸리면 낼 통행료 |
-| `board[].acquisitionPrice` | 인수 가격(`invested × 2`). 인수 불가(랜드마크/휴양지/주인 없음)면 `null` |
+| `board[].acquisitionPrice` | 인수 가격(`invested × 2`). 인수 불가(관광명소/휴양지/주인 없음)면 `null` |
 | `pending` | 현재 플레이어가 내려야 하는 결정(6장). 결정이 없으면 `null` |
 | `rankings` | 종료 시에만 채워진다: `[{ playerId, name, rank, cash, totalAssets, loanDebt, eliminated }]`. 정렬은 생존자 → 총자산 → **현금** → 좌석 순서(같은 상태면 항상 같은 순위) |
 
@@ -414,9 +414,9 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `options` | **지금 고를 수 있는 건물**만. 뜻이 바뀌지 않았으므로 이 목록만 쓰는 예전 클라이언트도 그대로 동작한다. 항목마다 `locked: false`와 `unlockLap`이 함께 온다(추가 필드) |
 | `lockedOptions` | **바퀴가 모자라 아직 못 짓는 건물**(`locked: true`). 화면에 비활성 행으로 보여 주기 위한 정보이며, 여기 있는 건물을 커맨드에 담으면 `400 ERR001`이다 |
 | `locked` | 그 항목을 지금 고를 수 있는지(`options`는 항상 `false`, `lockedOptions`는 항상 `true`) |
-| `unlockLap` | 그 건물이 열리는 바퀴(별장 1 · 빌딩 2 · 호텔 3). 랜드마크는 바퀴로 막지 않으므로 `1` |
+| `unlockLap` | 그 건물이 열리는 바퀴(별장 1 · 빌딩 2 · 호텔 3). 관광명소는 바퀴로 막지 않으므로 `1` |
 
-- 두 목록에는 **이미 지은 건물이 들어가지 않는다.** 랜드마크 업그레이드 기회(`options`가 `[{ type: "LANDMARK", … }]`)에서는 `lockedOptions`가 항상 빈 배열이다.
+- 두 목록에는 **이미 지은 건물이 들어가지 않는다.** 관광명소 업그레이드 기회(`options`가 `[{ type: "LANDMARK", … }]`)에서는 `lockedOptions`가 항상 빈 배열이다.
 - 그 바퀴에 **고를 수 있는 것이 하나도 없으면 건설 기회 자체가 열리지 않는다**(페이즈가 `AWAIT_BUILD`로 가지 않고 턴이 끝난다). `START_BUILD`의 `candidates`에도 그런 도시는 올라오지 않으며, 후보가 하나도 없으면 보너스를 자동으로 건너뛴다.
 - 예: 1바퀴 플레이어가 방콕(70,000원)을 막 매입한 직후
   ```json
@@ -474,7 +474,7 @@ GET /api/rooms/DK7P/events?presence=seat-1:<token1>,seat-3:<token3>
 | `PURCHASE_DECLINED` | `playerId`, `index` | 매입 포기 |
 | `BUILD_OFFERED` | `playerId`, `index`, `name`, `options`, `lockedOptions` | 건설 기회 열림. 두 목록은 같은 순간의 `pending`과 같다(6장) |
 | `BUILT` | `playerId`, `index`, `name`, `buildings`, `cost` | 건설 완료(지은 목록) |
-| `LANDMARK_BUILT` | `playerId`, `index`, `name`, `cost` | 랜드마크 완성(`BUILT`와 함께 발생) |
+| `LANDMARK_BUILT` | `playerId`, `index`, `name`, `cost` | 관광명소 완성(`BUILT`와 함께 발생) |
 | `BUILD_DECLINED` | `playerId`, `index` | 건설 포기(`index`는 출발 보너스 포기 시 `null`) |
 | `START_BONUS_OFFERED` | `playerId`, `candidates` | 출발 칸 보너스. 후보마다 `options`·`lockedOptions`가 있고, 그 바퀴에 지을 것이 없는 도시는 후보에 없다 |
 | `ACQUIRE_OFFERED` | `playerId`, `index`, `name`, `ownerId`, `price` | 인수 제안 |

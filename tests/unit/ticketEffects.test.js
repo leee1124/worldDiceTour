@@ -236,8 +236,8 @@ describe('TicketEffects(행운 티켓 효과 규칙)', () => {
       assert.equal(tax.amount, 50_000, '현금의 5%(내림)');
     });
 
-    it('건물 수만큼 내는 티켓은 랜드마크까지 센다', () => {
-      // Given (별장·빌딩·호텔·랜드마크 = 4)
+    it('건물 수만큼 내는 티켓은 관광명소까지 센다', () => {
+      // Given (별장·빌딩·호텔·관광명소 = 4)
       const { byId, board, players } = scene({
         cities: [
           { index: 1, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: true },

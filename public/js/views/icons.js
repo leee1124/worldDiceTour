@@ -2,7 +2,7 @@
  * 이모지를 대신하는 인라인 SVG 글리프 모음.
  *
  * 이 게임은 "세계 여행" 톤이다 — 국기(출발) · 섬(조난) · 주사위(카지노) · 비행기(공항) ·
- * 집·빌딩·호텔(건물) · 별(랜드마크)을 이미지 에셋 없이 획 굵기를 통일한 선 그림으로 그린다.
+ * 집·빌딩·호텔(건물) · 별(관광명소)을 이미지 에셋 없이 획 굵기를 통일한 선 그림으로 그린다.
  * 모두 `width/height: 1em`이라 부모의 `font-size`만 바꾸면 칸·버튼 크기에 맞춰 함께 커진다.
  *
  * 이모지 폰트에 기대지 않으므로 OS·브라우저가 달라도 항상 같은 모양으로 보인다.
@@ -124,7 +124,7 @@ export function hotelIcon() {
   ]);
 }
 
-/** 5각 별(채워짐) — 랜드마크. */
+/** 5각 별(채워짐) — 관광명소. */
 export function starIcon() {
   return icon(
     [fillPath('M8.0 1.7 L9.59 5.82 L13.99 6.05 L10.57 8.83 L11.7 13.1 L8.0 10.7 L4.3 13.1 L5.43 8.83 L2.01 6.05 L6.41 5.82 Z')],
@@ -289,10 +289,10 @@ export function buildingTypeIcon(type) {
   return build();
 }
 
-/** 랜드마크 배지(별 + "랜드마크" 글자). 보드·칸 시트·모달·시트가 모두 같은 조각을 쓴다. */
+/** 관광명소 배지(별 + "관광명소" 글자). 보드·칸 시트·모달·시트가 모두 같은 조각을 쓴다. */
 export function landmarkBadge() {
   return el('span', { class: 'build-landmark' }, [
     el('span', { class: 'build-landmark-star' }, [starIcon()]),
-    el('span', { class: 'build-landmark-text', text: '랜드마크' }),
+    el('span', { class: 'build-landmark-text', text: '관광명소' }),
   ]);
 }

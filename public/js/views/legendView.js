@@ -38,7 +38,7 @@ export function createLegendView() {
           el('span', { class: 'build-landmark', 'aria-hidden': 'true' }, [
             el('span', { class: 'build-landmark-star' }, [starIcon()]),
           ]),
-          el('span', { class: 'legend-text', text: '랜드마크(통행료 최대)' }),
+          el('span', { class: 'legend-text', text: '관광명소(통행료 최대)' }),
         ]),
       ]),
       ownersNode,

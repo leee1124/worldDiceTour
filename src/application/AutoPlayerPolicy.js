@@ -10,7 +10,7 @@ const BUY_CASH_RATIO = 2;
 const ACQUIRE_CASH_RATIO = 3;
 /** 건설 후 남겨둘 최소 현금. */
 const BUILD_CASH_RESERVE = 300_000;
-/** 랜드마크 기준: 현금이 건설비의 2배 이상. */
+/** 관광명소 기준: 현금이 건설비의 2배 이상. */
 const LANDMARK_CASH_RATIO = 2;
 /** 구조비를 낼지 판단하는 현금 기준. */
 const ISLAND_PAY_CASH = 1_000_000;
@@ -85,7 +85,7 @@ export class AutoPlayerPolicy {
 
   /**
    * 건설 조합 선택.
-   * 랜드마크는 현금이 건설비의 2배 이상일 때만, 일반 건물은 건설 후 최소 현금이 남는 범위에서
+   * 관광명소는 현금이 건설비의 2배 이상일 때만, 일반 건물은 건설 후 최소 현금이 남는 범위에서
    * 비싼 것부터 담는다. 바퀴가 모자라 잠긴 선택지는 절대 고르지 않는다(서버가 거부한다).
    */
   #chooseBuildings(cash, allOptions = []) {

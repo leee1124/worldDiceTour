@@ -72,8 +72,8 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
     assert.equal(decideFor(game).type, COMMAND_TYPES.SKIP_BUILD);
   });
 
-  it('랜드마크는 현금이 건설비의 2배 이상일 때만 짓는다', () => {
-    // Given (방콕 랜드마크 70,000원)
+  it('관광명소는 현금이 건설비의 2배 이상일 때만 짓는다', () => {
+    // Given (방콕 관광명소 70,000원)
     const rich = buildGame({
       cash: { s1: 200_000 },
       cities: [{ index: 3, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'] }],
@@ -336,8 +336,8 @@ describe('AutoPlayerPolicy(컴퓨터 의사결정)', () => {
       assert.equal(decideFor(game).type, COMMAND_TYPES.SKIP_BUILD);
     });
 
-    it('랜드마크: 현금이 건설비의 정확히 2배면 짓고, 1원 모자라면 짓지 않는다', () => {
-      // Given (방콕 랜드마크 70,000 → 기준 140,000)
+    it('관광명소: 현금이 건설비의 정확히 2배면 짓고, 1원 모자라면 짓지 않는다', () => {
+      // Given (방콕 관광명소 70,000 → 기준 140,000)
       const built = [{ index: 3, ownerId: 's1', buildings: ['VILLA', 'BUILDING', 'HOTEL'] }];
       const atThreshold = buildGame({
         cash: { s1: 140_000 },

@@ -1,6 +1,6 @@
 /**
  * 보드 가독성용 순수 뷰모델 테스트.
- * - 건물 배지 슬롯(별장·빌딩·호텔 3칸 + 랜드마크)
+ * - 건물 배지 슬롯(별장·빌딩·호텔 3칸 + 관광명소)
  * - 한 칸에 겹친 말(1~4개)의 부채꼴 배치
  * - "현재 위치" 문구 파생
  */
@@ -58,14 +58,14 @@ test('건물 배지: 지은 건물만 채워지고 한 글자 라벨(별·빌·�
   assert.equal(view.slots[0].label, '별장');
 });
 
-test('건물 배지: 랜드마크는 세 슬롯을 대신하는 전용 표시가 된다', () => {
-  // Given 랜드마크까지 올라간 도시
+test('건물 배지: 관광명소는 세 슬롯을 대신하는 전용 표시가 된다', () => {
+  // Given 관광명소까지 올라간 도시
   const space = { kind: 'CITY', buildings: ['VILLA', 'BUILDING', 'HOTEL'], landmark: true };
 
   // When 배지 뷰모델을 만들면
   const view = buildingSlotView(space);
 
-  // Then 슬롯 대신 랜드마크 표시를 쓰라고 알려 준다
+  // Then 슬롯 대신 관광명소 표시를 쓰라고 알려 준다
   assert.equal(view.landmark, true);
   assert.deepEqual(view.slots, []);
   assert.equal(view.builtCount, BUILDING_ORDER.length);

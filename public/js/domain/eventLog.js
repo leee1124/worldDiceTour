@@ -193,7 +193,7 @@ const FORMATTERS = {
     ),
 
   BUILT: (event, ctx) => {
-    // 서버가 보낸 순서와 무관하게 별장 · 빌딩 · 호텔(· 랜드마크) 순으로 읽히게 정리한다.
+    // 서버가 보낸 순서와 무관하게 별장 · 빌딩 · 호텔(· 관광명소) 순으로 읽히게 정리한다.
     const order = [...BUILDING_ORDER, 'LANDMARK'];
     const built = Array.isArray(event.buildings)
       ? [...event.buildings]
@@ -212,7 +212,7 @@ const FORMATTERS = {
   LANDMARK_BUILT: (event, ctx) =>
     line(
       LINE_KINDS.SPECIAL,
-      `${ctx.name(event.playerId)}의 ${event.name ?? ctx.space(event.index)}에 랜드마크가 세워졌습니다 (${formatWon(
+      `${ctx.name(event.playerId)}의 ${event.name ?? ctx.space(event.index)}에 관광명소가 세워졌습니다 (${formatWon(
         event.cost,
       )}).`,
     ),

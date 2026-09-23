@@ -20,7 +20,7 @@ describe('BuildingUnlocks(바퀴별 건물 해금 규칙)', () => {
     assert.equal(BuildingUnlocks.unlockLapOf(HOTEL), 3);
   });
 
-  it('랜드마크는 바퀴로 막지 않는다(3종 완성 여부로만 결정된다)', () => {
+  it('관광명소는 바퀴로 막지 않는다(3종 완성 여부로만 결정된다)', () => {
     // Given / When / Then
     assert.equal(BuildingUnlocks.unlockLapOf(LANDMARK), FIRST_LAP);
     assert.equal(BuildingUnlocks.isUnlockedAt(LANDMARK, 1), true);

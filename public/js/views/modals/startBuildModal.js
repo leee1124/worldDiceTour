@@ -100,7 +100,7 @@ export function startBuildModalSpec({ pending, boardOf, cash, keepBody, locked =
         el('p', { class: 'modal-help', text: LAP_RULE_TEXT }),
         el('p', {
           class: 'modal-help',
-          text: '랜드마크가 완성된 도시와, 이번 바퀴에 지을 것이 없는 도시는 후보에 나오지 않습니다.',
+          text: '관광명소가 완성된 도시와, 이번 바퀴에 지을 것이 없는 도시는 후보에 나오지 않습니다.',
         }),
         list,
         pickerSlot,

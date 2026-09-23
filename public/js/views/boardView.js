@@ -172,7 +172,7 @@ export function createBoardView({ onCellActivate }) {
       const ownerName = state.view.players.find((player) => player.seatId === space.ownerId)?.name ?? '다른 플레이어';
       parts.push(`소유 ${ownerName}`, `통행료 ${formatWon(space.toll)}`);
       if (space.landmark) {
-        parts.push('랜드마크');
+        parts.push('관광명소');
       } else {
         const view = buildingSlotView(space);
         const built = view.slots.filter((item) => item.built);

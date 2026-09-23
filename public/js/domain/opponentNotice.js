@@ -83,7 +83,7 @@ export function opponentNoticeOf(event, ctx) {
       return notice('build', `${who}: ${place(event.index)}에 ${builtLabel(event.buildings)} 건설`);
 
     case 'LANDMARK_BUILT':
-      return notice('landmark', `${who}: ${place(event.index)}에 랜드마크 완성`, { priority: PRIORITY.HIGH });
+      return notice('landmark', `${who}: ${place(event.index)}에 관광명소 완성`, { priority: PRIORITY.HIGH });
 
     case 'ACQUIRED': {
       const mine = Boolean(event.fromId) && ctx.isLocalSeat(event.fromId);

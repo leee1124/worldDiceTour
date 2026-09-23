@@ -55,8 +55,8 @@ test('상대 알림: 주사위를 모르면 도착 칸만 알려 준다', () => 
   assert.equal(notice.text, '컴퓨터1 → 파리');
 });
 
-test('상대 알림: 매입·건설·랜드마크는 로그와 같은 문구로 알린다', () => {
-  // Given 컴퓨터들의 매입 · 건설 · 랜드마크
+test('상대 알림: 매입·건설·관광명소는 로그와 같은 문구로 알린다', () => {
+  // Given 컴퓨터들의 매입 · 건설 · 관광명소
   const bought = opponentNoticeOf({ type: 'CITY_PURCHASED', playerId: 's2', index: 5, price: 260_000 }, ctx);
   const built = opponentNoticeOf({ type: 'BUILT', playerId: 's3', index: 9, buildings: ['BUILDING'], cost: 78_000 }, ctx);
   const landmark = opponentNoticeOf({ type: 'LANDMARK_BUILT', playerId: 's3', index: 9, cost: 300_000 }, ctx);
@@ -69,7 +69,7 @@ test('상대 알림: 매입·건설·랜드마크는 로그와 같은 문구로 
   assert.ok(built.text.includes('파리'), built.text);
   assert.ok(built.text.includes('빌딩'), built.text);
   assert.equal(landmark.kind, 'landmark');
-  assert.ok(landmark.text.includes('랜드마크'), landmark.text);
+  assert.ok(landmark.text.includes('관광명소'), landmark.text);
 });
 
 test('상대 알림: 내 도시를 인수당하면 경고로 더 오래 띄운다', () => {

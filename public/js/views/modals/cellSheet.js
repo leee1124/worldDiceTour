@@ -93,7 +93,7 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
         space.acquisitionPrice !== null && space.acquisitionPrice !== undefined
           ? moneyRow('인수 가격', space.acquisitionPrice, { note: '투자액 × 2 · 현금만' })
           : ownable && space.ownerId
-            ? infoRow('인수', space.landmark ? '랜드마크는 인수 불가' : '휴양지는 인수 불가')
+            ? infoRow('인수', space.landmark ? '관광명소는 인수 불가' : '휴양지는 인수 불가')
             : null,
         remaining.length > 0
           ? el('div', { class: 'sheet-remaining' }, [
@@ -108,7 +108,7 @@ export function cellSheetSpec({ space, ownerName, buildingCosts, onClose }) {
             ])
           : null,
         isCity && space.buildings?.length === 3 && !space.landmark
-          ? el('p', { class: 'modal-help', text: '3종을 모두 갖췄습니다. 다음 건설 기회에 랜드마크로 업그레이드할 수 있습니다.' })
+          ? el('p', { class: 'modal-help', text: '3종을 모두 갖췄습니다. 다음 건설 기회에 관광명소로 업그레이드할 수 있습니다.' })
           : null,
         corner || KIND_NOTES[space.kind]
           ? el('p', { class: 'modal-help', text: KIND_NOTES[space.kind] ?? '' })
